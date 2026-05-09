@@ -94,9 +94,9 @@ function createPoller(fn, intervalMs) {
       if (err.name === 'AbortError') return;
       isRetrying = true;
       retryId = setTimeout(async () => {
+        try { await fn(); } catch (_) { /* retry done, resume polling regardless */ }
         isRetrying = false;
         retryId = null;
-        try { await fn(); } catch (_) { /* retry done, resume polling regardless */ }
       }, 30_000);
     }
   }
@@ -147,20 +147,21 @@ function openModal(overlayEl, onConfirm) {
     if (action === 'cancel') { closeModal(overlayEl); cleanup(); }
     if (action === 'confirm') { closeModal(overlayEl); cleanup(); onConfirm(); }
   }
-  function cleanup() {
-    overlayEl.removeEventListener('keydown', handleKey);
-    overlayEl.removeEventListener('click', handleClick);
-  }
-  overlayEl.addEventListener('keydown', handleKey);
-  overlayEl.addEventListener('click', handleClick);
-  // Focus trap
-  overlayEl.addEventListener('keydown', function trap(e) {
+  const trap = function(e) {
     if (e.key !== 'Tab') return;
     const focusable = [...overlayEl.querySelectorAll('button, [tabindex="0"]')];
     const first = focusable[0], last = focusable[focusable.length - 1];
     if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
     else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
-  });
+  };
+  function cleanup() {
+    overlayEl.removeEventListener('keydown', handleKey);
+    overlayEl.removeEventListener('click', handleClick);
+    overlayEl.removeEventListener('keydown', trap);
+  }
+  overlayEl.addEventListener('keydown', handleKey);
+  overlayEl.addEventListener('click', handleClick);
+  overlayEl.addEventListener('keydown', trap);
 }
 
 function closeModal(overlayEl) {
