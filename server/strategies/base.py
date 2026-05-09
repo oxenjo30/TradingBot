@@ -1,0 +1,53 @@
+from dataclasses import dataclass, field
+from typing import Literal, ClassVar
+
+
+@dataclass
+class Signal:
+    symbol: str
+    side: Literal["buy", "sell"]
+    reason: str
+    qty: float | None = None       # shares — set one or the other
+    notional: float | None = None  # USD amount
+
+    def __post_init__(self):
+        if self.qty is None and self.notional is None:
+            raise ValueError(f"Signal for {self.symbol}: qty or notional required")
+
+
+class Strategy:
+    name: ClassVar[str] = "base"
+    label: ClassVar[str] = "Base"
+    description: ClassVar[str] = ""
+    default_params: ClassVar[dict] = {}
+    params_schema: ClassVar[list] = []
+    auto_trade: ClassVar[bool] = True
+
+    def __init__(self, params: dict):
+        merged = dict(self.default_params)
+        merged.update(params or {})
+        self.params = merged
+
+    def _signal(self, symbol: str, side: Literal["buy", "sell"], reason: str) -> Signal:
+        """Build a Signal using this strategy's qty/notional params."""
+        notional = self.params.get("notional")
+        qty      = self.params.get("qty")
+        if notional and float(notional) > 0:
+            return Signal(symbol=symbol, side=side, reason=reason,
+                          notional=float(notional))
+        return Signal(symbol=symbol, side=side, reason=reason,
+                      qty=float(qty) if qty else 1.0)
+
+    def evaluate(self, positions: dict[str, float]) -> list[Signal]:
+        return []
+
+    @classmethod
+    def describe(cls) -> dict:
+        return {
+            "name": cls.name,
+            "label": cls.label,
+            "description": cls.description,
+            "default_params": cls.default_params,
+            "params_schema": cls.params_schema,
+            "auto_trade": cls.auto_trade,
+        }

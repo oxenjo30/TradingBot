@@ -1,0 +1,402 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Trading Bot</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          bg:    "#0b0f17",
+          panel: "#121826",
+          panel2:"#1a2233",
+          line:  "#243049",
+          mute:  "#7f8aa3",
+          ok:    "#16c784",
+          bad:   "#ea3943",
+          warn:  "#f0b90b",
+          accent:"#5b8def",
+        },
+        fontFamily: { mono: ["ui-monospace","SFMono-Regular","Menlo","monospace"] }
+      }
+    }
+  }
+</script>
+<style>
+  body { background: #0b0f17; color: #e6ebf5; }
+  .card { background: #121826; border: 1px solid #243049; border-radius: 12px; }
+  .chip { background: #1a2233; border: 1px solid #243049; border-radius: 999px; padding: 2px 10px; font-size: 11px; }
+  .pos { color: #16c784; }
+  .neg { color: #ea3943; }
+  .mute{ color: #7f8aa3; }
+  table.tg { width:100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  table.tg th { text-align:left; font-weight:500; color:#7f8aa3; font-size:11px; padding:8px 10px; border-bottom:1px solid #243049; text-transform: uppercase; letter-spacing:.04em; }
+  table.tg td { padding:8px 10px; border-bottom:1px solid #1a2233; font-size:13px; }
+  table.tg tbody tr:hover { background:#1a2233; }
+  .btn { background:#1a2233; border:1px solid #243049; color:#e6ebf5; padding:6px 12px; border-radius:8px; font-size:13px; cursor:pointer; }
+  .btn:hover { background:#243049; }
+  .btn.primary { background:#5b8def; border-color:#5b8def; color:white; }
+  .btn.primary:hover { background:#4878dd; }
+  .btn.danger  { background:#ea3943; border-color:#ea3943; color:white; }
+  .btn.danger:hover { background:#cc2f37; }
+  .btn.success { background:#16c784; border-color:#16c784; color:#062a1c; }
+  .btn.success:hover { background:#13b073; }
+  .input { background:#0b0f17; border:1px solid #243049; color:#e6ebf5; padding:6px 10px; border-radius:8px; font-size:13px; width:100%; }
+  .input:focus { outline:none; border-color:#5b8def; }
+  .switch { width: 42px; height: 24px; background:#243049; border-radius: 999px; position:relative; cursor:pointer; transition: background .15s; overflow:hidden; flex-shrink:0; }
+  .switch::after { content:""; width:18px; height:18px; background:white; border-radius:50%; position:absolute; top:3px; left:3px; transition: left .15s; }
+  .switch.on { background:#16c784; }
+  .switch.on::after { left:21px; }
+  .tab { padding:8px 14px; cursor:pointer; color:#7f8aa3; border-bottom:2px solid transparent; font-size:13px; }
+  .tab.active { color:#e6ebf5; border-bottom-color:#5b8def; }
+  .tag { display:inline-block; padding:2px 8px; border-radius:6px; font-size:11px; }
+  .tag.buy  { background:#0d3a28; color:#16c784; }
+  .tag.sell { background:#3a1418; color:#ea3943; }
+  .tag.filled { background:#0d3a28; color:#16c784; }
+  .tag.new, .tag.accepted, .tag.pending_new { background:#1a2233; color:#5b8def; }
+  .tag.canceled, .tag.expired, .tag.rejected { background:#2a2e3a; color:#7f8aa3; }
+  .tag.error { background:#3a1418; color:#ea3943; }
+  details > summary { cursor:pointer; list-style:none; }
+  details > summary::-webkit-details-marker { display:none; }
+</style>
+</head>
+<body>
+<div class="max-w-[1400px] mx-auto px-6 py-5">
+
+  <header class="flex items-center justify-between mb-5">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-lg bg-accent flex items-center justify-center font-bold text-white">T</div>
+      <div>
+        <div class="text-lg font-semibold">TradeBot</div>
+        <div class="text-xs mute" id="env-line">…</div>
+      </div>
+    </div>
+    <div class="flex items-center gap-3 text-sm">
+      <span id="market-state" class="chip">market: …</span>
+      <span id="updated" class="mute text-xs"></span>
+      <button class="btn" onclick="showNotificationSettings()" title="Notification settings">🔔</button>
+      <button class="btn" onclick="doLogout()" title="Logout">⎋ Logout</button>
+    </div>
+  </header>
+
+  <!-- Notifications Settings Modal -->
+  <div id="notif-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100;overflow-y:auto">
+    <div style="max-width:520px;margin:3rem auto;padding:1rem">
+      <div class="card p-5">
+        <div class="flex items-center justify-between mb-4">
+          <div class="font-semibold">🔔 Notification Settings</div>
+          <button class="btn" onclick="closeNotifModal()">✕</button>
+        </div>
+        <div class="space-y-4">
+          <!-- Email -->
+          <div style="border:1px solid #243049;border-radius:10px;padding:1rem">
+            <div class="flex items-center justify-between mb-3">
+              <div class="text-sm font-semibold">📧 Email Alerts</div>
+              <div class="switch" id="sw-email" onclick="toggleNotifSwitch('email_enabled','sw-email')"></div>
+            </div>
+            <div class="grid grid-cols-2 gap-2 text-xs">
+              <div class="col-span-2"><label class="mute">Send alerts to</label><input class="input mt-1" id="n-email-to" placeholder="you@gmail.com" /></div>
+              <div><label class="mute">SMTP server</label><input class="input mt-1" id="n-smtp" placeholder="smtp.gmail.com" /></div>
+              <div><label class="mute">Port</label><input class="input mt-1" id="n-port" type="number" placeholder="587" /></div>
+              <div class="col-span-2"><label class="mute">Gmail login</label><input class="input mt-1" id="n-user" placeholder="you@gmail.com" /></div>
+              <div class="col-span-2">
+                <label class="mute">App Password <span style="color:#f0b90b">⚠ NOT your Gmail password</span></label>
+                <input class="input mt-1" id="n-pass" type="password" placeholder="xxxx xxxx xxxx xxxx" />
+                <div style="margin-top:6px;padding:8px 10px;background:#1a1a0a;border:1px solid #3a3010;border-radius:6px;font-size:11px;color:#c8a84b;line-height:1.6">
+                  Gmail requires an <b>App Password</b> — your regular password won't work.<br>
+                  1. Go to <b>myaccount.google.com → Security</b><br>
+                  2. Enable <b>2-Step Verification</b> (required)<br>
+                  3. Search for <b>"App Passwords"</b> → select Mail → Generate<br>
+                  4. Copy the 16-character code and paste it above
+                </div>
+              </div>
+            </div>
+            <button class="btn mt-2 text-xs" onclick="testNotif('email')">Send test email</button>
+          </div>
+          <!-- Telegram -->
+          <div style="border:1px solid #243049;border-radius:10px;padding:1rem">
+            <div class="flex items-center justify-between mb-3">
+              <div class="text-sm font-semibold">✈️ Telegram Alerts</div>
+              <div class="switch" id="sw-telegram" onclick="toggleNotifSwitch('telegram_enabled','sw-telegram')"></div>
+            </div>
+            <div class="space-y-2 text-xs">
+              <div><label class="mute">Bot Token <a href="https://t.me/BotFather" target="_blank" style="color:#5b8def">Get from @BotFather →</a></label><input class="input mt-1" id="n-tg-token" placeholder="1234567890:ABC..." /></div>
+              <div><label class="mute">Chat ID <a href="https://t.me/userinfobot" target="_blank" style="color:#5b8def">Get from @userinfobot →</a></label><input class="input mt-1" id="n-tg-chat" placeholder="123456789" /></div>
+            </div>
+            <button class="btn mt-2 text-xs" onclick="testNotif('telegram')">Send test message</button>
+          </div>
+          <!-- What to notify -->
+          <div style="border:1px solid #243049;border-radius:10px;padding:1rem">
+            <div class="text-sm font-semibold mb-3">When to notify</div>
+            <div class="space-y-2 text-sm">
+              <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" id="n-on-trade" /><span>Every trade execution</span></label>
+              <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" id="n-on-block" /><span>When a trade is blocked by risk controls</span></label>
+              <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" id="n-daily" /><span>Daily P&L summary</span></label>
+            </div>
+          </div>
+        </div>
+        <div class="flex gap-2 mt-4">
+          <button class="btn" style="flex:1" onclick="closeNotifModal()">Cancel</button>
+          <button class="btn primary" style="flex:1" onclick="saveNotifSettings()">Save Settings</button>
+        </div>
+        <div class="mt-2 text-xs mute" id="notif-status"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- account cards -->
+  <section class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-5" id="acct-cards"></section>
+
+  <!-- equity chart -->
+  <section class="card p-4 mb-5">
+    <div class="flex items-center justify-between mb-2">
+      <div class="text-sm font-semibold">Equity Curve</div>
+      <div class="flex gap-1" id="period-tabs">
+        <button class="tab active" data-p="1D">1D</button>
+        <button class="tab" data-p="1W">1W</button>
+        <button class="tab" data-p="1M">1M</button>
+        <button class="tab" data-p="3M">3M</button>
+        <button class="tab" data-p="1A">1Y</button>
+      </div>
+    </div>
+    <svg id="equity-chart" viewBox="0 0 800 180" preserveAspectRatio="none" class="w-full" style="height:180px"></svg>
+  </section>
+
+  <!-- ── Performance Analytics ──────────────────────────────────── -->
+  <section class="card p-4 mb-5">
+    <div class="flex items-center justify-between mb-3">
+      <div class="text-sm font-semibold">📊 Performance Analytics</div>
+      <button class="btn text-xs" onclick="refreshPerformance()">↻ Refresh</button>
+    </div>
+
+    <!-- Quick-stat strip -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+      <div style="background:#1a2233;border-radius:8px;padding:10px;text-align:center">
+        <div class="text-xs mute mb-1">Total Signals</div>
+        <div class="text-xl font-semibold" id="pf-total">—</div>
+      </div>
+      <div style="background:#1a2233;border-radius:8px;padding:10px;text-align:center">
+        <div class="text-xs mute mb-1">Strategies Used</div>
+        <div class="text-xl font-semibold" id="pf-strats">—</div>
+      </div>
+      <div style="background:#1a2233;border-radius:8px;padding:10px;text-align:center">
+        <div class="text-xs mute mb-1">Symbols Traded</div>
+        <div class="text-xl font-semibold" id="pf-syms">—</div>
+      </div>
+      <div style="background:#1a2233;border-radius:8px;padding:10px;text-align:center">
+        <div class="text-xs mute mb-1">Open Unrealized P&L</div>
+        <div class="text-xl font-semibold" id="pf-upl">—</div>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+
+      <!-- Left: per-strategy cards -->
+      <div>
+        <div class="text-xs mute uppercase tracking-wider mb-2">By Strategy</div>
+        <div id="pf-strategy-cards" class="space-y-2">
+          <div class="mute text-xs text-center py-4">Loading…</div>
+        </div>
+      </div>
+
+      <!-- Right: top symbols + 30-day activity -->
+      <div>
+        <div class="text-xs mute uppercase tracking-wider mb-2">Top Symbols</div>
+        <table class="tg mb-4">
+          <thead><tr><th>Symbol</th><th>Trades</th><th style="color:#16c784">Buys</th><th style="color:#ea3943">Sells</th><th>Strategies</th></tr></thead>
+          <tbody id="pf-symbols-body">
+            <tr><td colspan="5" class="mute text-center py-4">No data yet</td></tr>
+          </tbody>
+        </table>
+
+        <div class="text-xs mute uppercase tracking-wider mb-2">30-Day Activity</div>
+        <svg id="pf-activity-chart" viewBox="0 0 400 80" preserveAspectRatio="none"
+             class="w-full" style="height:80px;background:#0b0f17;border-radius:6px"></svg>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- market scanner -->
+  <section class="card p-4 mb-5">
+    <div class="flex items-center justify-between mb-3">
+      <div class="text-sm font-semibold">Market Scanner</div>
+      <span class="text-xs mute" id="scanner-updated">—</span>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div>
+        <div class="text-xs mute mb-2 uppercase tracking-wider">Most Active</div>
+        <div id="scanner-actives" class="space-y-1"></div>
+      </div>
+      <div>
+        <div class="text-xs mute mb-2 uppercase tracking-wider">Top Gainers</div>
+        <div id="scanner-gainers" class="space-y-1"></div>
+      </div>
+      <div>
+        <div class="text-xs mute mb-2 uppercase tracking-wider">Top Losers</div>
+        <div id="scanner-losers" class="space-y-1"></div>
+      </div>
+    </div>
+  </section>
+
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+
+    <!-- left col: positions + orders/signals -->
+    <div class="lg:col-span-2 space-y-5">
+
+      <section class="card">
+        <div class="flex items-center justify-between p-4 pb-2">
+          <div class="text-sm font-semibold">Positions</div>
+          <button class="btn danger" onclick="closeAllPositions()">Close all</button>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="tg" id="positions-table">
+            <thead><tr>
+              <th>Symbol</th><th>Side</th><th>Qty</th><th>Avg</th><th>Last</th>
+              <th>Mkt Value</th><th>Unrealized P&L</th><th>%</th><th></th>
+            </tr></thead>
+            <tbody><tr><td colspan="9" class="mute text-center py-6">No positions</td></tr></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="flex items-center justify-between p-4 pb-2">
+          <div class="flex gap-2">
+            <button class="tab active" data-tab="orders">Orders</button>
+            <button class="tab" data-tab="signals">Bot Signals</button>
+          </div>
+          <div class="flex gap-2">
+            <button class="btn" onclick="cancelAllOrders()">Cancel all open</button>
+          </div>
+        </div>
+        <div class="overflow-x-auto" id="tab-orders">
+          <table class="tg">
+            <thead><tr>
+              <th>Time</th><th>Symbol</th><th>Side</th><th>Qty</th><th>Filled</th>
+              <th>Avg Px</th><th>Type</th><th>Status</th><th></th>
+            </tr></thead>
+            <tbody id="orders-body"><tr><td colspan="9" class="mute text-center py-6">No orders</td></tr></tbody>
+          </table>
+        </div>
+        <div class="overflow-x-auto hidden" id="tab-signals">
+          <table class="tg">
+            <thead><tr>
+              <th>Time</th><th>Strategy</th><th>Symbol</th><th>Side</th><th>Qty</th>
+              <th>Reason</th><th>Status</th>
+            </tr></thead>
+            <tbody id="signals-body"><tr><td colspan="7" class="mute text-center py-6">No signals yet</td></tr></tbody>
+          </table>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- right col: risk + manual order + strategies -->
+    <div class="space-y-5">
+
+      <!-- risk controls -->
+      <section class="card p-4">
+        <div class="flex items-center justify-between mb-3">
+          <div class="text-sm font-semibold">Risk Controls</div>
+          <div id="risk-kill-badge"></div>
+        </div>
+        <div class="space-y-2 text-xs" id="risk-warnings"></div>
+        <div class="grid grid-cols-2 gap-2 mt-3">
+          <div>
+            <label class="text-xs mute">Max Daily Loss %</label>
+            <input class="input mt-1" id="r-max-loss" type="number" step="0.1" min="0.1" max="20" />
+          </div>
+          <div>
+            <label class="text-xs mute">Max Day Trades (PDT)</label>
+            <input class="input mt-1" id="r-max-dt" type="number" step="1" min="1" max="10" />
+          </div>
+          <div>
+            <label class="text-xs mute">Position Size Mode</label>
+            <select class="input mt-1" id="r-size-mode">
+              <option value="fixed">Fixed (qty)</option>
+              <option value="pct_portfolio">% of Portfolio</option>
+            </select>
+          </div>
+          <div>
+            <label class="text-xs mute">Position Size %</label>
+            <input class="input mt-1" id="r-size-pct" type="number" step="0.1" min="0.1" max="50" />
+          </div>
+          <div>
+            <label class="text-xs mute">Max Position %</label>
+            <input class="input mt-1" id="r-max-pos" type="number" step="0.5" min="1" max="100" />
+          </div>
+          <div class="flex items-end">
+            <button class="btn w-full" onclick="saveRiskSettings()">Save</button>
+          </div>
+        </div>
+        <div class="mt-3 flex gap-2">
+          <button class="btn danger flex-1" id="kill-btn" onclick="toggleKillSwitch()">
+            🛑 Kill Switch
+          </button>
+          <div class="text-xs mute flex items-center" id="risk-pdt-status"></div>
+        </div>
+      </section>
+
+      <!-- manual order -->
+      <section class="card p-4">
+        <div class="text-sm font-semibold mb-3">Manual Order</div>
+        <div class="grid grid-cols-2 gap-2">
+          <div class="col-span-2">
+            <label class="text-xs mute">Symbol</label>
+            <input class="input mt-1" id="m-symbol" placeholder="AAPL" oninput="this.value=this.value.toUpperCase()" />
+          </div>
+          <!-- amount mode toggle -->
+          <div class="col-span-2 flex gap-2 text-xs">
+            <button class="tab active" data-mode="qty" id="mode-qty" onclick="setOrderMode('qty')">Shares</button>
+            <button class="tab" data-mode="usd" id="mode-usd" onclick="setOrderMode('usd')">USD Amount</button>
+          </div>
+          <div id="input-qty-wrap">
+            <label class="text-xs mute">Shares</label>
+            <input class="input mt-1" id="m-qty" type="number" min="0.0001" step="any" value="1" />
+          </div>
+          <div id="input-usd-wrap" class="hidden">
+            <label class="text-xs mute">USD Amount ($)</label>
+            <input class="input mt-1" id="m-usd" type="number" min="1" step="1" value="100" />
+          </div>
+          <div>
+            <label class="text-xs mute">Side</label>
+            <select class="input mt-1" id="m-side">
+              <option value="buy">Buy</option>
+              <option value="sell">Sell</option>
+            </select>
+          </div>
+          <div class="col-span-2 flex gap-2 mt-1">
+            <button class="btn success flex-1" onclick="manualOrder('buy')">Buy</button>
+            <button class="btn danger flex-1" onclick="manualOrder('sell')">Sell</button>
+          </div>
+          <div class="col-span-2 text-xs mute" id="m-quote">—</div>
+          <button class="btn col-span-2" onclick="lookupQuote()">Get quote</button>
+        </div>
+      </section>
+
+      <!-- strategies -->
+      <section class="card p-4">
+        <div class="flex items-center justify-between mb-3">
+          <div class="text-sm font-semibold">Strategies</div>
+          <button class="btn primary" onclick="runEngineNow()" title="Run all enabled strategies once">▶ Run now</button>
+        </div>
+        <div id="strategies-list" class="space-y-3"></div>
+        <div class="mt-3 text-xs mute" id="engine-status">engine idle</div>
+      </section>
+
+    </div>
+  </div>
+
+  <footer class="mt-6 text-xs mute text-center">
+    Paper trading via Alpaca. Strategies tick every 60s while market is open.
+  </footer>
+
+</div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
