@@ -411,9 +411,10 @@ def broker_account_status(account_id: int, request: Request):
         raise HTTPException(404, "account not found")
     try:
         from .alpaca_client import AccountClient
+        creds = db.get_broker_account_credentials(account_id)
         client = AccountClient(
-            api_key=crypto.decrypt(row["api_key"]),
-            api_secret=crypto.decrypt(row["api_secret"]),
+            api_key=crypto.decrypt(creds["api_key"]),
+            api_secret=crypto.decrypt(creds["api_secret"]),
             paper=(row["account_type"] == "paper"),
         )
         return client.get_account_summary()

@@ -338,6 +338,15 @@ def get_broker_account(account_id: int) -> dict | None:
         return dict(r) if r else None
 
 
+def get_broker_account_credentials(account_id: int) -> dict | None:
+    """Return encrypted api_key + api_secret for internal use (status check, engine). Never send to clients."""
+    with get_conn() as c:
+        r = c.execute(
+            "SELECT api_key, api_secret FROM broker_accounts WHERE id=?", (account_id,)
+        ).fetchone()
+        return dict(r) if r else None
+
+
 def update_broker_account(account_id: int, *, label: str | None = None, account_type: str | None = None) -> None:
     """Update label and/or account_type. Sets updated_at."""
     fields, vals = [], []
