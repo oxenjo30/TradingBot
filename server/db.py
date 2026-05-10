@@ -91,6 +91,8 @@ def _migrate_env_account() -> None:
     if not api_key or not api_secret:
         return
     account_type = os.environ.get("ALPACA_ACCOUNT_TYPE", "paper").strip()
+    if account_type not in ("paper", "live"):
+        account_type = "paper"
     try:
         key_enc = crypto.encrypt(api_key)
         secret_enc = crypto.encrypt(api_secret)
@@ -320,7 +322,7 @@ def create_broker_account(label: str, api_key_enc: str, api_secret_enc: str, acc
 
 
 def get_broker_accounts() -> list[dict]:
-    """Return all accounts with ciphertext credentials (masking done in main.py)."""
+    """Return all accounts. api_secret excluded; api_key returned as ciphertext for masking in main.py."""
     with get_conn() as c:
         return [dict(r) for r in c.execute(
             "SELECT id, label, api_key, account_type, created_at, updated_at FROM broker_accounts ORDER BY id"
@@ -370,7 +372,7 @@ def get_broker_account_assignments(account_id: int) -> list[str]:
     """Return strategy names assigned to this account."""
     with get_conn() as c:
         rows = c.execute(
-            "SELECT strategy_name FROM strategy_accounts WHERE account_id=?", (account_id,)
+            "SELECT strategy_name FROM strategy_accounts WHERE account_id=? ORDER BY strategy_name", (account_id,)
         ).fetchall()
         return [r["strategy_name"] for r in rows]
 
