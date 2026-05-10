@@ -584,3 +584,241 @@ async function initDashboard() {
   createPoller(fetchOrders,     30_000).start();
   createPoller(fetchClock,      10_000).start();
 }
+
+// ─────────────────────────────────────────
+// initBots — bots.html
+// ─────────────────────────────────────────
+async function initBots() {
+  const chipEl = document.getElementById('market-chip');
+  let clock = await initClockChip(chipEl);
+  const marketOpen = clock ? clock.is_open : null;
+
+  let account = null;
+  let killSwitchState = null; // null=unknown, true/false=known
+
+  function applyKillSwitchUI(on) {
+    killSwitchState = on;
+    document.getElementById('banner-kill').classList.toggle('hidden', !on);
+    document.getElementById('btn-ks-on').classList.toggle('hidden', on);
+    document.getElementById('btn-ks-off').classList.toggle('hidden', !on);
+    updateRunBtnState();
+  }
+
+  function updateRunBtnState() {
+    const btn = document.getElementById('btn-run-now');
+    if (killSwitchState === null) {
+      btn.disabled = true;
+      btn.title = 'Checking kill switch status…';
+    } else if (killSwitchState === true) {
+      btn.disabled = true;
+      btn.title = 'Kill switch is active.';
+    } else if (marketOpen === null) {
+      btn.disabled = true;
+      btn.title = 'Market status unavailable.';
+    } else if (!marketOpen) {
+      btn.disabled = true;
+      btn.title = 'Market is closed.';
+    } else {
+      btn.disabled = false;
+      btn.title = '';
+    }
+  }
+
+  async function fetchAccount() {
+    try {
+      account = await api('/api/account', { key: 'bots-account' });
+      if (account.account_type === 'paper') {
+        document.getElementById('banner-paper').classList.remove('hidden');
+        document.getElementById('paper-badge')?.classList.remove('hidden');
+      }
+    } catch {
+      document.getElementById('banner-paper').textContent = 'Trading mode unknown — Enable and Run Engine Now are disabled.';
+      document.getElementById('banner-paper').classList.remove('hidden');
+      document.getElementById('btn-run-now').disabled = true;
+    }
+  }
+
+  async function fetchRiskState() {
+    try {
+      const risk = await api('/api/risk', { key: 'bots-risk' });
+      applyKillSwitchUI(risk.kill_switch);
+      document.getElementById('risk-error').classList.add('hidden');
+    } catch {
+      document.getElementById('risk-error').classList.remove('hidden');
+      killSwitchState = null;
+      updateRunBtnState();
+    }
+  }
+
+  async function fetchStrategies() {
+    const [strats, engine] = await Promise.all([
+      api('/api/strategies', { key: 'bots-strats' }),
+      api('/api/engine',     { key: 'bots-engine' })
+    ]);
+
+    const ranMap = {};
+    (engine.ran || []).forEach(r => { ranMap[r.strategy] = r; });
+
+    const enabled = strats.filter(s => s.enabled).length;
+    document.getElementById('engine-status-txt').textContent =
+      `${enabled} of ${strats.length} strategies enabled · Last run: ${engine.ts ? fmt.time(engine.ts) : 'Never'}`;
+
+    const tbody = document.getElementById('strat-body');
+    tbody.innerHTML = '';
+
+    strats.forEach(s => {
+      const tr = document.createElement('tr');
+
+      const tdIcon = document.createElement('td');
+      tdIcon.innerHTML = '<div class="icon-circle icon-purple" style="width:26px;height:26px;"><svg width="11" height="11" fill="none" stroke="#8B5CF6" stroke-width="2" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="2" height="2"/><rect x="13" y="9" width="2" height="2"/><path d="M9 13a3 3 0 0 0 6 0"/></svg></div>';
+
+      const tdName = document.createElement('td');
+      const nameDiv = document.createElement('div');
+      nameDiv.className = 'truncate';
+      nameDiv.style.fontWeight = '500';
+      nameDiv.textContent = s.label;
+      tdName.appendChild(nameDiv);
+
+      const tdDesc = document.createElement('td');
+      tdDesc.className = 'text-muted truncate';
+      tdDesc.textContent = s.description;
+
+      const tdBadge = document.createElement('td');
+      const badge = document.createElement('span');
+      let bc, bt;
+      if (!s.enabled) { bc = 'b-disabled'; bt = 'Disabled'; }
+      else if (ranMap[s.name]?.error) { bc = 'b-error'; bt = 'Last Run Error'; }
+      else if (ranMap[s.name]) { bc = 'b-enabled'; }
+      else { bc = 'b-notrun'; bt = 'Not Run Yet'; }
+      badge.className = 'badge ' + bc;
+      if (bc === 'b-enabled') {
+        const dot = document.createElement('span'); dot.className = 'pdot'; badge.appendChild(dot);
+        const t = document.createElement('span'); t.textContent = 'Enabled'; badge.appendChild(t);
+      } else {
+        badge.textContent = bt;
+      }
+      tdBadge.appendChild(badge);
+
+      const tdAction = document.createElement('td');
+      tdAction.style.textAlign = 'right';
+      const btn = document.createElement('button');
+      btn.className = 'btn btn-sm ' + (s.enabled ? 'btn-ghost' : 'btn-primary');
+      btn.textContent = s.enabled ? 'Disable' : 'Enable';
+      btn.addEventListener('click', () => confirmToggle(s, !s.enabled, btn));
+      tdAction.appendChild(btn);
+
+      tr.append(tdIcon, tdName, tdDesc, tdBadge, tdAction);
+      tbody.appendChild(tr);
+    });
+  }
+
+  function confirmToggle(strategy, enable, triggerBtn) {
+    const overlay = document.getElementById('modal-toggle');
+    document.getElementById('modal-toggle-title').textContent =
+      (enable ? 'Enable' : 'Disable') + ' Strategy';
+    const body = document.getElementById('modal-toggle-body');
+    body.innerHTML = '';
+    const txt = document.createTextNode(
+      'Are you sure you want to ' + (enable ? 'enable' : 'disable') + ' '
+    );
+    const strong = document.createElement('strong');
+    strong.textContent = strategy.label;
+    body.appendChild(txt);
+    body.appendChild(strong);
+    body.appendChild(document.createTextNode('?'));
+
+    openModal(overlay, async () => {
+      triggerBtn.disabled = true;
+      triggerBtn.textContent = '…';
+      try {
+        await api(`/api/strategies/${strategy.name}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ enabled: enable }),
+          key: 'bots-toggle-' + strategy.name
+        });
+        await fetchStrategies();
+      } catch {
+        triggerBtn.disabled = false;
+        triggerBtn.textContent = enable ? 'Enable' : 'Disable';
+        triggerBtn.closest('td').textContent = 'Action failed — check logs.';
+      }
+    });
+  }
+
+  document.getElementById('btn-run-now').addEventListener('click', () => {
+    const modeText = account?.account_type === 'paper' ? 'Paper Trading' : 'Live Trading';
+    const modeEl = document.getElementById('modal-run-mode');
+    modeEl.innerHTML = '';
+    modeEl.appendChild(document.createTextNode('Account mode: '));
+    const strong = document.createElement('strong');
+    strong.textContent = modeText;
+    modeEl.appendChild(strong);
+    openModal(document.getElementById('modal-run'), runEngine);
+  });
+
+  async function runEngine() {
+    const btn = document.getElementById('btn-run-now');
+    const resultEl = document.getElementById('run-result');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="pdot"></span> Running…';
+    resultEl.classList.add('hidden');
+
+    try {
+      const result = await api('/api/engine/run_now', { method: 'POST', key: 'bots-run' });
+      const errors = (result.ran || []).filter(r => r.error);
+      resultEl.className = 'result-panel' + (errors.length || result.error ? ' error' : '');
+      resultEl.innerHTML = '';
+
+      const lines = [
+        'Strategies evaluated: ' + (result.ran?.length || 0),
+        'Signals generated: ' + (result.signals?.length || 0),
+      ];
+      if (result.error) lines.push('Engine error: ' + result.error);
+      errors.forEach(e => lines.push('Error in ' + e.strategy + ': ' + e.error));
+
+      lines.forEach(line => {
+        const p = document.createElement('div');
+        p.textContent = line;
+        resultEl.appendChild(p);
+      });
+      resultEl.classList.remove('hidden');
+      setTimeout(() => resultEl.classList.add('hidden'), 10_000);
+      await fetchStrategies();
+    } catch {
+      resultEl.className = 'result-panel error';
+      resultEl.innerHTML = '';
+      resultEl.textContent = 'Action failed — check logs.';
+      resultEl.classList.remove('hidden');
+    } finally {
+      btn.innerHTML = '<svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg> Run Engine Now';
+      updateRunBtnState();
+    }
+  }
+
+  async function setKillSwitch(on) {
+    try {
+      const res = await api('/api/risk/kill_switch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ on }),
+        key: 'bots-ks'
+      });
+      applyKillSwitchUI(res.kill_switch);
+      api('/api/engine', { key: 'bots-engine-bg' }).then(() => {}).catch(() => {});
+    } catch {
+      alert('Kill switch action failed. Check logs.');
+    }
+  }
+
+  document.getElementById('btn-ks-on').addEventListener('click', () => {
+    openModal(document.getElementById('modal-ks-on'), () => setKillSwitch(true));
+  });
+  document.getElementById('btn-ks-off').addEventListener('click', () => {
+    openModal(document.getElementById('modal-ks-off'), () => setKillSwitch(false));
+  });
+
+  await fetchAccount();
+  await fetchRiskState();
+  createPoller(fetchStrategies, 30_000).start();
+}
