@@ -1,7 +1,7 @@
 # Multi-Broker Account Support — Design Spec
 
 **Date:** 2026-05-10
-**Status:** Approved (post-review revision 3)
+**Status:** Approved (post-review revision 4)
 
 ---
 
@@ -63,7 +63,16 @@ def decrypt(ciphertext: str) -> str:
     return _fernet.decrypt(ciphertext.encode()).decode()
 ```
 
-`init_crypto()` is called in `main.py`'s lifespan startup handler. It is a no-op (warning only) when `DB_SECRET_KEY` is absent, allowing the setup wizard to start. `encrypt()` and `decrypt()` fail fast with a clear error if called before a key is set.
+`init_crypto()` is called in `main.py`'s lifespan startup handler **before** `db.init_db()`. Order matters: `init_db()` runs the startup `.env` migration which calls `crypto.encrypt()` — if `init_crypto()` runs after, `_fernet` will be `None` and the migration crashes.
+
+```python
+async def lifespan(app: FastAPI):
+    crypto.init_crypto()  # must be first
+    db.init_db()
+    ...
+```
+
+It is a no-op (warning only) when `DB_SECRET_KEY` is absent, allowing the setup wizard to start. `encrypt()` and `decrypt()` fail fast with a clear error if called before a key is set.
 
 **Key rotation warning:** Changing `DB_SECRET_KEY` renders all existing encrypted credentials unreadable. A re-encryption migration must be performed manually before restarting with a new key. Documented in `.env.example` (see Files Modified).
 
@@ -73,7 +82,12 @@ def decrypt(ciphertext: str) -> str:
 
 ### Connection Helper
 
-Rename the existing `conn()` context manager in `server/db.py` to `get_conn()` and execute `PRAGMA foreign_keys = ON` immediately after `sqlite3.connect()`. Update all existing call sites (`with conn()` → `with get_conn()`; there are 15 in the current file). No other module imports `conn` directly — only `db.py` internal functions use it.
+Rename the existing `conn()` context manager in `server/db.py` to `get_conn()` and execute `PRAGMA foreign_keys = ON` immediately after `sqlite3.connect()`. Update **all** existing call sites (`with conn()` → `with get_conn()`):
+
+- 15 call sites in `server/db.py`
+- 4 call sites in `server/auth.py` (line 6 imports `conn` directly: `from .db import conn, init_db` — change to `from .db import get_conn, init_db`; update lines 31, 39, 86, 94)
+
+Total: 19 call sites across 2 files.
 
 ```python
 @contextmanager
@@ -228,12 +242,14 @@ def assign_strategy_account(strategy_name: str, account_id: int, enabled: bool) 
         )
         return cur.rowcount > 0
 
-def update_strategy_account_enabled(strategy_name: str, account_id: int, enabled: bool) -> None:
+def update_strategy_account_enabled(strategy_name: str, account_id: int, enabled: bool) -> bool:
+    """Returns True if updated, False if (strategy_name, account_id) pair not found."""
     with get_conn() as c:
-        c.execute(
+        cur = c.execute(
             "UPDATE strategy_accounts SET enabled=? WHERE strategy_name=? AND account_id=?",
             (int(enabled), strategy_name, account_id)
         )
+        return cur.rowcount > 0
 
 def unassign_strategy_account(strategy_name: str, account_id: int) -> None:
     with get_conn() as c:
@@ -378,8 +394,8 @@ def _mask_account(row: dict) -> dict:
     try:
         key_plain_last4 = crypto.decrypt(row["api_key"])[-4:]
         row["api_key"] = "****" + key_plain_last4
-    except RuntimeError:
-        # crypto not initialised (DB_SECRET_KEY absent) — mask without decrypting
+    except Exception:
+        # Covers RuntimeError (crypto not initialised) and InvalidToken (wrong key / corruption)
         row["api_key"] = "****[key unavailable]"
     row.pop("api_secret", None)  # never returned
     return row
@@ -388,6 +404,10 @@ def _mask_account(row: dict) -> dict:
 Note: `GET /api/broker-accounts/{id}/status` calls `crypto.decrypt()` in `main.py` directly — not via `db.py`. This is consistent with the crypto module contract (only `main.py` and `engine.py` call `crypto.decrypt()`).
 
 `POST /api/strategies/{name}/accounts` calls `db.assign_strategy_account()` and returns HTTP 409 if it returns `False` (already assigned).
+
+`PATCH /api/strategies/{name}/accounts/{id}` calls `db.update_strategy_account_enabled()` and returns HTTP 404 if it returns `False` (pair not found).
+
+Deleting the Default account (id=1) is permitted — no guard is needed. CASCADE removes its strategy assignments; affected strategies will have no accounts and be skipped on the next tick until reassigned.
 
 ### Strategy Account Assignments
 
@@ -497,6 +517,8 @@ def run_tick():
 
 The global `alpaca_client.get_account_summary()` and `alpaca_client.get_positions()` calls at the top of the current `run_tick()` are removed. The kill switch check uses `risk.is_killed()` directly (DB read, no account needed). `_last_run["risk"]` is no longer populated at the top of the tick; the `GET /api/engine` response will have `"risk": null`. The `GET /api/risk` endpoint is unchanged and continues to use the global single-account client.
 
+The error-path inside the per-strategy loop must still append to `_last_run["ran"]` — the existing behaviour (`_last_run["ran"].append({"strategy": s["name"], "error": str(e)})`) is preserved unchanged inside the `except` block. The pseudocode omits this line for brevity but it must not be removed.
+
 ---
 
 ## Setup Wizard Update (`server/main.py`)
@@ -579,6 +601,7 @@ Dashboard, Performance, Positions, Balances, Logs, Risk, Settings, Backtesting.
 | File | Change |
 |------|--------|
 | `server/crypto.py` | **Create** — `init_crypto()`, `generate_key()`, `encrypt()`, `decrypt()` |
+| `server/auth.py` | Update `from .db import conn` → `get_conn`; rename 4 call sites |
 | `server/db.py` | Rename `conn()` → `get_conn()` (15 call sites); add new tables + 12 CRUD functions; startup migration |
 | `server/alpaca_client.py` | Add `AccountClient` class |
 | `server/engine.py` | Add per-account loop with `client_cache`; preserve all existing logic |
