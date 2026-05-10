@@ -51,6 +51,25 @@ CREATE TABLE IF NOT EXISTS strategy_perf (
 
 CREATE INDEX IF NOT EXISTS idx_signals_ts ON signals(ts DESC);
 CREATE INDEX IF NOT EXISTS idx_perf_strategy ON strategy_perf(strategy, date DESC);
+
+CREATE TABLE IF NOT EXISTS broker_accounts (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  label        TEXT NOT NULL UNIQUE,
+  api_key      TEXT NOT NULL,
+  api_secret   TEXT NOT NULL,
+  account_type TEXT NOT NULL DEFAULT 'paper'
+                   CHECK (account_type IN ('paper', 'live')),
+  created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at   TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS strategy_accounts (
+  strategy_name TEXT NOT NULL REFERENCES strategies(name) ON DELETE CASCADE,
+  account_id    INTEGER NOT NULL REFERENCES broker_accounts(id) ON DELETE CASCADE,
+  enabled       INTEGER NOT NULL DEFAULT 1 CHECK (enabled IN (0, 1)),
+  created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (strategy_name, account_id)
+);
 """
 
 RISK_DEFAULTS = {
@@ -63,6 +82,29 @@ RISK_DEFAULTS = {
 }
 
 
+def _migrate_env_account() -> None:
+    """Insert Default broker account from .env on first run. Idempotent."""
+    import os
+    from . import crypto
+    api_key = os.environ.get("ALPACA_API_KEY", "").strip()
+    api_secret = os.environ.get("ALPACA_API_SECRET", "").strip()
+    if not api_key or not api_secret:
+        return
+    account_type = os.environ.get("ALPACA_ACCOUNT_TYPE", "paper").strip()
+    try:
+        key_enc = crypto.encrypt(api_key)
+        secret_enc = crypto.encrypt(api_secret)
+    except RuntimeError:
+        return  # crypto not initialised — skip migration silently
+    with get_conn() as c:
+        c.execute(
+            """INSERT INTO broker_accounts (id, label, api_key, api_secret, account_type)
+               VALUES (1, 'Default', ?, ?, ?)
+               ON CONFLICT(id) DO NOTHING""",
+            (key_enc, secret_enc, account_type)
+        )
+
+
 def init_db():
     with get_conn() as c:
         c.executescript(SCHEMA)
@@ -72,6 +114,7 @@ def init_db():
             c.execute(
                 "INSERT OR IGNORE INTO risk_settings(key, value) VALUES(?,?)", (k, v)
             )
+    _migrate_env_account()
 
 
 def get_risk_settings() -> dict:
@@ -262,3 +305,126 @@ def daily_signal_counts(days: int = 30) -> list[dict]:
             ORDER BY date ASC
         """, (days,)).fetchall()
     return [dict(r) for r in rows]
+
+
+# ── Broker Accounts ───────────────────────────────────────────────────────────
+
+def create_broker_account(label: str, api_key_enc: str, api_secret_enc: str, account_type: str) -> int:
+    """Insert new account. Returns new row id. Raises IntegrityError if label not unique."""
+    with get_conn() as c:
+        cur = c.execute(
+            "INSERT INTO broker_accounts (label, api_key, api_secret, account_type) VALUES (?,?,?,?)",
+            (label, api_key_enc, api_secret_enc, account_type)
+        )
+        return cur.lastrowid
+
+
+def get_broker_accounts() -> list[dict]:
+    """Return all accounts with ciphertext credentials (masking done in main.py)."""
+    with get_conn() as c:
+        return [dict(r) for r in c.execute(
+            "SELECT id, label, api_key, account_type, created_at, updated_at FROM broker_accounts ORDER BY id"
+        )]
+
+
+def get_broker_account(account_id: int) -> dict | None:
+    with get_conn() as c:
+        r = c.execute(
+            "SELECT id, label, api_key, account_type, created_at, updated_at FROM broker_accounts WHERE id=?",
+            (account_id,)
+        ).fetchone()
+        return dict(r) if r else None
+
+
+def update_broker_account(account_id: int, *, label: str | None = None, account_type: str | None = None) -> None:
+    """Update label and/or account_type. Sets updated_at."""
+    fields, vals = [], []
+    if label is not None:
+        fields.append("label=?"); vals.append(label)
+    if account_type is not None:
+        fields.append("account_type=?"); vals.append(account_type)
+    if not fields:
+        raise ValueError("at least one of label or account_type required")
+    fields.append("updated_at=?"); vals.append(now_iso())
+    vals.append(account_id)
+    with get_conn() as c:
+        c.execute(f"UPDATE broker_accounts SET {', '.join(fields)} WHERE id=?", vals)
+
+
+def update_broker_credentials(account_id: int, api_key_enc: str, api_secret_enc: str) -> None:
+    """Replace encrypted credentials and set updated_at."""
+    with get_conn() as c:
+        c.execute(
+            "UPDATE broker_accounts SET api_key=?, api_secret=?, updated_at=? WHERE id=?",
+            (api_key_enc, api_secret_enc, now_iso(), account_id)
+        )
+
+
+def delete_broker_account(account_id: int) -> None:
+    """Delete account. CASCADE removes strategy_accounts rows."""
+    with get_conn() as c:
+        c.execute("DELETE FROM broker_accounts WHERE id=?", (account_id,))
+
+
+def get_broker_account_assignments(account_id: int) -> list[str]:
+    """Return strategy names assigned to this account."""
+    with get_conn() as c:
+        rows = c.execute(
+            "SELECT strategy_name FROM strategy_accounts WHERE account_id=?", (account_id,)
+        ).fetchall()
+        return [r["strategy_name"] for r in rows]
+
+
+# ── Strategy Accounts ─────────────────────────────────────────────────────────
+
+def get_strategy_accounts(strategy_name: str) -> list[dict]:
+    """Return enabled (strategy, account) pairs with ciphertext credentials. Used by engine."""
+    with get_conn() as c:
+        return [dict(r) for r in c.execute(
+            """SELECT sa.account_id AS id, ba.label, ba.api_key, ba.api_secret, ba.account_type
+               FROM strategy_accounts sa
+               JOIN broker_accounts ba ON ba.id = sa.account_id
+               WHERE sa.strategy_name = ? AND sa.enabled = 1""",
+            (strategy_name,)
+        )]
+
+
+def get_strategy_account_list(strategy_name: str) -> list[dict]:
+    """Return all assigned accounts with enabled flag. Used by API endpoint."""
+    with get_conn() as c:
+        return [dict(r) for r in c.execute(
+            """SELECT ba.id, ba.label, ba.account_type, sa.enabled, sa.created_at
+               FROM strategy_accounts sa
+               JOIN broker_accounts ba ON ba.id = sa.account_id
+               WHERE sa.strategy_name = ?
+               ORDER BY ba.id""",
+            (strategy_name,)
+        )]
+
+
+def assign_strategy_account(strategy_name: str, account_id: int, enabled: bool) -> bool:
+    """Assign account to strategy. Returns True if inserted, False if already assigned (no-op)."""
+    with get_conn() as c:
+        cur = c.execute(
+            "INSERT OR IGNORE INTO strategy_accounts (strategy_name, account_id, enabled) VALUES (?,?,?)",
+            (strategy_name, account_id, int(enabled))
+        )
+        return cur.rowcount > 0
+
+
+def update_strategy_account_enabled(strategy_name: str, account_id: int, enabled: bool) -> bool:
+    """Returns True if updated, False if (strategy_name, account_id) pair not found."""
+    with get_conn() as c:
+        cur = c.execute(
+            "UPDATE strategy_accounts SET enabled=? WHERE strategy_name=? AND account_id=?",
+            (int(enabled), strategy_name, account_id)
+        )
+        return cur.rowcount > 0
+
+
+def unassign_strategy_account(strategy_name: str, account_id: int) -> None:
+    with get_conn() as c:
+        c.execute(
+            "DELETE FROM strategy_accounts WHERE strategy_name=? AND account_id=?",
+            (strategy_name, account_id)
+        )
