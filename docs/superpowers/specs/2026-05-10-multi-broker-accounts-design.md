@@ -1,7 +1,7 @@
 # Multi-Broker Account Support — Design Spec
 
 **Date:** 2026-05-10
-**Status:** Approved (post-review revision 2)
+**Status:** Approved (post-review revision 3)
 
 ---
 
@@ -73,7 +73,7 @@ def decrypt(ciphertext: str) -> str:
 
 ### Connection Helper
 
-Rename the existing `conn()` context manager in `server/db.py` to `get_conn()` and execute `PRAGMA foreign_keys = ON` immediately after `sqlite3.connect()`. Update all existing call sites (`with conn()` → `with get_conn()`; there are 16 in the current file).
+Rename the existing `conn()` context manager in `server/db.py` to `get_conn()` and execute `PRAGMA foreign_keys = ON` immediately after `sqlite3.connect()`. Update all existing call sites (`with conn()` → `with get_conn()`; there are 15 in the current file). No other module imports `conn` directly — only `db.py` internal functions use it.
 
 ```python
 @contextmanager
@@ -156,23 +156,27 @@ def get_broker_account(account_id: int) -> dict | None:
         return dict(r) if r else None
 
 def update_broker_account(account_id: int, *, label: str | None = None, account_type: str | None = None) -> None:
-    """Update label and/or account_type. Sets updated_at. Caller guarantees at least one is non-None."""
+    """Update label and/or account_type. Sets updated_at to UTC ISO string."""
+    from datetime import datetime, timezone
     fields, vals = [], []
     if label is not None:
         fields.append("label=?"); vals.append(label)
     if account_type is not None:
         fields.append("account_type=?"); vals.append(account_type)
-    fields.append("updated_at=datetime('now')")
+    if not fields:
+        raise ValueError("at least one of label or account_type required")
+    fields.append("updated_at=?"); vals.append(datetime.now(timezone.utc).isoformat())
     vals.append(account_id)
     with get_conn() as c:
         c.execute(f"UPDATE broker_accounts SET {', '.join(fields)} WHERE id=?", vals)
 
 def update_broker_credentials(account_id: int, api_key_enc: str, api_secret_enc: str) -> None:
-    """Replace encrypted credentials. Sets updated_at."""
+    """Replace encrypted credentials. Sets updated_at to UTC ISO string."""
+    from datetime import datetime, timezone
     with get_conn() as c:
         c.execute(
-            "UPDATE broker_accounts SET api_key=?, api_secret=?, updated_at=datetime('now') WHERE id=?",
-            (api_key_enc, api_secret_enc, account_id)
+            "UPDATE broker_accounts SET api_key=?, api_secret=?, updated_at=? WHERE id=?",
+            (api_key_enc, api_secret_enc, datetime.now(timezone.utc).isoformat(), account_id)
         )
 
 def delete_broker_account(account_id: int) -> None:
@@ -215,12 +219,14 @@ def get_strategy_account_list(strategy_name: str) -> list[dict]:
             (strategy_name,)
         )]
 
-def assign_strategy_account(strategy_name: str, account_id: int, enabled: bool) -> None:
+def assign_strategy_account(strategy_name: str, account_id: int, enabled: bool) -> bool:
+    """Assign account to strategy. Returns True if inserted, False if already assigned (no-op)."""
     with get_conn() as c:
-        c.execute(
-            "INSERT INTO strategy_accounts (strategy_name, account_id, enabled) VALUES (?,?,?)",
+        cur = c.execute(
+            "INSERT OR IGNORE INTO strategy_accounts (strategy_name, account_id, enabled) VALUES (?,?,?)",
             (strategy_name, account_id, int(enabled))
         )
+        return cur.rowcount > 0
 
 def update_strategy_account_enabled(strategy_name: str, account_id: int, enabled: bool) -> None:
     with get_conn() as c:
@@ -315,6 +321,8 @@ class AccountClient:
 
 The return shape of `get_account_summary()` is identical to the existing module-level function (same 11 keys) so `risk.check_all()`, `risk.calc_qty()`, and `risk.status_summary()` work without modification.
 
+`get_positions()` intentionally returns only 3 fields (`symbol`, `qty`, `side`) — enough for the engine's position-sizing dict. The full 9-field positions response for `/api/positions` continues to use the module-level `alpaca_client.get_positions()` and is not affected.
+
 ---
 
 ## API Endpoints
@@ -367,13 +375,19 @@ class StrategyAccountPatch(BaseModel):
 ```python
 def _mask_account(row: dict) -> dict:
     row = dict(row)
-    key_plain_last4 = crypto.decrypt(row["api_key"])[-4:]
-    row["api_key"] = "****" + key_plain_last4
+    try:
+        key_plain_last4 = crypto.decrypt(row["api_key"])[-4:]
+        row["api_key"] = "****" + key_plain_last4
+    except RuntimeError:
+        # crypto not initialised (DB_SECRET_KEY absent) — mask without decrypting
+        row["api_key"] = "****[key unavailable]"
     row.pop("api_secret", None)  # never returned
     return row
 ```
 
 Note: `GET /api/broker-accounts/{id}/status` calls `crypto.decrypt()` in `main.py` directly — not via `db.py`. This is consistent with the crypto module contract (only `main.py` and `engine.py` call `crypto.decrypt()`).
+
+`POST /api/strategies/{name}/accounts` calls `db.assign_strategy_account()` and returns HTTP 409 if it returns `False` (already assigned).
 
 ### Strategy Account Assignments
 
@@ -401,8 +415,21 @@ def run_tick():
     global _last_run
     # ... existing: _last_run reset, clock fetch, market-open check ...
 
-    # Kill switch check: read from risk_settings table (global, not per-account)
-    # ... existing: risk_status = risk.status_summary(...); if kill_switch: return ...
+    # Kill switch check: reads from risk_settings DB table — no account fetch needed.
+    # Replace the existing block:
+    #   account = alpaca_client.get_account_summary()
+    #   day_trade_count = _get_day_trade_count(account)
+    #   risk_status = risk.status_summary(account, day_trade_count)
+    #   _last_run["risk"] = risk_status
+    #   if risk_status["kill_switch"]: return
+    # With the simpler direct check:
+    if risk.is_killed():
+        _last_run["error"] = "kill switch active"
+        log.warning("kill switch active; skipping tick")
+        return
+    # _last_run["risk"] is left None at tick start; it is not populated globally
+    # since there is no single account anymore. The /api/risk endpoint is unchanged
+    # (it continues to use the global alpaca_client for its own account fetch).
 
     # Per-account client cache — one AccountClient per account_id per tick
     client_cache: dict[int, tuple[AccountClient, dict, int, dict[str, float]]] = {}
@@ -468,7 +495,7 @@ def run_tick():
 
 `get_latest_quote()` continues to use the global `alpaca_client.data()` client — market data is not account-specific. The module-level `get_latest_quote()` call in the existing engine is unchanged.
 
-The global `alpaca_client.get_account_summary()` and `alpaca_client.get_positions()` calls at the top of the current `run_tick()` are removed. The kill switch check is restructured to not require a global account fetch — it reads the kill switch flag directly from `risk.get_settings()` (the DB) or from any available account's `risk_status`. If no accounts are available for any strategy, the tick exits cleanly with a log warning.
+The global `alpaca_client.get_account_summary()` and `alpaca_client.get_positions()` calls at the top of the current `run_tick()` are removed. The kill switch check uses `risk.is_killed()` directly (DB read, no account needed). `_last_run["risk"]` is no longer populated at the top of the tick; the `GET /api/engine` response will have `"risk": null`. The `GET /api/risk` endpoint is unchanged and continues to use the global single-account client.
 
 ---
 
@@ -481,14 +508,27 @@ The global `alpaca_client.get_account_summary()` and `alpaca_client.get_position
 3. Include `DB_SECRET_KEY` in the written content.
 
 ```python
+def _read_env_key(name: str) -> str:
+    try:
+        for line in env_path.read_text().splitlines():
+            if line.startswith(f"{name}="):
+                return line.split("=", 1)[1].strip()
+    except FileNotFoundError:
+        pass
+    return ""
+
+# Inside setup_complete():
 existing_secret = os.environ.get("DB_SECRET_KEY") or _read_env_key("DB_SECRET_KEY")
 db_secret = existing_secret or crypto.generate_key()
 
+endpoint = ("https://paper-api.alpaca.markets" if body.account_type == "paper"
+            else "https://api.alpaca.markets")
+
 env_content = (
-    f"ALPACA_API_KEY={data.api_key}\n"
-    f"ALPACA_API_SECRET={data.api_secret}\n"
-    f"ALPACA_ENDPOINT={data.endpoint}\n"
-    f"ALPACA_ACCOUNT_TYPE={data.account_type}\n"
+    f"ALPACA_API_KEY={body.api_key}\n"
+    f"ALPACA_API_SECRET={body.api_secret}\n"
+    f"ALPACA_ENDPOINT={endpoint}/v2\n"
+    f"ALPACA_ACCOUNT_TYPE={body.account_type}\n"
     f"DB_SECRET_KEY={db_secret}\n"
 )
 env_path.write_text(env_content)
@@ -496,7 +536,7 @@ os.environ["DB_SECRET_KEY"] = db_secret
 crypto.init_crypto()  # re-initialise with the (possibly new) key
 ```
 
-`_read_env_key(name)` reads the current `.env` file and returns the value of a given key, or `""` if not present. This prevents overwriting an existing `DB_SECRET_KEY` on subsequent setup runs.
+`_read_env_key` reads the current `.env` file and returns the value for a given key, or `""` if the file is missing or the key is absent. This prevents overwriting an existing `DB_SECRET_KEY` on subsequent setup runs. The `endpoint` variable is computed from `body.account_type` (same as the existing `setup_complete` code) — `SetupCompleteIn` has no `endpoint` field and is not changed.
 
 ---
 
@@ -539,7 +579,7 @@ Dashboard, Performance, Positions, Balances, Logs, Risk, Settings, Backtesting.
 | File | Change |
 |------|--------|
 | `server/crypto.py` | **Create** — `init_crypto()`, `generate_key()`, `encrypt()`, `decrypt()` |
-| `server/db.py` | Rename `conn()` → `get_conn()` (16 call sites); add new tables + 12 CRUD functions; startup migration |
+| `server/db.py` | Rename `conn()` → `get_conn()` (15 call sites); add new tables + 12 CRUD functions; startup migration |
 | `server/alpaca_client.py` | Add `AccountClient` class |
 | `server/engine.py` | Add per-account loop with `client_cache`; preserve all existing logic |
 | `server/main.py` | Call `init_crypto()` in lifespan; add 11 new endpoints + Pydantic models; update `setup_complete` |
