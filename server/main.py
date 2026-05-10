@@ -6,9 +6,9 @@ from typing import Literal
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
-from . import alpaca_client, auth, db, engine, notifications, risk, scanner, strategies
+from . import alpaca_client, auth, crypto, db, engine, notifications, risk, scanner, strategies
 from .config import STATIC_DIR, BASE_DIR
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
@@ -16,6 +16,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    crypto.init_crypto()  # must run before db.init_db() — migration calls crypto.encrypt()
     db.init_db()
     existing = {s["name"] for s in db.get_strategies()}
     for cls in strategies.REGISTRY.values():
@@ -38,6 +39,28 @@ def _require_auth(request: Request):
         return  # no password set yet — allow (setup mode)
     if not auth.validate_session(_get_token(request)):
         raise HTTPException(401, "unauthorized")
+
+
+def _read_env_key(name: str) -> str:
+    try:
+        for line in (BASE_DIR / ".env").read_text().splitlines():
+            if line.startswith(f"{name}="):
+                return line.split("=", 1)[1].strip()
+    except FileNotFoundError:
+        pass
+    return ""
+
+
+def _mask_account(row: dict) -> dict:
+    row = dict(row)
+    try:
+        key_plain_last4 = crypto.decrypt(row["api_key"])[-4:]
+        row["api_key"] = "****" + key_plain_last4
+    except Exception:
+        # RuntimeError (key missing) or InvalidToken (corruption / wrong key)
+        row["api_key"] = "****[key unavailable]"
+    row.pop("api_secret", None)  # api_secret is never returned
+    return row
 
 
 # ── Models ─────────────────────────────────────────────────────────────────────
@@ -86,6 +109,33 @@ class NotificationSettings(BaseModel):
     notify_on_trade: bool = True
     notify_on_block: bool = False
     notify_daily_summary: bool = True
+
+class BrokerAccountCreate(BaseModel):
+    label: str
+    api_key: str
+    api_secret: str
+    account_type: Literal["paper", "live"] = "paper"
+
+class BrokerAccountPatch(BaseModel):
+    label: str | None = None
+    account_type: Literal["paper", "live"] | None = None
+
+    @model_validator(mode="after")
+    def at_least_one(self) -> "BrokerAccountPatch":
+        if self.label is None and self.account_type is None:
+            raise ValueError("at least one of label or account_type must be provided")
+        return self
+
+class BrokerCredentialsUpdate(BaseModel):
+    api_key: str
+    api_secret: str
+
+class StrategyAccountAssign(BaseModel):
+    account_id: int
+    enabled: bool = True
+
+class StrategyAccountPatch(BaseModel):
+    enabled: bool
 
 
 # ── Setup & Auth routes ────────────────────────────────────────────────────────
@@ -136,8 +186,10 @@ def setup_test(body: SetupTestIn):
 
 @app.post("/api/setup/complete")
 def setup_complete(body: SetupCompleteIn):
-    # 1. Write .env
+    # 1. Write .env — preserve DB_SECRET_KEY if already set
     env_path = BASE_DIR / ".env"
+    existing_secret = os.environ.get("DB_SECRET_KEY") or _read_env_key("DB_SECRET_KEY")
+    db_secret = existing_secret or crypto.generate_key()
     endpoint = ("https://paper-api.alpaca.markets" if body.account_type == "paper"
                 else "https://api.alpaca.markets")
     env_content = (
@@ -145,8 +197,11 @@ def setup_complete(body: SetupCompleteIn):
         f"ALPACA_API_SECRET={body.api_secret}\n"
         f"ALPACA_ENDPOINT={endpoint}/v2\n"
         f"ALPACA_ACCOUNT_TYPE={body.account_type}\n"
+        f"DB_SECRET_KEY={db_secret}\n"
     )
     env_path.write_text(env_content)
+    os.environ["DB_SECRET_KEY"] = db_secret
+    crypto.init_crypto()  # re-initialise with the (possibly new) key
 
     # 2. Risk settings
     db.set_risk_setting("max_daily_loss_pct", str(body.max_daily_loss_pct))
@@ -292,6 +347,134 @@ def update_strategy(name: str, body: StrategyUpdate, request: Request):
         params = {**params, **body.params}
     db.upsert_strategy(name, enabled=enabled, params=params)
     return db.get_strategy(name)
+
+
+# ── Broker Accounts ────────────────────────────────────────────────────────────
+
+@app.get("/api/broker-accounts")
+def list_broker_accounts(request: Request):
+    _require_auth(request)
+    return [_mask_account(r) for r in db.get_broker_accounts()]
+
+
+@app.get("/api/broker-accounts/{account_id}")
+def get_broker_account(account_id: int, request: Request):
+    _require_auth(request)
+    row = db.get_broker_account(account_id)
+    if not row:
+        raise HTTPException(404, "account not found")
+    return _mask_account(row)
+
+
+@app.post("/api/broker-accounts", status_code=201)
+def create_broker_account(body: BrokerAccountCreate, request: Request):
+    _require_auth(request)
+    try:
+        new_id = db.create_broker_account(
+            body.label,
+            crypto.encrypt(body.api_key),
+            crypto.encrypt(body.api_secret),
+            body.account_type,
+        )
+    except Exception as e:
+        raise HTTPException(400, str(e))
+    return _mask_account(db.get_broker_account(new_id))
+
+
+@app.patch("/api/broker-accounts/{account_id}")
+def patch_broker_account(account_id: int, body: BrokerAccountPatch, request: Request):
+    _require_auth(request)
+    if not db.get_broker_account(account_id):
+        raise HTTPException(404, "account not found")
+    db.update_broker_account(account_id, label=body.label, account_type=body.account_type)
+    return _mask_account(db.get_broker_account(account_id))
+
+
+@app.put("/api/broker-accounts/{account_id}/credentials")
+def rotate_broker_credentials(account_id: int, body: BrokerCredentialsUpdate, request: Request):
+    _require_auth(request)
+    if not db.get_broker_account(account_id):
+        raise HTTPException(404, "account not found")
+    db.update_broker_credentials(
+        account_id,
+        crypto.encrypt(body.api_key),
+        crypto.encrypt(body.api_secret),
+    )
+    return _mask_account(db.get_broker_account(account_id))
+
+
+@app.get("/api/broker-accounts/{account_id}/status")
+def broker_account_status(account_id: int, request: Request):
+    _require_auth(request)
+    row = db.get_broker_account(account_id)
+    if not row:
+        raise HTTPException(404, "account not found")
+    try:
+        from .alpaca_client import AccountClient
+        client = AccountClient(
+            api_key=crypto.decrypt(row["api_key"]),
+            api_secret=crypto.decrypt(row["api_secret"]),
+            paper=(row["account_type"] == "paper"),
+        )
+        return client.get_account_summary()
+    except Exception as e:
+        raise HTTPException(400, str(e))
+
+
+@app.get("/api/broker-accounts/{account_id}/assignments")
+def broker_account_assignments(account_id: int, request: Request):
+    _require_auth(request)
+    if not db.get_broker_account(account_id):
+        raise HTTPException(404, "account not found")
+    return {"strategies": db.get_broker_account_assignments(account_id)}
+
+
+@app.delete("/api/broker-accounts/{account_id}")
+def delete_broker_account(account_id: int, request: Request):
+    _require_auth(request)
+    if not db.get_broker_account(account_id):
+        raise HTTPException(404, "account not found")
+    db.delete_broker_account(account_id)
+    return {"ok": True}
+
+
+# ── Strategy Account Assignments ───────────────────────────────────────────────
+
+@app.get("/api/strategies/{name}/accounts")
+def list_strategy_accounts(name: str, request: Request):
+    _require_auth(request)
+    if name not in strategies.REGISTRY:
+        raise HTTPException(404, "unknown strategy")
+    return db.get_strategy_account_list(name)
+
+
+@app.post("/api/strategies/{name}/accounts", status_code=201)
+def assign_strategy_account(name: str, body: StrategyAccountAssign, request: Request):
+    _require_auth(request)
+    if name not in strategies.REGISTRY:
+        raise HTTPException(404, "unknown strategy")
+    if not db.get_broker_account(body.account_id):
+        raise HTTPException(404, "broker account not found")
+    inserted = db.assign_strategy_account(name, body.account_id, body.enabled)
+    if not inserted:
+        raise HTTPException(409, "account already assigned to this strategy")
+    return db.get_strategy_account_list(name)
+
+
+@app.patch("/api/strategies/{name}/accounts/{account_id}")
+def patch_strategy_account(name: str, account_id: int, body: StrategyAccountPatch, request: Request):
+    _require_auth(request)
+    updated = db.update_strategy_account_enabled(name, account_id, body.enabled)
+    if not updated:
+        raise HTTPException(404, "assignment not found")
+    return db.get_strategy_account_list(name)
+
+
+@app.delete("/api/strategies/{name}/accounts/{account_id}")
+def unassign_strategy_account(name: str, account_id: int, request: Request):
+    _require_auth(request)
+    db.unassign_strategy_account(name, account_id)
+    return {"ok": True}
 
 
 # ── Performance analytics ──────────────────────────────────────────────────────
