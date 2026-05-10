@@ -1406,7 +1406,7 @@ async function initApiKeys() {
     try {
       const result = await api(`/api/broker-accounts/${accountId}/status`, { key: `test-${accountId}` });
       statusEl.style.color = '#22C55E';
-      statusEl.textContent = `✓ Connected · ${result.account_type} · equity $${fmt.money(result.equity)}`;
+      statusEl.textContent = `✓ Connected · ${result.account_type} · equity ${fmt.usd(result.equity)}`;
     } catch {
       statusEl.style.color = '#EF4444';
       statusEl.textContent = '✗ Connection failed';
