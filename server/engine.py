@@ -130,6 +130,12 @@ def run_tick():
                         sig.symbol, sig.side, sig.qty, account, price
                     )
 
+                # ── zero-qty guard ──────────────────────────────────────────
+                if not sig.notional and (final_qty is None or final_qty <= 0):
+                    db.log_signal(s["name"], sig.symbol, sig.side, final_qty,
+                                  "blocked: zero or negative qty after sizing", None, "blocked")
+                    continue
+
                 # ── submit ──────────────────────────────────────────────────
                 client_oid = f"{s['name']}-{uuid.uuid4().hex[:12]}"
                 try:
