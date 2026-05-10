@@ -113,39 +113,120 @@
   <!-- ── Main ── -->
   <main class="content flex flex-col gap-4">
 
-    <div class="card" style="max-width:600px;">
-      <div style="font-size:14px;font-weight:600;margin-bottom:1rem;">Alpaca Connection Status</div>
-
-      <div class="flex flex-col gap-3">
-        <div class="flex items-center justify-between">
-          <span class="text-muted" style="font-size:13px;">Connection</span>
-          <span id="conn-status" class="badge b-disabled">Checking…</span>
-        </div>
-        <div class="flex items-center justify-between">
-          <span class="text-muted" style="font-size:13px;">Account Mode</span>
-          <span id="conn-mode" class="text-tabular" style="font-size:13px;font-weight:600;">—</span>
-        </div>
-        <div class="flex items-center justify-between">
-          <span class="text-muted" style="font-size:13px;">Account Status</span>
-          <span id="conn-acct-status" class="text-tabular" style="font-size:13px;">—</span>
-        </div>
-        <div class="flex items-center justify-between">
-          <span class="text-muted" style="font-size:13px;">Last Successful Fetch</span>
-          <span id="conn-last-fetch" class="text-muted" style="font-size:13px;">—</span>
-        </div>
-        <div class="flex items-center justify-between">
-          <span class="text-muted" style="font-size:13px;">Trading Blocked</span>
-          <span id="conn-blocked" style="font-size:13px;">—</span>
-        </div>
+    <div class="card">
+      <div class="flex items-center justify-between mb-3">
+        <div style="font-size:14px;font-weight:600;">Broker Accounts</div>
+        <button id="btn-add-account" class="btn btn-primary" style="font-size:12px;padding:.35rem .8rem;">+ Add Account</button>
       </div>
-
-      <div style="margin-top:1.5rem;padding-top:1rem;border-top:1px solid #1E2D45;">
-        <p class="text-muted" style="font-size:12px;">API key and secret are stored server-side only and are never sent to the browser.</p>
+      <div id="accounts-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:1rem;">
+        <div class="state-empty">Loading…</div>
       </div>
     </div>
 
   </main>
 
+</div>
+
+<!-- ── Modals ── -->
+
+<!-- Add Account -->
+<div id="modal-add-account" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modal-add-title">
+  <div class="modal-box" style="max-width:420px;">
+    <div id="modal-add-title" class="modal-title">Add Broker Account</div>
+    <div class="modal-body flex flex-col gap-3">
+      <div>
+        <label class="text-muted" style="font-size:12px;display:block;margin-bottom:4px;">Label</label>
+        <input id="add-label" type="text" class="input-field" placeholder="e.g. Paper Account 1">
+      </div>
+      <div>
+        <label class="text-muted" style="font-size:12px;display:block;margin-bottom:4px;">API Key</label>
+        <input id="add-api-key" type="text" class="input-field" placeholder="APCA-…">
+      </div>
+      <div>
+        <label class="text-muted" style="font-size:12px;display:block;margin-bottom:4px;">API Secret</label>
+        <input id="add-api-secret" type="password" class="input-field" placeholder="Secret">
+      </div>
+      <div>
+        <label class="text-muted" style="font-size:12px;display:block;margin-bottom:4px;">Account Type</label>
+        <select id="add-account-type" class="input-field">
+          <option value="paper">Paper</option>
+          <option value="live">Live</option>
+        </select>
+      </div>
+      <div id="add-error" class="hidden" style="font-size:12px;color:#EF4444;"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" data-action="cancel">Cancel</button>
+      <button class="btn btn-primary" data-action="confirm">Add Account</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Account -->
+<div id="modal-edit-account" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modal-edit-title">
+  <div class="modal-box" style="max-width:420px;">
+    <div id="modal-edit-title" class="modal-title">Edit Account</div>
+    <div class="modal-body flex flex-col gap-3">
+      <input id="edit-account-id" type="hidden">
+      <div>
+        <label class="text-muted" style="font-size:12px;display:block;margin-bottom:4px;">Label</label>
+        <input id="edit-label" type="text" class="input-field">
+      </div>
+      <div>
+        <label class="text-muted" style="font-size:12px;display:block;margin-bottom:4px;">Account Type</label>
+        <select id="edit-account-type" class="input-field">
+          <option value="paper">Paper</option>
+          <option value="live">Live</option>
+        </select>
+      </div>
+      <div id="edit-error" class="hidden" style="font-size:12px;color:#EF4444;"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" data-action="cancel">Cancel</button>
+      <button class="btn btn-primary" data-action="confirm">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Rotate Credentials -->
+<div id="modal-rotate" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modal-rotate-title">
+  <div class="modal-box" style="max-width:420px;">
+    <div id="modal-rotate-title" class="modal-title">Rotate Credentials</div>
+    <div class="modal-body flex flex-col gap-3">
+      <input id="rotate-account-id" type="hidden">
+      <p class="text-muted" style="font-size:12px;">Replaces the stored API key and secret for this account.</p>
+      <div>
+        <label class="text-muted" style="font-size:12px;display:block;margin-bottom:4px;">New API Key</label>
+        <input id="rotate-api-key" type="text" class="input-field" placeholder="APCA-…">
+      </div>
+      <div>
+        <label class="text-muted" style="font-size:12px;display:block;margin-bottom:4px;">New API Secret</label>
+        <input id="rotate-api-secret" type="password" class="input-field" placeholder="Secret">
+      </div>
+      <div id="rotate-error" class="hidden" style="font-size:12px;color:#EF4444;"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" data-action="cancel">Cancel</button>
+      <button class="btn btn-primary" data-action="confirm">Rotate</button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Confirm -->
+<div id="modal-delete-account" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modal-delete-title">
+  <div class="modal-box" style="max-width:420px;">
+    <div id="modal-delete-title" class="modal-title" style="color:#EF4444;">Delete Account</div>
+    <div class="modal-body">
+      <div id="delete-account-name" style="font-weight:600;margin-bottom:.5rem;"></div>
+      <div id="delete-assignments-warn" class="hidden" style="font-size:12px;color:#F59E0B;margin-bottom:.5rem;"></div>
+      <p class="text-muted" style="font-size:13px;">This action cannot be undone. All strategy assignments will be removed.</p>
+      <input id="delete-account-id" type="hidden">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" data-action="cancel">Cancel</button>
+      <button class="btn btn-danger" data-action="confirm">Delete Account</button>
+    </div>
+  </div>
 </div>
 
 <script src="/static/app.js"></script>
