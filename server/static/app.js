@@ -196,6 +196,7 @@ function perfChartConfig(timestamps, equities, baseValue) {
   return {
     series: [{ name: 'Equity', data: timestamps.map((t, i) => ({ x: new Date(t * 1000), y: equities[i] })) }],
     chart: { type: 'area', height: 220, toolbar: { show: false }, background: 'transparent', animations: { enabled: false } },
+    dataLabels: { enabled: false },
     stroke: { curve: 'smooth', width: 2, colors: ['#3B82F6'] },
     fill: { type: 'gradient', gradient: { shade: 'dark', opacityFrom: 0.3, opacityTo: 0, stops: [0, 100] } },
     colors: ['#3B82F6'],
@@ -204,7 +205,7 @@ function perfChartConfig(timestamps, equities, baseValue) {
     yaxis: { labels: { style: { colors: '#64748B', fontSize: '11px' }, formatter: v => '$' + (v/1000).toFixed(0) + 'k' } },
     grid: { borderColor: '#1E2D45', strokeDashArray: 3 },
     theme: { mode: 'dark' },
-    tooltip: { theme: 'dark', x: { format: 'MMM dd, yyyy' } }
+    tooltip: { theme: 'dark', x: { format: 'HH:mm MMM dd' } }
   };
 }
 
