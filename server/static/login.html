@@ -6,6 +6,7 @@
   <title>Login — TradeBot</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="icon" href="data:,">
   <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body class="login-wrap">
@@ -28,11 +29,6 @@
     <div id="login-error" class="state-error hidden mb-4" style="text-align:left;padding:.6rem .75rem;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);border-radius:8px;"></div>
 
     <form id="login-form">
-      <div class="mb-4">
-        <label class="block text-muted mb-1" style="font-size:12px;font-weight:500;">Username</label>
-        <input id="username" type="text" autocomplete="username" required
-          class="w-full" style="background:rgba(30,45,69,.5);border:1px solid #1E2D45;border-radius:8px;padding:8px 12px;font-size:14px;color:#E6EBF5;outline:none;">
-      </div>
       <div class="mb-6">
         <label class="block text-muted mb-1" style="font-size:12px;font-weight:500;">Password</label>
         <input id="password" type="password" autocomplete="current-password" required
@@ -49,7 +45,6 @@
       e.preventDefault();
       const btn = document.getElementById('login-btn');
       const errEl = document.getElementById('login-error');
-      const username = document.getElementById('username').value;
       const password = document.getElementById('password').value;
 
       btn.disabled = true;
@@ -61,12 +56,12 @@
         const res = await fetch('/api/auth/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username, password })
+          body: JSON.stringify({ password })
         });
         if (res.ok) {
           location.href = '/static/index.html';
         } else {
-          errEl.textContent = 'Invalid username or password.';
+          errEl.textContent = 'Incorrect password.';
           errEl.classList.remove('hidden');
           btn.disabled = false;
           btn.textContent = 'Sign In';
