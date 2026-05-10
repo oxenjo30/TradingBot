@@ -1153,41 +1153,197 @@ async function initLogs() {
 async function initApiKeys() {
   initClockChip(document.getElementById('market-chip'));
 
-  async function fetchConnection() {
-    const statusEl  = document.getElementById('conn-status');
-    const modeEl    = document.getElementById('conn-mode');
-    const acctEl    = document.getElementById('conn-acct-status');
-    const fetchEl   = document.getElementById('conn-last-fetch');
-    const blockedEl = document.getElementById('conn-blocked');
-
+  async function loadAccounts() {
+    const grid = document.getElementById('accounts-grid');
     try {
-      const a = await api('/api/account', { key: 'keys-account' });
-
-      statusEl.className = 'badge b-enabled';
-      statusEl.innerHTML = '<span class="pdot"></span><span>Connected</span>';
-
-      modeEl.textContent = a.account_type === 'paper' ? 'Paper Trading' : 'Live Trading';
-      modeEl.className = 'text-tabular ' + (a.account_type === 'paper' ? 'text-muted' : 'glow-green');
-
-      acctEl.textContent = a.status || '—';
-      fetchEl.textContent = new Date().toLocaleTimeString();
-      blockedEl.textContent = a.trading_blocked ? 'Yes' : 'No';
-      blockedEl.className = a.trading_blocked ? 'glow-red' : 'text-green';
-
-      if (a.account_type === 'paper') {
-        document.getElementById('paper-badge')?.classList.remove('hidden');
+      const accounts = await api('/api/broker-accounts', { key: 'keys-list' });
+      grid.innerHTML = '';
+      if (!accounts.length) {
+        const empty = document.createElement('div');
+        empty.className = 'state-empty';
+        empty.textContent = 'No broker accounts yet. Add one to get started.';
+        grid.appendChild(empty);
+        return;
       }
-
-    } catch (e) {
-      if (e.name === 'AbortError') return;
-      statusEl.className = 'badge b-error';
-      statusEl.textContent = 'Disconnected';
-      modeEl.textContent = '—';
-      acctEl.textContent = '—';
-      blockedEl.textContent = '—';
-      throw e;
+      accounts.forEach(acct => grid.appendChild(buildCard(acct)));
+    } catch {
+      grid.innerHTML = '<div class="state-error">Failed to load accounts.</div>';
     }
   }
 
-  createPoller(fetchConnection, 30_000).start();
+  function buildCard(acct) {
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.style.cssText = 'padding:1rem;display:flex;flex-direction:column;gap:.6rem;';
+
+    const header = document.createElement('div');
+    header.style.cssText = 'display:flex;align-items:center;justify-content:space-between;';
+    const label = document.createElement('div');
+    label.style.cssText = 'font-size:14px;font-weight:600;';
+    label.textContent = acct.label;
+    const typeBadge = document.createElement('span');
+    typeBadge.className = 'badge ' + (acct.account_type === 'live' ? 'b-enabled' : 'b-disabled');
+    typeBadge.textContent = acct.account_type === 'live' ? 'Live' : 'Paper';
+    header.append(label, typeBadge);
+
+    const keyRow = document.createElement('div');
+    keyRow.className = 'text-muted';
+    keyRow.style.cssText = 'font-size:12px;font-family:monospace;';
+    keyRow.textContent = acct.api_key;
+
+    const dateRow = document.createElement('div');
+    dateRow.className = 'text-muted';
+    dateRow.style.cssText = 'font-size:11px;';
+    dateRow.textContent = 'Added ' + new Date(acct.created_at).toLocaleDateString();
+
+    const statusRow = document.createElement('div');
+    statusRow.style.cssText = 'font-size:12px;min-height:18px;';
+
+    const actions = document.createElement('div');
+    actions.style.cssText = 'display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.25rem;';
+
+    const btnTest = document.createElement('button');
+    btnTest.className = 'btn btn-ghost btn-sm';
+    btnTest.style.fontSize = '11px';
+    btnTest.textContent = 'Test Connection';
+    btnTest.addEventListener('click', () => testConnection(acct.id, statusRow));
+
+    const btnEdit = document.createElement('button');
+    btnEdit.className = 'btn btn-ghost btn-sm';
+    btnEdit.style.fontSize = '11px';
+    btnEdit.textContent = 'Edit';
+    btnEdit.addEventListener('click', () => openEditModal(acct));
+
+    const btnRotate = document.createElement('button');
+    btnRotate.className = 'btn btn-ghost btn-sm';
+    btnRotate.style.fontSize = '11px';
+    btnRotate.textContent = 'Rotate Keys';
+    btnRotate.addEventListener('click', () => openRotateModal(acct.id));
+
+    const btnDel = document.createElement('button');
+    btnDel.className = 'btn btn-sm';
+    btnDel.style.cssText = 'font-size:11px;color:#EF4444;background:none;border:1px solid #EF444440;';
+    btnDel.textContent = 'Delete';
+    btnDel.addEventListener('click', () => openDeleteModal(acct));
+
+    actions.append(btnTest, btnEdit, btnRotate, btnDel);
+    card.append(header, keyRow, dateRow, statusRow, actions);
+    return card;
+  }
+
+  async function testConnection(accountId, statusEl) {
+    statusEl.textContent = 'Testing…';
+    statusEl.style.color = '';
+    try {
+      const result = await api(`/api/broker-accounts/${accountId}/status`, { key: `test-${accountId}` });
+      statusEl.style.color = '#22C55E';
+      statusEl.textContent = `✓ Connected · ${result.account_type} · equity $${fmt.money(result.equity)}`;
+    } catch {
+      statusEl.style.color = '#EF4444';
+      statusEl.textContent = '✗ Connection failed';
+    }
+  }
+
+  function openEditModal(acct) {
+    document.getElementById('edit-account-id').value = acct.id;
+    document.getElementById('edit-label').value = acct.label;
+    document.getElementById('edit-account-type').value = acct.account_type;
+    document.getElementById('edit-error').classList.add('hidden');
+    openModal(document.getElementById('modal-edit-account'), async () => {
+      const label = document.getElementById('edit-label').value.trim();
+      const accountType = document.getElementById('edit-account-type').value;
+      const errEl = document.getElementById('edit-error');
+      if (!label) { errEl.textContent = 'Label is required.'; errEl.classList.remove('hidden'); return; }
+      try {
+        await api(`/api/broker-accounts/${acct.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ label, account_type: accountType }),
+          key: 'edit-account',
+        });
+        await loadAccounts();
+      } catch (e) {
+        errEl.textContent = 'Save failed.';
+        errEl.classList.remove('hidden');
+        throw e;
+      }
+    });
+  }
+
+  function openRotateModal(accountId) {
+    document.getElementById('rotate-account-id').value = accountId;
+    document.getElementById('rotate-api-key').value = '';
+    document.getElementById('rotate-api-secret').value = '';
+    document.getElementById('rotate-error').classList.add('hidden');
+    openModal(document.getElementById('modal-rotate'), async () => {
+      const apiKey = document.getElementById('rotate-api-key').value.trim();
+      const apiSecret = document.getElementById('rotate-api-secret').value.trim();
+      const errEl = document.getElementById('rotate-error');
+      if (!apiKey || !apiSecret) { errEl.textContent = 'Both fields required.'; errEl.classList.remove('hidden'); return; }
+      try {
+        await api(`/api/broker-accounts/${accountId}/credentials`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ api_key: apiKey, api_secret: apiSecret }),
+          key: 'rotate-account',
+        });
+        await loadAccounts();
+      } catch (e) {
+        errEl.textContent = 'Rotate failed.';
+        errEl.classList.remove('hidden');
+        throw e;
+      }
+    });
+  }
+
+  async function openDeleteModal(acct) {
+    document.getElementById('delete-account-id').value = acct.id;
+    document.getElementById('delete-account-name').textContent = acct.label;
+    const warnEl = document.getElementById('delete-assignments-warn');
+    warnEl.classList.add('hidden');
+    try {
+      const { strategies } = await api(`/api/broker-accounts/${acct.id}/assignments`, { key: `assign-${acct.id}` });
+      if (strategies.length) {
+        warnEl.textContent = `Will remove ${strategies.length} strategy assignment(s): ${strategies.join(', ')}`;
+        warnEl.classList.remove('hidden');
+      }
+    } catch { /* non-blocking — warn not shown if fetch fails */ }
+    openModal(document.getElementById('modal-delete-account'), async () => {
+      await api(`/api/broker-accounts/${acct.id}`, { method: 'DELETE', key: 'del-account' });
+      await loadAccounts();
+    });
+  }
+
+  document.getElementById('btn-add-account').addEventListener('click', () => {
+    ['add-label', 'add-api-key', 'add-api-secret'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('add-account-type').value = 'paper';
+    document.getElementById('add-error').classList.add('hidden');
+    openModal(document.getElementById('modal-add-account'), async () => {
+      const label = document.getElementById('add-label').value.trim();
+      const apiKey = document.getElementById('add-api-key').value.trim();
+      const apiSecret = document.getElementById('add-api-secret').value.trim();
+      const accountType = document.getElementById('add-account-type').value;
+      const errEl = document.getElementById('add-error');
+      if (!label || !apiKey || !apiSecret) {
+        errEl.textContent = 'All fields are required.';
+        errEl.classList.remove('hidden');
+        return;
+      }
+      try {
+        await api('/api/broker-accounts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ label, api_key: apiKey, api_secret: apiSecret, account_type: accountType }),
+          key: 'add-account',
+        });
+        await loadAccounts();
+      } catch (e) {
+        errEl.textContent = 'Add failed: ' + (e.message || 'unknown error');
+        errEl.classList.remove('hidden');
+        throw e;
+      }
+    });
+  });
+
+  await loadAccounts();
 }
