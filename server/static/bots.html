@@ -148,17 +148,18 @@
       <div id="risk-error" class="state-error hidden" style="margin-bottom:.75rem;">Could not load risk status.</div>
       <table class="dtable">
         <colgroup>
-          <col style="width:36px">
-          <col style="width:30%">
+          <col style="width:22px">
+          <col style="width:26px">
+          <col style="width:26%">
           <col>
           <col style="width:140px">
           <col style="width:90px">
         </colgroup>
         <thead><tr>
-          <th></th><th>Strategy</th><th>Description</th><th>Status</th><th style="text-align:right;">Action</th>
+          <th></th><th></th><th>Strategy</th><th>Description</th><th>Status</th><th style="text-align:right;">Action</th>
         </tr></thead>
         <tbody id="strat-body">
-          <tr><td colspan="5" class="state-empty">Loading strategies…</td></tr>
+          <tr><td colspan="6" class="state-empty">Loading strategies…</td></tr>
         </tbody>
       </table>
     </div>
@@ -216,6 +217,36 @@
     <div class="modal-actions">
       <button class="btn btn-ghost" data-action="cancel">Cancel</button>
       <button class="btn btn-primary" data-action="confirm">Deactivate</button>
+    </div>
+  </div>
+</div>
+
+<!-- Assign Account picker -->
+<div id="modal-assign-account" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modal-assign-title">
+  <div class="modal-box" style="max-width:380px;">
+    <div id="modal-assign-title" class="modal-title">Assign Account</div>
+    <div class="modal-body">
+      <div id="assign-strategy-name" style="font-weight:600;margin-bottom:.5rem;font-size:13px;"></div>
+      <select id="assign-account-select" class="input-field" style="width:100%;">
+        <option value="">Select a broker account…</option>
+      </select>
+      <div id="assign-error" class="hidden" style="font-size:12px;color:#EF4444;margin-top:.5rem;"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" data-action="cancel">Cancel</button>
+      <button class="btn btn-primary" data-action="confirm">Assign</button>
+    </div>
+  </div>
+</div>
+
+<!-- Unassign confirm -->
+<div id="modal-unassign" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modal-unassign-title">
+  <div class="modal-box" style="max-width:360px;">
+    <div id="modal-unassign-title" class="modal-title">Remove Account</div>
+    <div class="modal-body"><span id="unassign-desc"></span></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" data-action="cancel">Cancel</button>
+      <button class="btn btn-danger" data-action="confirm">Remove</button>
     </div>
   </div>
 </div>
