@@ -822,3 +822,371 @@ async function initBots() {
   await fetchRiskState();
   createPoller(fetchStrategies, 30_000).start();
 }
+
+// ─────────────────────────────────────────
+// initPositions — positions.html
+// ─────────────────────────────────────────
+async function initPositions() {
+  initClockChip(document.getElementById('market-chip'));
+
+  async function fetchPositions() {
+    const tbody = document.getElementById('pos-body');
+    try {
+      const positions = await api('/api/positions', { key: 'pos-positions' });
+      tbody.innerHTML = '';
+      if (!positions.length) {
+        const tr = document.createElement('tr');
+        const td = document.createElement('td');
+        td.colSpan = 7; td.className = 'state-empty'; td.textContent = 'No open positions.';
+        tr.appendChild(td); tbody.appendChild(tr); return;
+      }
+      positions.forEach(p => {
+        const tr = document.createElement('tr');
+        const pnl = p.unrealized_pl || 0;
+        const vals = [
+          p.symbol,
+          p.side,
+          (p.qty || 0).toFixed(2),
+          fmt.usd(p.avg_entry_price),
+          fmt.usd(p.current_price),
+          fmt.usd(p.market_value),
+          '' // P&L with glow — set below
+        ];
+        vals.forEach((v, i) => {
+          const td = document.createElement('td');
+          if (i === 6) {
+            td.textContent = fmt.usdSigned(pnl, '—');
+            td.className = 'text-tabular ' + (pnl >= 0 ? 'glow-green' : 'glow-red');
+          } else {
+            td.textContent = v;
+          }
+          tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+      });
+    } catch (e) {
+      if (e.name === 'AbortError') return;
+      tbody.innerHTML = '<tr><td colspan="7" class="state-error">Failed to load — retrying in 30s</td></tr>';
+      throw e;
+    }
+  }
+
+  let currentStatus = 'all';
+  async function fetchOrders() {
+    const tbody = document.getElementById('orders-body');
+    try {
+      const orders = await api(`/api/orders?status=${currentStatus}&limit=50`, { key: 'pos-orders' });
+      tbody.innerHTML = '';
+      if (!orders.length) {
+        const tr = document.createElement('tr');
+        const td = document.createElement('td');
+        td.colSpan = 6; td.className = 'state-empty'; td.textContent = 'No orders.';
+        tr.appendChild(td); tbody.appendChild(tr); return;
+      }
+      orders.forEach(o => {
+        const tr = document.createElement('tr');
+        const fields = [fmt.time(o.submitted_at), o.symbol, '', (o.qty || o.filled_qty || 0).toFixed(2), o.status, fmt.time(o.filled_at)];
+        fields.forEach((v, i) => {
+          const td = document.createElement('td');
+          if (i === 2) {
+            const tag = document.createElement('span');
+            tag.className = 'badge ' + (o.side === 'buy' ? 'b-buy' : 'b-sell');
+            tag.textContent = o.side === 'buy' ? 'Buy' : 'Sell';
+            td.appendChild(tag);
+          } else { td.textContent = v; }
+          tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+      });
+    } catch (e) {
+      if (e.name === 'AbortError') return;
+      tbody.innerHTML = '<tr><td colspan="6" class="state-error">Failed to load — retrying in 30s</td></tr>';
+      throw e;
+    }
+  }
+
+  document.querySelectorAll('[data-status]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('[data-status]').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentStatus = btn.dataset.status;
+      fetchOrders();
+    });
+  });
+
+  createPoller(fetchPositions, 30_000).start();
+  createPoller(fetchOrders,    30_000).start();
+}
+
+// ─────────────────────────────────────────
+// initPerformance — performance.html
+// ─────────────────────────────────────────
+async function initPerformance() {
+  initClockChip(document.getElementById('market-chip'));
+  let dailyChart = null;
+
+  async function fetchPerformance() {
+    try {
+      const p = await api('/api/performance', { key: 'perf-data' });
+
+      // Strategy stats table
+      const statsTbody = document.getElementById('strat-stats-body');
+      statsTbody.innerHTML = '';
+      (p.strategy_stats || []).forEach(s => {
+        const tr = document.createElement('tr');
+        [s.strategy, s.total, s.buys, s.sells, s.blocked].forEach(v => {
+          const td = document.createElement('td');
+          td.textContent = v ?? '0';
+          tr.appendChild(td);
+        });
+        statsTbody.appendChild(tr);
+      });
+      if (!p.strategy_stats?.length) {
+        statsTbody.innerHTML = '<tr><td colspan="5" class="state-empty">No data.</td></tr>';
+      }
+
+      // Top symbols table
+      const symTbody = document.getElementById('topsym-body');
+      symTbody.innerHTML = '';
+      (p.top_symbols || []).slice(0, 10).forEach(s => {
+        const tr = document.createElement('tr');
+        [s.symbol, s.total, s.buys, s.sells].forEach(v => {
+          const td = document.createElement('td'); td.textContent = v ?? '0'; tr.appendChild(td);
+        });
+        symTbody.appendChild(tr);
+      });
+      if (!p.top_symbols?.length) {
+        symTbody.innerHTML = '<tr><td colspan="4" class="state-empty">No data.</td></tr>';
+      }
+
+      // Daily chart
+      const daily = p.daily_counts || [];
+      if (daily.length >= 2) {
+        const chartEl = document.getElementById('daily-chart');
+        chartEl.innerHTML = '';
+        if (dailyChart) dailyChart.destroy();
+        dailyChart = safeMakeChart(chartEl, {
+          series: [
+            { name: 'Total', data: daily.map(d => ({ x: d.date, y: d.total })) },
+            { name: 'Buys',  data: daily.map(d => ({ x: d.date, y: d.buys  })) },
+            { name: 'Sells', data: daily.map(d => ({ x: d.date, y: d.sells })) },
+          ],
+          chart: { type: 'bar', height: 200, toolbar: { show: false }, background: 'transparent', stacked: false },
+          colors: ['#3B82F6', '#10B981', '#EF4444'],
+          xaxis: { type: 'category', labels: { style: { colors: '#64748B', fontSize: '11px' } }, axisBorder: { show: false } },
+          yaxis: { labels: { style: { colors: '#64748B', fontSize: '11px' } } },
+          grid: { borderColor: '#1E2D45', strokeDashArray: 3 },
+          legend: { labels: { colors: '#E6EBF5' } },
+          theme: { mode: 'dark' },
+          tooltip: { theme: 'dark' }
+        });
+      }
+
+    } catch (e) {
+      if (e.name === 'AbortError') return;
+      throw e;
+    }
+  }
+
+  async function fetchSignals() {
+    const tbody = document.getElementById('signals-body');
+    try {
+      const sigs = await api('/api/signals?limit=50', { key: 'perf-signals' });
+      tbody.innerHTML = '';
+      if (!sigs.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="state-empty">No signals.</td></tr>'; return;
+      }
+      sigs.slice(0, 50).forEach(s => {
+        const tr = document.createElement('tr');
+        const statusCls = { filled: 'b-enabled', blocked: 'b-notrun', error: 'b-error', pending: 'b-disabled' }[s.status] || 'b-disabled';
+        const fields = [fmt.time(s.ts), s.strategy, s.symbol, '', s.reason, ''];
+        fields.forEach((v, i) => {
+          const td = document.createElement('td');
+          if (i === 3) {
+            const tag = document.createElement('span');
+            tag.className = 'badge ' + (s.side === 'buy' ? 'b-buy' : 'b-sell');
+            tag.textContent = s.side === 'buy' ? 'Buy' : 'Sell';
+            td.appendChild(tag);
+          } else if (i === 5) {
+            const badge = document.createElement('span');
+            badge.className = 'badge ' + statusCls;
+            badge.textContent = s.status;
+            td.appendChild(badge);
+          } else {
+            td.textContent = v;
+          }
+          tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+      });
+    } catch (e) {
+      if (e.name === 'AbortError') return;
+      tbody.innerHTML = '<tr><td colspan="6" class="state-error">Failed to load — retrying in 30s</td></tr>';
+      throw e;
+    }
+  }
+
+  createPoller(fetchPerformance, 60_000).start();
+  createPoller(fetchSignals,     30_000).start();
+}
+
+// ─────────────────────────────────────────
+// initBalances — balances.html
+// ─────────────────────────────────────────
+async function initBalances() {
+  initClockChip(document.getElementById('market-chip'));
+
+  async function fetchAccount() {
+    try {
+      const a = await api('/api/account', { key: 'bal-account' });
+      document.getElementById('bal-equity').textContent = fmt.usd(a.equity);
+      document.getElementById('bal-cash').textContent   = fmt.usd(a.cash);
+      document.getElementById('bal-bp').textContent     = fmt.usd(a.buying_power);
+      document.getElementById('bal-pv').textContent     = fmt.usd(a.portfolio_value);
+      if (a.account_type === 'paper') {
+        document.getElementById('paper-badge')?.classList.remove('hidden');
+      }
+    } catch (e) {
+      if (e.name === 'AbortError') return;
+      ['bal-equity','bal-cash','bal-bp','bal-pv'].forEach(id => {
+        document.getElementById(id).textContent = '—';
+      });
+      throw e;
+    }
+  }
+
+  async function fetchHoldings() {
+    const tbody = document.getElementById('holdings-body');
+    try {
+      const positions = await api('/api/positions', { key: 'bal-positions' });
+      tbody.innerHTML = '';
+      if (!positions.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="state-empty">No open holdings.</td></tr>';
+        return;
+      }
+      positions.forEach(p => {
+        const tr = document.createElement('tr');
+        const pnl = p.unrealized_pl || 0;
+        const fields = [p.symbol, (p.qty||0).toFixed(2), fmt.usd(p.avg_entry_price), fmt.usd(p.current_price), fmt.usd(p.market_value), ''];
+        fields.forEach((v, i) => {
+          const td = document.createElement('td');
+          if (i === 5) {
+            td.textContent = fmt.usdSigned(pnl, '—');
+            td.className = 'text-tabular ' + (pnl >= 0 ? 'glow-green' : 'glow-red');
+          } else { td.textContent = v; }
+          tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+      });
+    } catch (e) {
+      if (e.name === 'AbortError') return;
+      tbody.innerHTML = '<tr><td colspan="6" class="state-error">Failed to load — retrying in 30s</td></tr>';
+      throw e;
+    }
+  }
+
+  createPoller(fetchAccount,  30_000).start();
+  createPoller(fetchHoldings, 30_000).start();
+}
+
+// ─────────────────────────────────────────
+// initLogs — logs.html
+// ─────────────────────────────────────────
+async function initLogs() {
+  initClockChip(document.getElementById('market-chip'));
+  let currentFilter = 'all';
+
+  async function fetchSignals() {
+    const tbody = document.getElementById('logs-body');
+    try {
+      const sigs = await api('/api/signals?limit=200', { key: 'logs-signals' });
+      const filtered = currentFilter === 'all' ? sigs : sigs.filter(s => s.status === currentFilter);
+      tbody.innerHTML = '';
+      if (!filtered.length) {
+        tbody.innerHTML = '<tr><td colspan="7" class="state-empty">No signals.</td></tr>';
+        return;
+      }
+      const statusCls = { filled: 'b-enabled', blocked: 'b-notrun', error: 'b-error', pending: 'b-disabled' };
+      filtered.slice(0, 100).forEach(s => {
+        const tr = document.createElement('tr');
+        const fields = [fmt.time(s.ts), s.strategy, s.symbol, '', (s.qty||0).toFixed(2), s.reason, ''];
+        fields.forEach((v, i) => {
+          const td = document.createElement('td');
+          if (i === 3) {
+            const tag = document.createElement('span');
+            tag.className = 'badge ' + (s.side === 'buy' ? 'b-buy' : 'b-sell');
+            tag.textContent = s.side === 'buy' ? 'Buy' : 'Sell';
+            td.appendChild(tag);
+          } else if (i === 6) {
+            const badge = document.createElement('span');
+            badge.className = 'badge ' + (statusCls[s.status] || 'b-disabled');
+            badge.textContent = s.status;
+            td.appendChild(badge);
+          } else { td.textContent = v; }
+          tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+      });
+    } catch (e) {
+      if (e.name === 'AbortError') return;
+      tbody.innerHTML = '<tr><td colspan="7" class="state-error">Failed to load — retrying in 30s</td></tr>';
+      throw e;
+    }
+  }
+
+  document.querySelectorAll('[data-filter]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('[data-filter]').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentFilter = btn.dataset.filter;
+      fetchSignals();
+    });
+  });
+
+  createPoller(fetchSignals, 30_000).start();
+}
+
+// ─────────────────────────────────────────
+// initApiKeys — apikeys.html
+// ─────────────────────────────────────────
+async function initApiKeys() {
+  initClockChip(document.getElementById('market-chip'));
+
+  async function fetchConnection() {
+    const statusEl  = document.getElementById('conn-status');
+    const modeEl    = document.getElementById('conn-mode');
+    const acctEl    = document.getElementById('conn-acct-status');
+    const fetchEl   = document.getElementById('conn-last-fetch');
+    const blockedEl = document.getElementById('conn-blocked');
+
+    try {
+      const a = await api('/api/account', { key: 'keys-account' });
+
+      statusEl.className = 'badge b-enabled';
+      statusEl.innerHTML = '<span class="pdot"></span><span>Connected</span>';
+
+      modeEl.textContent = a.account_type === 'paper' ? 'Paper Trading' : 'Live Trading';
+      modeEl.className = 'text-tabular ' + (a.account_type === 'paper' ? 'text-muted' : 'glow-green');
+
+      acctEl.textContent = a.status || '—';
+      fetchEl.textContent = new Date().toLocaleTimeString();
+      blockedEl.textContent = a.trading_blocked ? 'Yes' : 'No';
+      blockedEl.className = a.trading_blocked ? 'glow-red' : 'text-green';
+
+      if (a.account_type === 'paper') {
+        document.getElementById('paper-badge')?.classList.remove('hidden');
+      }
+
+    } catch (e) {
+      if (e.name === 'AbortError') return;
+      statusEl.className = 'badge b-error';
+      statusEl.textContent = 'Disconnected';
+      modeEl.textContent = '—';
+      acctEl.textContent = '—';
+      blockedEl.textContent = '—';
+      throw e;
+    }
+  }
+
+  createPoller(fetchConnection, 30_000).start();
+}
