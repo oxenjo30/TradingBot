@@ -261,3 +261,326 @@ document.addEventListener('DOMContentLoaded', () => {
 // ─────────────────────────────────────────
 // Page init functions are appended in Tasks 4–10
 // ─────────────────────────────────────────
+
+// ─────────────────────────────────────────
+// initDashboard — index.html
+// ─────────────────────────────────────────
+async function initDashboard() {
+  const chipEl = document.getElementById('market-chip');
+  await initClockChip(chipEl);
+
+  // Chart instances (destroyed and recreated on range tab change)
+  let perfChart = null;
+  let allocChart = null;
+  let radialChart = null;
+  const sparkCharts = {};
+
+  // ── Fetch account ──
+  async function fetchAccount() {
+    const t0 = Date.now();
+    try {
+      const a = await api('/api/account', { key: 'idx-account' });
+      const latency = Date.now() - t0;
+
+      const balEl = document.getElementById('balance-val');
+      clearState(balEl);
+      balEl.textContent = fmt.usd(a.equity);
+
+      const pnlEl = document.getElementById('daypnl-val');
+      clearState(pnlEl);
+      pnlEl.textContent = fmt.usdSigned(a.day_pl, '—');
+      pnlEl.className = 'text-tabular truncate ' + (a.day_pl >= 0 ? 'glow-green' : 'glow-red');
+      pnlEl.style.fontSize = '20px';
+      pnlEl.style.fontWeight = '700';
+
+      document.getElementById('daypnl-sub').textContent = fmt.pctDecimal(a.day_pl_pct, '');
+
+      if (a.account_type === 'paper') {
+        document.getElementById('paper-badge').classList.remove('hidden');
+      }
+
+      document.getElementById('sys-exchange').textContent = a.status || 'ACTIVE';
+      document.getElementById('sys-exchange-dot').classList.remove('off');
+      document.getElementById('sys-api').textContent = 'Connected';
+      document.getElementById('sys-api-dot').classList.remove('off');
+      document.getElementById('sys-latency').textContent = latency + 'ms';
+
+      const pct = (a.day_pl_pct || 0) * 100;
+      document.getElementById('pnl-daypnl').textContent = fmt.usdSigned(a.day_pl, '$0.00');
+      document.getElementById('pnl-daypnl').className = 'text-tabular ' + (a.day_pl >= 0 ? 'glow-green' : 'glow-red');
+
+      if (radialChart) { radialChart.destroy(); }
+      const radEl = document.getElementById('radial-chart');
+      radEl.innerHTML = '';
+      radialChart = safeMakeChart(radEl, radialConfig(pct, 'Day P&L'));
+
+    } catch (e) {
+      if (e.name === 'AbortError') return;
+      showError(document.getElementById('balance-val'));
+      throw e;
+    }
+  }
+
+  // ── Fetch performance ──
+  async function fetchPerformance() {
+    try {
+      const p = await api('/api/performance', { key: 'idx-perf' });
+
+      const upnlEl = document.getElementById('upnl-val');
+      clearState(upnlEl);
+      const upnl = p.total_unrealized_pl || 0;
+      upnlEl.textContent = fmt.usdSigned(upnl, '$0.00');
+      upnlEl.className = 'text-tabular truncate ' + (upnl >= 0 ? 'glow-green' : 'glow-red');
+      upnlEl.style.fontSize = '20px';
+      upnlEl.style.fontWeight = '700';
+
+      const opEl = document.getElementById('openpos-val');
+      clearState(opEl);
+      opEl.textContent = fmt.integer(p.open_positions, '0');
+
+      document.getElementById('pnl-upnl').textContent = fmt.usdSigned(p.total_unrealized_pl, '$0.00');
+      document.getElementById('pnl-upnl').className = 'text-tabular ' + (upnl >= 0 ? 'glow-green' : 'glow-red');
+      document.getElementById('pnl-openpos').textContent = fmt.integer(p.open_positions, '0');
+
+      const counts = (p.daily_counts || []).slice(-7).map(d => d.total || 0);
+      const sparkIds = ['spark-balance','spark-daypnl','spark-fillrate','spark-bots','spark-upnl','spark-openpos'];
+      sparkIds.forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        if (sparkCharts[id]) { sparkCharts[id].destroy(); }
+        el.innerHTML = '';
+        sparkCharts[id] = safeMakeChart(el, sparkConfig(counts));
+      });
+
+    } catch (e) {
+      if (e.name === 'AbortError') return;
+      showError(document.getElementById('upnl-val'));
+      throw e;
+    }
+  }
+
+  // ── Fetch signals → fill rate ──
+  async function fetchSignals() {
+    try {
+      const sigs = await api('/api/signals?limit=200', { key: 'idx-signals' });
+      const filled  = sigs.filter(s => s.status === 'filled').length;
+      const blocked = sigs.filter(s => s.status === 'blocked').length;
+      const error   = sigs.filter(s => s.status === 'error').length;
+      const denom   = filled + blocked + error;
+      const frEl    = document.getElementById('fillrate-val');
+      clearState(frEl);
+      frEl.textContent = denom === 0 ? '—' : ((filled / denom) * 100).toFixed(1) + '%';
+    } catch (e) {
+      if (e.name === 'AbortError') return;
+      showError(document.getElementById('fillrate-val'));
+      throw e;
+    }
+  }
+
+  // ── Fetch strategies → active bots + bot status panel ──
+  async function fetchStrategies() {
+    try {
+      const strats = await api('/api/strategies', { key: 'idx-strategies' });
+      const botsEl = document.getElementById('bots-val');
+      clearState(botsEl);
+      botsEl.textContent = strats.filter(s => s.enabled).length;
+
+      const engine = await api('/api/engine', { key: 'idx-engine' });
+      const ranMap = {};
+      (engine.ran || []).forEach(r => { ranMap[r.strategy] = r; });
+      const listEl = document.getElementById('bot-status-list');
+      listEl.innerHTML = '';
+      strats.forEach(s => {
+        const row = document.createElement('div');
+        row.style.cssText = 'display:flex;align-items:center;gap:8px;min-width:0;';
+
+        const ic = document.createElement('div');
+        ic.className = 'icon-circle icon-purple';
+        ic.style.cssText = 'width:28px;height:28px;flex-shrink:0;';
+        ic.innerHTML = '<svg width="12" height="12" fill="none" stroke="#8B5CF6" stroke-width="2" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="2" height="2"/><rect x="13" y="9" width="2" height="2"/><path d="M9 13a3 3 0 0 0 6 0"/></svg>';
+
+        const name = document.createElement('div');
+        name.style.cssText = 'flex:1;min-width:0;';
+        const nameSpan = document.createElement('div');
+        nameSpan.className = 'truncate';
+        nameSpan.style.fontSize = '12px';
+        nameSpan.style.fontWeight = '500';
+        nameSpan.textContent = s.label;
+        name.appendChild(nameSpan);
+
+        const badge = document.createElement('span');
+        let badgeClass, badgeText;
+        if (!s.enabled) {
+          badgeClass = 'b-disabled'; badgeText = 'Disabled';
+        } else if (ranMap[s.name] && ranMap[s.name].error) {
+          badgeClass = 'b-error'; badgeText = 'Last Run Error';
+        } else if (ranMap[s.name]) {
+          badgeClass = 'b-enabled';
+          badgeText = '';
+        } else {
+          badgeClass = 'b-notrun'; badgeText = 'Not Run Yet';
+        }
+        badge.className = 'badge ' + badgeClass;
+        if (badgeClass === 'b-enabled') {
+          const dot = document.createElement('span');
+          dot.className = 'pdot';
+          badge.appendChild(dot);
+          const t = document.createElement('span');
+          t.textContent = 'Enabled';
+          badge.appendChild(t);
+        } else {
+          badge.textContent = badgeText;
+        }
+
+        row.appendChild(ic);
+        row.appendChild(name);
+        row.appendChild(badge);
+        listEl.appendChild(row);
+      });
+
+      document.getElementById('sys-lastrun').textContent = engine.ts ? fmt.time(engine.ts) : 'Never';
+
+    } catch (e) {
+      if (e.name === 'AbortError') return;
+      showError(document.getElementById('bots-val'));
+      throw e;
+    }
+  }
+
+  // ── Fetch positions → allocation donut ──
+  async function fetchPositions() {
+    try {
+      const positions = await api('/api/positions', { key: 'idx-positions' });
+      const allocEl = document.getElementById('alloc-chart');
+      const emptyEl = document.getElementById('alloc-empty');
+
+      if (!positions.length) {
+        allocEl.classList.add('hidden');
+        emptyEl.classList.remove('hidden');
+        return;
+      }
+      allocEl.classList.remove('hidden');
+      emptyEl.classList.add('hidden');
+      allocEl.innerHTML = '';
+      if (allocChart) { allocChart.destroy(); }
+      const labels = positions.map(p => p.symbol);
+      const series = positions.map(p => Math.abs(p.market_value));
+      allocChart = safeMakeChart(allocEl, donutConfig(labels, series));
+    } catch (e) {
+      if (e.name === 'AbortError') return;
+      showError(document.getElementById('alloc-chart'));
+      throw e;
+    }
+  }
+
+  // ── Fetch orders → recent trades ──
+  async function fetchOrders() {
+    try {
+      const orders = await api('/api/orders?status=closed&limit=25', { key: 'idx-orders' });
+      const filled = orders
+        .filter(o => o.status === 'filled' && o.filled_at)
+        .sort((a, b) => new Date(b.filled_at) - new Date(a.filled_at))
+        .slice(0, 5);
+
+      const tbody = document.getElementById('trades-body');
+      tbody.innerHTML = '';
+      if (!filled.length) {
+        const tr = document.createElement('tr');
+        const td = document.createElement('td');
+        td.colSpan = 5;
+        td.className = 'state-empty';
+        td.textContent = 'No recent trades.';
+        tr.appendChild(td);
+        tbody.appendChild(tr);
+        return;
+      }
+      filled.forEach(o => {
+        const tr = document.createElement('tr');
+        const cells = [
+          fmt.time(o.filled_at),
+          o.symbol,
+          '',
+          o.filled_qty != null ? o.filled_qty.toFixed(2) : '—',
+          '—'
+        ];
+        cells.forEach((text, i) => {
+          const td = document.createElement('td');
+          if (i === 2) {
+            const tag = document.createElement('span');
+            tag.className = 'badge ' + (o.side === 'buy' ? 'b-buy' : 'b-sell');
+            tag.textContent = o.side === 'buy' ? 'Buy' : 'Sell';
+            td.appendChild(tag);
+          } else {
+            td.textContent = text;
+          }
+          tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+      });
+    } catch (e) {
+      if (e.name === 'AbortError') return;
+      const tbody = document.getElementById('trades-body');
+      tbody.innerHTML = '<tr><td colspan="5" class="state-error">Failed to load trades.</td></tr>';
+      throw e;
+    }
+  }
+
+  // ── Portfolio history chart ──
+  async function fetchPerfChart(period, timeframe) {
+    const chartEl = document.getElementById('perf-chart');
+    chartEl.innerHTML = '<div class="skeleton" style="height:220px;border-radius:8px;"></div>';
+    try {
+      const h = await api(`/api/portfolio_history?period=${period}&timeframe=${timeframe}`, { key: 'idx-ph' });
+      const ts = h.timestamp || [];
+      const eq = h.equity    || [];
+      const base = h.base_value || 0;
+
+      chartEl.innerHTML = '';
+      if (ts.length < 2) {
+        chartEl.innerHTML = '<div class="state-empty" style="height:220px;display:flex;align-items:center;justify-content:center;">Not enough data for this range.</div>';
+        return;
+      }
+      if (perfChart) { perfChart.destroy(); }
+      perfChart = safeMakeChart(chartEl, perfChartConfig(ts, eq, base));
+
+      const last = eq[eq.length - 1] || 0;
+      const change = last - base;
+      const headEl = document.getElementById('perf-headline');
+      headEl.textContent = fmt.usdSigned(change, '—');
+      headEl.className = 'text-tabular glow-' + (change >= 0 ? 'green' : 'red');
+
+    } catch (e) {
+      if (e.name === 'AbortError') return;
+      chartEl.innerHTML = '<div class="state-error" style="height:220px;display:flex;align-items:center;justify-content:center;">Failed to load chart.</div>';
+      throw e;
+    }
+  }
+
+  // ── Range tab wiring ──
+  document.querySelectorAll('.range-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.range-tab').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      fetchPerfChart(btn.dataset.period, btn.dataset.timeframe);
+    });
+  });
+
+  // ── Server time ticker ──
+  async function fetchClock() {
+    try {
+      const c = await api('/api/clock', { key: 'idx-clock2' });
+      document.getElementById('sys-time').textContent = new Date(c.timestamp).toLocaleTimeString();
+    } catch { /* non-critical */ }
+  }
+
+  // ── Start pollers ──
+  fetchPerfChart('1D', '5Min');
+
+  createPoller(fetchAccount,    30_000).start();
+  createPoller(fetchPerformance,30_000).start();
+  createPoller(fetchSignals,    60_000).start();
+  createPoller(fetchStrategies, 30_000).start();
+  createPoller(fetchPositions,  30_000).start();
+  createPoller(fetchOrders,     30_000).start();
+  createPoller(fetchClock,      10_000).start();
+}
