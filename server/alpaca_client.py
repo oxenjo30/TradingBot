@@ -241,10 +241,12 @@ class AccountClient:
             })
         return out
 
-    def submit_market_order(self, symbol: str, side: str,
+    def submit_market_order(self, symbol: str, side: Literal["buy", "sell"],
                             qty: float | None = None,
                             notional: float | None = None,
                             client_order_id: str | None = None) -> dict:
+        if qty is None and notional is None:
+            raise ValueError("qty or notional required")
         req = MarketOrderRequest(
             symbol=symbol.upper(),
             qty=qty if not notional else None,
