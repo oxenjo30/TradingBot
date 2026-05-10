@@ -103,7 +103,7 @@ def run_tick():
             for sig in signals:
                 # ── risk check ──────────────────────────────────────────────
                 try:
-                    risk.check_all(sig.symbol, sig.side, account, day_trade_count)
+                    risk.check_all(sig.symbol, sig.side, account, acct_data["dtc"])
                 except risk.RiskViolation as rv:
                     reason = f"RISK BLOCK: {rv}"
                     log.warning("%s %s blocked — %s", sig.side, sig.symbol, rv)
@@ -152,7 +152,7 @@ def run_tick():
                     })
                     if sig.side == "sell":
                         acct_data["dtc"] += 1
-                    delta = final_qty if sig.side == "buy" else -(final_qty or 0)
+                    delta = (final_qty or 0) if sig.side == "buy" else -(final_qty or 0)
                     acct_data["positions"][sig.symbol] = (
                         acct_data["positions"].get(sig.symbol, 0.0) + delta
                     )
