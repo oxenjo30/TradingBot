@@ -64,10 +64,10 @@ RISK_DEFAULTS = {
 
 
 def init_db():
-    with conn() as c:
+    with get_conn() as c:
         c.executescript(SCHEMA)
     # seed risk defaults without overwriting existing values
-    with conn() as c:
+    with get_conn() as c:
         for k, v in RISK_DEFAULTS.items():
             c.execute(
                 "INSERT OR IGNORE INTO risk_settings(key, value) VALUES(?,?)", (k, v)
@@ -75,7 +75,7 @@ def init_db():
 
 
 def get_risk_settings() -> dict:
-    with conn() as c:
+    with get_conn() as c:
         rows = c.execute("SELECT key, value FROM risk_settings").fetchall()
     base = dict(RISK_DEFAULTS)
     base.update({r["key"]: r["value"] for r in rows})
@@ -92,20 +92,20 @@ def get_risk_settings() -> dict:
 def set_risk_setting(key: str, value: str):
     if key not in RISK_DEFAULTS:
         raise ValueError(f"unknown risk key: {key}")
-    with conn() as c:
+    with get_conn() as c:
         c.execute(
             "INSERT OR REPLACE INTO risk_settings(key, value) VALUES(?,?)", (key, value)
         )
 
 
 def get_app_config(key: str, default: str = "") -> str:
-    with conn() as c:
+    with get_conn() as c:
         row = c.execute("SELECT value FROM app_config WHERE key=?", (key,)).fetchone()
     return row["value"] if row else default
 
 
 def set_app_config(key: str, value: str):
-    with conn() as c:
+    with get_conn() as c:
         c.execute(
             "INSERT OR REPLACE INTO app_config(key, value) VALUES(?,?)", (key, value)
         )
@@ -116,7 +116,7 @@ def get_notification_settings() -> dict:
             "email_user", "email_pass", "telegram_enabled",
             "telegram_token", "telegram_chat_id", "notify_on_trade",
             "notify_on_block", "notify_daily_summary"]
-    with conn() as c:
+    with get_conn() as c:
         rows = c.execute("SELECT key, value FROM app_config WHERE key IN ({})".format(
             ",".join("?" * len(keys))), keys).fetchall()
     result = {k: "" for k in keys}
@@ -129,9 +129,10 @@ def get_notification_settings() -> dict:
 
 
 @contextmanager
-def conn():
+def get_conn():
     c = sqlite3.connect(DB_PATH)
     c.row_factory = sqlite3.Row
+    c.execute("PRAGMA foreign_keys = ON")
     try:
         yield c
         c.commit()
@@ -144,7 +145,7 @@ def now_iso() -> str:
 
 
 def upsert_strategy(name: str, enabled: bool, params: dict):
-    with conn() as c:
+    with get_conn() as c:
         c.execute(
             """INSERT INTO strategies(name, enabled, params_json, updated_at)
                VALUES(?,?,?,?)
@@ -157,7 +158,7 @@ def upsert_strategy(name: str, enabled: bool, params: dict):
 
 
 def get_strategies() -> list[dict]:
-    with conn() as c:
+    with get_conn() as c:
         rows = c.execute("SELECT * FROM strategies ORDER BY name").fetchall()
     return [
         {
@@ -171,7 +172,7 @@ def get_strategies() -> list[dict]:
 
 
 def get_strategy(name: str) -> dict | None:
-    with conn() as c:
+    with get_conn() as c:
         r = c.execute("SELECT * FROM strategies WHERE name=?", (name,)).fetchone()
     if not r:
         return None
@@ -185,7 +186,7 @@ def get_strategy(name: str) -> dict | None:
 
 def log_signal(strategy: str, symbol: str, side: str, qty: float, reason: str,
                order_id: str | None, status: str):
-    with conn() as c:
+    with get_conn() as c:
         c.execute(
             """INSERT INTO signals(ts, strategy, symbol, side, qty, reason, order_id, status)
                VALUES(?,?,?,?,?,?,?,?)""",
@@ -194,7 +195,7 @@ def log_signal(strategy: str, symbol: str, side: str, qty: float, reason: str,
 
 
 def recent_signals(limit: int = 100) -> list[dict]:
-    with conn() as c:
+    with get_conn() as c:
         rows = c.execute(
             "SELECT * FROM signals ORDER BY id DESC LIMIT ?", (limit,)
         ).fetchall()
@@ -205,7 +206,7 @@ def recent_signals(limit: int = 100) -> list[dict]:
 
 def performance_by_strategy() -> list[dict]:
     """Aggregate signal counts per strategy."""
-    with conn() as c:
+    with get_conn() as c:
         rows = c.execute("""
             SELECT
                 strategy,
@@ -227,7 +228,7 @@ def performance_by_strategy() -> list[dict]:
 
 def top_symbols_overall(limit: int = 10) -> list[dict]:
     """Most traded symbols across all strategies."""
-    with conn() as c:
+    with get_conn() as c:
         rows = c.execute("""
             SELECT
                 symbol,
@@ -246,7 +247,7 @@ def top_symbols_overall(limit: int = 10) -> list[dict]:
 
 def daily_signal_counts(days: int = 30) -> list[dict]:
     """Signal counts per calendar day for the past N days."""
-    with conn() as c:
+    with get_conn() as c:
         rows = c.execute("""
             SELECT
                 DATE(ts)                                          AS date,

@@ -3,7 +3,7 @@ import hashlib
 import hmac
 import os
 import time
-from .db import conn, init_db
+from .db import get_conn, init_db
 
 SESSION_TTL = 60 * 60 * 24  # 24 hours
 _sessions: dict[str, float] = {}  # token → expiry_ts
@@ -28,7 +28,7 @@ def _verify_pw(password: str, stored: str) -> bool:
 
 def set_password(password: str):
     hashed = _hash_pw(password)
-    with conn() as c:
+    with get_conn() as c:
         c.execute(
             "INSERT OR REPLACE INTO app_config(key, value) VALUES('password_hash', ?)",
             (hashed,)
@@ -36,7 +36,7 @@ def set_password(password: str):
 
 
 def get_password_hash() -> str | None:
-    with conn() as c:
+    with get_conn() as c:
         row = c.execute(
             "SELECT value FROM app_config WHERE key='password_hash'"
         ).fetchone()
@@ -83,7 +83,7 @@ def revoke_session(token: str):
 # ── Setup state ───────────────────────────────────────────────────────────────
 
 def setup_complete() -> bool:
-    with conn() as c:
+    with get_conn() as c:
         row = c.execute(
             "SELECT value FROM app_config WHERE key='setup_complete'"
         ).fetchone()
@@ -91,7 +91,7 @@ def setup_complete() -> bool:
 
 
 def mark_setup_complete():
-    with conn() as c:
+    with get_conn() as c:
         c.execute(
             "INSERT OR REPLACE INTO app_config(key, value) VALUES('setup_complete', 'true')"
         )
