@@ -652,23 +652,36 @@ async function initBots() {
   }
 
   async function fetchStrategies() {
-    const [strats, engine] = await Promise.all([
-      api('/api/strategies', { key: 'bots-strats' }),
-      api('/api/engine',     { key: 'bots-engine' })
+    const [strats, engineStatus, allAccounts] = await Promise.all([
+      api('/api/strategies',      { key: 'bots-strats' }),
+      api('/api/engine',          { key: 'bots-engine' }),
+      api('/api/broker-accounts', { key: 'bots-all-accts' }),
     ]);
 
     const ranMap = {};
-    (engine.ran || []).forEach(r => { ranMap[r.strategy] = r; });
+    (engineStatus.ran || []).forEach(r => { ranMap[r.strategy] = r; });
 
     const enabled = strats.filter(s => s.enabled).length;
     document.getElementById('engine-status-txt').textContent =
-      `${enabled} of ${strats.length} strategies enabled · Last run: ${engine.ts ? fmt.time(engine.ts) : 'Never'}`;
+      `${enabled} of ${strats.length} strategies enabled · Last run: ${engineStatus.ts ? fmt.time(engineStatus.ts) : 'Never'}`;
 
     const tbody = document.getElementById('strat-body');
     tbody.innerHTML = '';
 
-    strats.forEach(s => {
+    for (const s of strats) {
+      let stratAccounts = [];
+      try {
+        stratAccounts = await api(`/api/strategies/${s.name}/accounts`, { key: `sa-${s.name}` });
+      } catch { /* no assignments yet — empty array is fine */ }
+
+      // ── main strategy row ──────────────────────────────────────────────────
       const tr = document.createElement('tr');
+      tr.style.cursor = 'pointer';
+      tr.dataset.expanded = 'false';
+
+      const tdChevron = document.createElement('td');
+      tdChevron.style.cssText = 'color:#64748B;font-size:10px;user-select:none;padding-right:0;';
+      tdChevron.textContent = '▶';
 
       const tdIcon = document.createElement('td');
       tdIcon.innerHTML = '<div class="icon-circle icon-purple" style="width:26px;height:26px;"><svg width="11" height="11" fill="none" stroke="#8B5CF6" stroke-width="2" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="2" height="2"/><rect x="13" y="9" width="2" height="2"/><path d="M9 13a3 3 0 0 0 6 0"/></svg></div>';
@@ -694,7 +707,7 @@ async function initBots() {
       badge.className = 'badge ' + bc;
       if (bc === 'b-enabled') {
         const dot = document.createElement('span'); dot.className = 'pdot'; badge.appendChild(dot);
-        const t = document.createElement('span'); t.textContent = 'Enabled'; badge.appendChild(t);
+        badge.appendChild(document.createTextNode('Enabled'));
       } else {
         badge.textContent = bt;
       }
@@ -702,15 +715,171 @@ async function initBots() {
 
       const tdAction = document.createElement('td');
       tdAction.style.textAlign = 'right';
-      const btn = document.createElement('button');
-      btn.className = 'btn btn-sm ' + (s.enabled ? 'btn-ghost' : 'btn-primary');
-      btn.textContent = s.enabled ? 'Disable' : 'Enable';
-      btn.addEventListener('click', () => confirmToggle(s, !s.enabled, btn));
-      tdAction.appendChild(btn);
+      const toggleBtn = document.createElement('button');
+      toggleBtn.className = 'btn btn-sm ' + (s.enabled ? 'btn-ghost' : 'btn-primary');
+      toggleBtn.textContent = s.enabled ? 'Disable' : 'Enable';
+      toggleBtn.addEventListener('click', (e) => { e.stopPropagation(); confirmToggle(s, !s.enabled, toggleBtn); });
+      tdAction.appendChild(toggleBtn);
 
-      tr.append(tdIcon, tdName, tdDesc, tdBadge, tdAction);
+      tr.append(tdChevron, tdIcon, tdName, tdDesc, tdBadge, tdAction);
       tbody.appendChild(tr);
-    });
+
+      // ── expandable sub-row ─────────────────────────────────────────────────
+      const subTr = document.createElement('tr');
+      subTr.className = 'hidden';
+      subTr.style.background = 'rgba(17,24,39,0.4)';
+      const subTd = document.createElement('td');
+      subTd.colSpan = 6;
+      subTd.style.padding = '0 .75rem .75rem 3rem';
+
+      function buildSubTable(currentAccounts) {
+        subTd.innerHTML = '';
+        const subTable = document.createElement('table');
+        subTable.className = 'dtable';
+        subTable.style.marginTop = '.5rem';
+
+        const thead = document.createElement('thead');
+        thead.innerHTML = '<tr><th>Account</th><th>Type</th><th>Status</th><th style="text-align:right;">Action</th></tr>';
+        const stbody = document.createElement('tbody');
+
+        if (!currentAccounts.length) {
+          const emptyTr = document.createElement('tr');
+          const emptyTd = document.createElement('td');
+          emptyTd.colSpan = 4;
+          emptyTd.className = 'text-muted';
+          emptyTd.style.cssText = 'font-size:12px;padding:.5rem 0;';
+          emptyTd.textContent = 'No accounts assigned yet.';
+          emptyTr.appendChild(emptyTd);
+          stbody.appendChild(emptyTr);
+        }
+
+        currentAccounts.forEach(acct => {
+          const atr = document.createElement('tr');
+
+          const tdLbl = document.createElement('td');
+          tdLbl.textContent = acct.label;
+
+          const tdType = document.createElement('td');
+          tdType.innerHTML = `<span class="badge ${acct.account_type === 'live' ? 'b-enabled' : 'b-disabled'}">${acct.account_type}</span>`;
+
+          const tdSt = document.createElement('td');
+          const enBadge = document.createElement('span');
+          enBadge.className = 'badge ' + (acct.enabled ? 'b-enabled' : 'b-disabled');
+          if (acct.enabled) {
+            const dot = document.createElement('span'); dot.className = 'pdot'; enBadge.appendChild(dot);
+            enBadge.appendChild(document.createTextNode('Enabled'));
+          } else {
+            enBadge.textContent = 'Disabled';
+          }
+          tdSt.appendChild(enBadge);
+
+          const tdAct = document.createElement('td');
+          tdAct.style.textAlign = 'right';
+
+          const perToggleBtn = document.createElement('button');
+          perToggleBtn.className = 'btn btn-sm btn-ghost';
+          perToggleBtn.style.fontSize = '11px';
+          perToggleBtn.textContent = acct.enabled ? 'Disable' : 'Enable';
+          perToggleBtn.addEventListener('click', async () => {
+            perToggleBtn.disabled = true;
+            try {
+              await api(`/api/strategies/${s.name}/accounts/${acct.id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ enabled: !acct.enabled }),
+                key: `sa-toggle-${s.name}-${acct.id}`,
+              });
+              stratAccounts = await api(`/api/strategies/${s.name}/accounts`, { key: `sa-${s.name}` });
+              buildSubTable(stratAccounts);
+            } catch { perToggleBtn.disabled = false; }
+          });
+
+          const removeBtn = document.createElement('button');
+          removeBtn.className = 'btn btn-sm';
+          removeBtn.style.cssText = 'font-size:11px;color:#EF4444;background:none;border:none;margin-left:.25rem;';
+          removeBtn.textContent = '×';
+          removeBtn.title = 'Unassign account';
+          removeBtn.addEventListener('click', () => {
+            const descEl = document.getElementById('unassign-desc');
+            descEl.innerHTML = '';
+            descEl.appendChild(document.createTextNode('Remove '));
+            const strong = document.createElement('strong'); strong.textContent = acct.label;
+            descEl.appendChild(strong);
+            descEl.appendChild(document.createTextNode(` from ${s.label}?`));
+            openModal(document.getElementById('modal-unassign'), async () => {
+              await api(`/api/strategies/${s.name}/accounts/${acct.id}`, {
+                method: 'DELETE', key: `sa-del-${s.name}-${acct.id}`,
+              });
+              stratAccounts = await api(`/api/strategies/${s.name}/accounts`, { key: `sa-${s.name}` });
+              buildSubTable(stratAccounts);
+            });
+          });
+
+          tdAct.append(perToggleBtn, removeBtn);
+          atr.append(tdLbl, tdType, tdSt, tdAct);
+          stbody.appendChild(atr);
+        });
+
+        // ── Assign Account button ────────────────────────────────────────────
+        const assignTr = document.createElement('tr');
+        const assignTd = document.createElement('td');
+        assignTd.colSpan = 4;
+        assignTd.style.paddingTop = '.5rem';
+        const assignBtn = document.createElement('button');
+        assignBtn.className = 'btn btn-ghost btn-sm';
+        assignBtn.style.fontSize = '11px';
+        assignBtn.textContent = '+ Assign Account';
+        assignBtn.addEventListener('click', () => {
+          const assignedIds = new Set(stratAccounts.map(a => a.id));
+          const available = allAccounts.filter(a => !assignedIds.has(a.id));
+          const sel = document.getElementById('assign-account-select');
+          sel.innerHTML = '<option value="">Select a broker account…</option>';
+          available.forEach(a => {
+            const opt = document.createElement('option');
+            opt.value = a.id;
+            opt.textContent = `${a.label} (${a.account_type})`;
+            sel.appendChild(opt);
+          });
+          document.getElementById('assign-strategy-name').textContent = s.label;
+          document.getElementById('assign-error').classList.add('hidden');
+          openModal(document.getElementById('modal-assign-account'), async () => {
+            const acctId = parseInt(sel.value);
+            const errEl = document.getElementById('assign-error');
+            if (!acctId) { errEl.textContent = 'Please select an account.'; errEl.classList.remove('hidden'); return; }
+            try {
+              await api(`/api/strategies/${s.name}/accounts`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ account_id: acctId, enabled: true }),
+                key: `sa-assign-${s.name}`,
+              });
+              stratAccounts = await api(`/api/strategies/${s.name}/accounts`, { key: `sa-${s.name}` });
+              buildSubTable(stratAccounts);
+            } catch {
+              errEl.textContent = 'Assign failed.';
+              errEl.classList.remove('hidden');
+            }
+          });
+        });
+        assignTd.appendChild(assignBtn);
+        assignTr.appendChild(assignTd);
+        stbody.appendChild(assignTr);
+
+        subTable.append(thead, stbody);
+        subTd.appendChild(subTable);
+      }
+
+      buildSubTable(stratAccounts);
+      subTr.appendChild(subTd);
+      tbody.appendChild(subTr);
+
+      tr.addEventListener('click', () => {
+        const isExpanded = tr.dataset.expanded === 'true';
+        tr.dataset.expanded = isExpanded ? 'false' : 'true';
+        tdChevron.textContent = isExpanded ? '▶' : '▼';
+        subTr.classList.toggle('hidden', isExpanded);
+      });
+    }
   }
 
   function confirmToggle(strategy, enable, triggerBtn) {
