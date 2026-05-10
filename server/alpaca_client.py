@@ -194,3 +194,70 @@ def get_portfolio_history(period: str = "1M", timeframe: str = "1D") -> dict:
     r = httpx.get(url, headers=headers, params=params, timeout=15.0)
     r.raise_for_status()
     return r.json()
+
+
+class AccountClient:
+    """Per-account Alpaca client with the same interface as the module-level functions.
+    get_account_summary() returns identical 11-key dict so risk.check_all() works unchanged.
+    get_positions() returns 3 fields only (symbol, qty, side) — sufficient for engine sizing.
+    """
+
+    def __init__(self, api_key: str, api_secret: str, paper: bool):
+        self._t = TradingClient(api_key, api_secret, paper=paper)
+        self._d = StockHistoricalDataClient(api_key, api_secret)
+        self._paper = paper
+
+    def get_account_summary(self) -> dict:
+        a = self._t.get_account()
+        equity = float(a.equity)
+        last_equity = float(a.last_equity)
+        return {
+            "status": str(a.status),
+            "cash": float(a.cash),
+            "equity": equity,
+            "last_equity": last_equity,
+            "buying_power": float(a.buying_power),
+            "portfolio_value": float(a.portfolio_value),
+            "day_pl": equity - last_equity,
+            "day_pl_pct": ((equity - last_equity) / last_equity * 100) if last_equity else 0.0,
+            "pattern_day_trader": bool(a.pattern_day_trader),
+            "trading_blocked": bool(a.trading_blocked),
+            "account_type": "paper" if self._paper else "live",
+        }
+
+    def get_day_trade_count(self) -> int:
+        try:
+            return int(self._t.get_account().daytrade_count or 0)
+        except Exception:
+            return 0
+
+    def get_positions(self) -> list[dict]:
+        out = []
+        for p in self._t.get_all_positions():
+            out.append({
+                "symbol": p.symbol,
+                "qty": float(p.qty),
+                "side": str(p.side).lower().replace("positionside.", ""),
+            })
+        return out
+
+    def submit_market_order(self, symbol: str, side: str,
+                            qty: float | None = None,
+                            notional: float | None = None,
+                            client_order_id: str | None = None) -> dict:
+        req = MarketOrderRequest(
+            symbol=symbol.upper(),
+            qty=qty if not notional else None,
+            notional=round(notional, 2) if notional else None,
+            side=OrderSide.BUY if side == "buy" else OrderSide.SELL,
+            time_in_force=TimeInForce.DAY,
+            client_order_id=client_order_id,
+        )
+        o = self._t.submit_order(req)
+        return {
+            "id": str(o.id),
+            "symbol": o.symbol,
+            "side": str(o.side).lower().replace("orderside.", ""),
+            "qty": float(o.qty) if o.qty else None,
+            "status": str(o.status).lower().replace("orderstatus.", ""),
+        }
