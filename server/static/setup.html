@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>TradeBot â€” Setup</title>
+<title>TradeBot &ndash; Setup</title>
 <link rel="stylesheet" href="/static/styles.css" />
 <style>
   body { background:#0d1117; min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:2rem; }
@@ -49,67 +49,36 @@
 <body>
 <div class="wizard">
   <div class="wizard-header">
-    <div class="wizard-icon">ðŸ“ˆ</div>
+    <div class="wizard-icon">&#x1F4C8;</div>
     <div class="wizard-title">TradeBot Setup</div>
-    <div class="wizard-sub">Let's get your trading bot ready in 4 easy steps</div>
+    <div class="wizard-sub">Get your trading bot ready in 3 easy steps</div>
   </div>
 
   <div class="step-pills">
     <div class="pill active" id="pill-0"></div>
     <div class="pill" id="pill-1"></div>
     <div class="pill" id="pill-2"></div>
-    <div class="pill" id="pill-3"></div>
-    <div class="pill" id="pill-4"></div>
   </div>
 
   <div class="card p-6">
 
     <!-- Step 0: Welcome -->
     <div class="step active" id="step-0">
-      <div class="step-title">Welcome to TradeBot ðŸ‘‹</div>
-      <div class="step-desc">An automated stock trading bot that monitors the market 24/7 and executes trades based on proven strategies â€” no coding required.</div>
+      <div class="step-title">Welcome to TradeBot &#x1F44B;</div>
+      <div class="step-desc">An automated stock trading bot that monitors the market 24/7 and executes trades based on proven strategies &mdash; no coding required.</div>
       <div class="welcome-features">
-        <div class="feature"><div class="feature-icon">ðŸ¤–</div><div><div class="feature-title">7 Built-in Strategies</div><div class="feature-desc">SMA Crossover, RSI, Momentum, Bollinger Bands, 52-Week Breakout, MACD, Golden Cross</div></div></div>
-        <div class="feature"><div class="feature-icon">ðŸ›¡ï¸</div><div><div class="feature-title">Risk Controls Built-in</div><div class="feature-desc">Kill switch, daily loss limits, PDT protection, and position sizing</div></div></div>
-        <div class="feature"><div class="feature-icon">ðŸ“Š</div><div><div class="feature-title">Live Dashboard</div><div class="feature-desc">Monitor positions, P&L, signals, and market scanner in real time</div></div></div>
-        <div class="feature"><div class="feature-icon">ðŸ””</div><div><div class="feature-title">Instant Notifications</div><div class="feature-desc">Get email or Telegram alerts every time a trade executes</div></div></div>
+        <div class="feature"><div class="feature-icon">&#x1F916;</div><div><div class="feature-title">7 Built-in Strategies</div><div class="feature-desc">SMA Crossover, RSI, Momentum, Bollinger Bands, 52-Week Breakout, MACD, Golden Cross</div></div></div>
+        <div class="feature"><div class="feature-icon">&#x1F6E1;&#xFE0F;</div><div><div class="feature-title">Risk Controls Built-in</div><div class="feature-desc">Kill switch, daily loss limits, PDT protection, and position sizing</div></div></div>
+        <div class="feature"><div class="feature-icon">&#x1F4CA;</div><div><div class="feature-title">Live Dashboard</div><div class="feature-desc">Monitor positions, P&amp;L, signals, and market scanner in real time</div></div></div>
+        <div class="feature"><div class="feature-icon">&#x1F514;</div><div><div class="feature-title">Instant Notifications</div><div class="feature-desc">Get email or Telegram alerts every time a trade executes</div></div></div>
       </div>
       <div class="btn-row">
-        <button class="btn primary" style="flex:1;padding:.75rem" onclick="nextStep()">Get Started â†’</button>
+        <button class="btn primary" style="flex:1;padding:.75rem" onclick="nextStep()">Get Started &rarr;</button>
       </div>
     </div>
 
-    <!-- Step 1: Broker Connection -->
+    <!-- Step 1: Risk Settings -->
     <div class="step" id="step-1">
-      <div class="step-title">Connect Your Broker</div>
-      <div class="step-desc">TradeBot uses <strong style="color:#c8d6e8">Alpaca Markets</strong> â€” a free commission-free broker with a paper (practice) trading account. <a href="https://alpaca.markets" target="_blank" style="color:#5b8def">Create a free account â†’</a></div>
-      <div class="form-row">
-        <label>API Key</label>
-        <input class="input" id="s-api-key" placeholder="PKXXXXXXXXXXXXXXXXXX" />
-        <div class="hint">Found in Alpaca dashboard â†’ Broker Accounts</div>
-      </div>
-      <div class="form-row">
-        <label>API Secret</label>
-        <input class="input" id="s-api-secret" type="password" placeholder="Your API secret key" />
-      </div>
-      <div class="form-row">
-        <label>Account Type</label>
-        <select class="input" id="s-account-type">
-          <option value="paper">Paper Trading (Practice â€” Recommended for beginners)</option>
-          <option value="live">Live Trading (Real money)</option>
-        </select>
-        <div class="hint">âš ï¸ Start with Paper Trading. Switch to Live only after testing your strategies.</div>
-      </div>
-      <button class="btn" onclick="testConnection()" id="test-btn">ðŸ”Œ Test Connection</button>
-      <div class="test-result" id="test-result"></div>
-      <div class="btn-row">
-        <button class="btn" onclick="prevStep()">â† Back</button>
-        <button class="btn primary" style="flex:1" id="next-1" onclick="nextStep()" disabled>Continue â†’</button>
-      </div>
-    </div>
-
-    <!-- Step 2: Risk Settings -->
-    <div class="step" id="step-2">
       <div class="step-title">Risk Settings</div>
       <div class="step-desc">These guardrails protect your account. You can always change them later in the dashboard.</div>
       <div class="form-row">
@@ -128,55 +97,55 @@
         <div class="hint">Maximum number of stocks the bot can hold at the same time.</div>
       </div>
       <div class="btn-row">
-        <button class="btn" onclick="prevStep()">â† Back</button>
-        <button class="btn primary" style="flex:1" onclick="nextStep()">Continue â†’</button>
+        <button class="btn" onclick="prevStep()">&larr; Back</button>
+        <button class="btn primary" style="flex:1" onclick="nextStep()">Continue &rarr;</button>
       </div>
     </div>
 
-    <!-- Step 3: Starter Strategy -->
-    <div class="step" id="step-3">
+    <!-- Step 2: Starter Strategy -->
+    <div class="step" id="step-2">
       <div class="step-title">Choose Your First Strategy</div>
       <div class="step-desc">Pick one to start with. You can enable more strategies anytime from the dashboard.</div>
       <div class="strategy-picks">
         <label class="strategy-pick selected" onclick="selectStrategy('momentum')">
           <input type="radio" name="strategy" value="momentum" checked />
           <div class="strategy-info">
-            <div class="name">ðŸš€ Momentum Breakout <span style="font-size:.7rem;background:#16c784;color:#000;padding:.1rem .4rem;border-radius:99px;margin-left:.3rem">Recommended</span></div>
+            <div class="name">&#x1F680; Momentum Breakout <span style="font-size:.7rem;background:#16c784;color:#000;padding:.1rem .4rem;border-radius:99px;margin-left:.3rem">Recommended</span></div>
             <div class="desc">Scans the market for trending stocks with strong momentum. Best for rising markets. Good for beginners.</div>
           </div>
         </label>
         <label class="strategy-pick" onclick="selectStrategy('breakout_52w')">
           <input type="radio" name="strategy" value="breakout_52w" />
           <div class="strategy-info">
-            <div class="name">ðŸ“ˆ 52-Week High Breakout</div>
+            <div class="name">&#x1F4C8; 52-Week High Breakout</div>
             <div class="desc">Buys stocks hitting yearly highs on above-average volume. One of the most proven signals in trading research.</div>
           </div>
         </label>
         <label class="strategy-pick" onclick="selectStrategy('macd_volume')">
           <input type="radio" name="strategy" value="macd_volume" />
           <div class="strategy-info">
-            <div class="name">ðŸ“‰ MACD + Volume</div>
+            <div class="name">&#x1F4C9; MACD + Volume</div>
             <div class="desc">MACD crossover confirmed by volume. Fewer false signals than simple moving average crosses.</div>
           </div>
         </label>
         <label class="strategy-pick" onclick="selectStrategy('manual')">
           <input type="radio" name="strategy" value="manual" />
           <div class="strategy-info">
-            <div class="name">ðŸ–ï¸ Manual Only â€” I'll place trades myself</div>
+            <div class="name">&#x1F5D2;&#xFE0F; Manual Only &mdash; I'll place trades myself</div>
             <div class="desc">No automated trading. Use the dashboard to monitor markets and place orders manually.</div>
           </div>
         </label>
       </div>
       <div class="btn-row">
-        <button class="btn" onclick="prevStep()">â† Back</button>
-        <button class="btn primary" style="flex:1" onclick="nextStep()">Continue â†’</button>
+        <button class="btn" onclick="prevStep()">&larr; Back</button>
+        <button class="btn primary" style="flex:1" onclick="nextStep()">Continue &rarr;</button>
       </div>
     </div>
 
-    <!-- Step 4: Set Password -->
-    <div class="step" id="step-4">
+    <!-- Step 3: Set Password -->
+    <div class="step" id="step-3">
       <div class="step-title">Set Your Dashboard Password</div>
-      <div class="step-desc">Protect your dashboard with a password. Anyone on your network who knows the URL can access it â€” keep it secure.</div>
+      <div class="step-desc">Protect your dashboard with a password. Anyone on your network who knows the URL can access it &mdash; keep it secure.</div>
       <div class="form-row">
         <label>Password</label>
         <input class="input" id="s-password" type="password" placeholder="Choose a strong password" />
@@ -187,21 +156,21 @@
       </div>
       <div class="test-result" id="pw-error" style="display:none"></div>
       <div class="btn-row">
-        <button class="btn" onclick="prevStep()">â† Back</button>
-        <button class="btn primary" style="flex:1" onclick="finishSetup()">âœ… Finish Setup</button>
+        <button class="btn" onclick="prevStep()">&larr; Back</button>
+        <button class="btn primary" style="flex:1" onclick="finishSetup()">&#x2705; Finish Setup</button>
       </div>
     </div>
 
-    <!-- Step 5: Done -->
-    <div class="step" id="step-5">
-      <div class="success-icon">ðŸŽ‰</div>
+    <!-- Step 4: Done -->
+    <div class="step" id="step-4">
+      <div class="success-icon">&#x1F389;</div>
       <div class="step-title" style="text-align:center">You're all set!</div>
-      <div class="step-desc" style="text-align:center">TradeBot is configured and your first strategy is enabled. The bot will start scanning the market automatically when it opens.</div>
+      <div class="step-desc" style="text-align:center">Your dashboard is ready. Head to <strong style="color:#c8d6e8">Broker Accounts</strong> to connect your Alpaca account and start trading.</div>
       <div class="welcome-features" style="margin-top:1.5rem">
-        <div class="feature"><div class="feature-icon">ðŸ’¡</div><div><div class="feature-title">Tip: Start with Paper Trading</div><div class="feature-desc">Watch how the bot performs for a week before switching to live money.</div></div></div>
-        <div class="feature"><div class="feature-icon">ðŸ””</div><div><div class="feature-title">Set up Notifications</div><div class="feature-desc">Go to Settings â†’ Notifications to get trade alerts via email or Telegram.</div></div></div>
+        <div class="feature"><div class="feature-icon">&#x1F511;</div><div><div class="feature-title">Connect a Broker Account</div><div class="feature-desc">Go to Broker Accounts &rarr; Add Account to link your Alpaca paper or live account.</div></div></div>
+        <div class="feature"><div class="feature-icon">&#x1F514;</div><div><div class="feature-title">Set up Notifications</div><div class="feature-desc">Go to Settings &rarr; Notifications to get trade alerts via email or Telegram.</div></div></div>
       </div>
-      <button class="btn primary" style="width:100%;padding:.85rem;margin-top:1.5rem;font-size:1rem" onclick="window.location.href='/'">Open Dashboard â†’</button>
+      <button class="btn primary" style="width:100%;padding:.85rem;margin-top:1.5rem;font-size:1rem" onclick="window.location.href='/'">Open Dashboard &rarr;</button>
     </div>
 
   </div><!-- /card -->
@@ -209,14 +178,16 @@
 
 <script>
 let currentStep = 0;
-const TOTAL_STEPS = 5;
+const TOTAL_STEPS = 4;
 let _selectedStrategy = "momentum";
 
 function updatePills() {
-  for (let i = 0; i <= TOTAL_STEPS; i++) {
+  // pills 0-2 represent steps 1-3
+  for (let i = 0; i < 3; i++) {
     const pill = document.getElementById(`pill-${i}`);
     if (!pill) continue;
-    pill.className = "pill" + (i < currentStep ? " done" : i === currentStep ? " active" : "");
+    const stepNum = i + 1;
+    pill.className = "pill" + (currentStep > stepNum ? " done" : currentStep === stepNum ? " active" : "");
   }
   document.querySelectorAll(".step").forEach((el, i) => {
     el.classList.toggle("active", i === currentStep);
@@ -233,37 +204,6 @@ function selectStrategy(name) {
   });
 }
 
-async function testConnection() {
-  const key    = document.getElementById("s-api-key").value.trim();
-  const secret = document.getElementById("s-api-secret").value.trim();
-  const type   = document.getElementById("s-account-type").value;
-  if (!key || !secret) { alert("Please enter your API key and secret."); return; }
-  const btn = document.getElementById("test-btn");
-  const res = document.getElementById("test-result");
-  btn.disabled = true; btn.textContent = "Testing...";
-  try {
-    const r = await fetch("/api/setup/test_connection", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ api_key: key, api_secret: secret, account_type: type }),
-    });
-    const d = await r.json();
-    if (r.ok && d.ok) {
-      res.className = "test-result ok";
-      res.textContent = `âœ… Connected! Account: ${d.account_id} | Equity: $${Number(d.equity).toLocaleString()}`;
-      document.getElementById("next-1").disabled = false;
-    } else {
-      res.className = "test-result err";
-      res.textContent = `âŒ ${d.detail || "Connection failed. Check your API key and secret."}`;
-    }
-  } catch {
-    res.className = "test-result err";
-    res.textContent = "âŒ Could not reach server.";
-  }
-  res.style.display = "block";
-  btn.disabled = false; btn.textContent = "ðŸ”Œ Test Connection";
-}
-
 async function finishSetup() {
   const pw  = document.getElementById("s-password").value;
   const pw2 = document.getElementById("s-password2").value;
@@ -278,14 +218,11 @@ async function finishSetup() {
   }
   err.style.display = "none";
   const payload = {
-    api_key:      document.getElementById("s-api-key").value.trim(),
-    api_secret:   document.getElementById("s-api-secret").value.trim(),
-    account_type: document.getElementById("s-account-type").value,
-    notional:     parseFloat(document.getElementById("s-notional").value) || 500,
+    notional:           parseFloat(document.getElementById("s-notional").value) || 500,
     max_daily_loss_pct: parseFloat(document.getElementById("s-max-loss").value) || 2,
     max_position_count: parseInt(document.getElementById("s-max-pos").value) || 5,
-    starter_strategy: _selectedStrategy,
-    password: pw,
+    starter_strategy:   _selectedStrategy,
+    password:           pw,
   };
   try {
     const r = await fetch("/api/setup/complete", {
@@ -299,9 +236,11 @@ async function finishSetup() {
       err.className = "test-result err"; err.style.display = "block";
       err.textContent = d.detail || "Setup failed.";
     }
-  } catch { err.className = "test-result err"; err.style.display = "block"; err.textContent = "Error saving setup."; }
+  } catch {
+    err.className = "test-result err"; err.style.display = "block";
+    err.textContent = "Error saving setup.";
+  }
 }
 </script>
 </body>
 </html>
-

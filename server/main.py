@@ -89,9 +89,6 @@ class SetupTestIn(BaseModel):
     account_type: str = "paper"
 
 class SetupCompleteIn(BaseModel):
-    api_key: str
-    api_secret: str
-    account_type: str = "paper"
     notional: float = 500
     max_daily_loss_pct: float = 2.0
     max_position_count: int = 5
@@ -189,20 +186,16 @@ def setup_test(body: SetupTestIn):
 
 @app.post("/api/setup/complete")
 def setup_complete(body: SetupCompleteIn):
-    # 1. Write .env — preserve DB_SECRET_KEY if already set
+    # 1. Ensure DB_SECRET_KEY exists in .env (generate once; preserve everything else)
     env_path = BASE_DIR / ".env"
     existing_secret = os.environ.get("DB_SECRET_KEY") or _read_env_key("DB_SECRET_KEY")
     db_secret = existing_secret or crypto.generate_key()
-    endpoint = ("https://paper-api.alpaca.markets" if body.account_type == "paper"
-                else "https://api.alpaca.markets")
-    env_content = (
-        f"ALPACA_API_KEY={body.api_key}\n"
-        f"ALPACA_API_SECRET={body.api_secret}\n"
-        f"ALPACA_ENDPOINT={endpoint}/v2\n"
-        f"ALPACA_ACCOUNT_TYPE={body.account_type}\n"
-        f"DB_SECRET_KEY={db_secret}\n"
-    )
-    env_path.write_text(env_content)
+    try:
+        lines = [l for l in env_path.read_text().splitlines() if not l.startswith("DB_SECRET_KEY=")]
+    except FileNotFoundError:
+        lines = []
+    lines.append(f"DB_SECRET_KEY={db_secret}")
+    env_path.write_text("\n".join(lines) + "\n")
     os.environ["DB_SECRET_KEY"] = db_secret
     crypto.init_crypto()  # re-initialise with the (possibly new) key
 
