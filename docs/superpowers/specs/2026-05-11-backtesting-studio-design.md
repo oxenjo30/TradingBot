@@ -72,7 +72,7 @@ CREATE TABLE backtest_runs (
   sharpe_ratio      REAL,
   total_trades      INTEGER,
   equity_curve      TEXT,                  -- JSON [{date, equity}, ...]
-  trades            TEXT                   -- JSON [{date, symbol, side, qty, price, pnl}, ...]
+  trades            TEXT                   -- JSON [{date, symbol, side, qty, price, pnl}, ...] — closed trades only; pnl is realised P&L at close
 );
 ```
 
@@ -104,7 +104,7 @@ DELETE /api/backtest/runs/{id}    Delete a saved run
 ```python
 class BacktestRequest(BaseModel):
     strategy:          str
-    symbols:           list[str]
+    symbols:           list[str] = Field(..., min_length=1)
     start_date:        date          # FastAPI validates ISO format automatically
     end_date:          date
     initial_capital:   float = 10000.0
@@ -112,9 +112,10 @@ class BacktestRequest(BaseModel):
     commission_pct:    float = 0.1
     slippage_pct:      float = 0.05
 
-    @validator("end_date")
-    def end_after_start(cls, v, values):
-        if "start_date" in values and v <= values["start_date"]:
+    @field_validator("end_date", mode="after")   # Pydantic v2 syntax
+    @classmethod
+    def end_after_start(cls, v, info):
+        if info.data.get("start_date") and v <= info.data["start_date"]:
             raise ValueError("end_date must be after start_date")
         return v
 
@@ -160,7 +161,7 @@ Runs synchronously. For typical date ranges (1–3 years, 1–5 symbols) this co
 
 2. **Build trading calendar** — union of all bar dates across symbols, filtered to `[start_date, end_date]`. If a symbol has no bars for a given date, that symbol is silently skipped on that date (no signal generated, existing position marked to last known close price).
 
-3. **Thread-safe patch via thread-local** — `alpaca_client` exposes a `threading.local()` object `_bt`. `get_recent_bars` checks `_bt.bars` first; if set, it returns the date-sliced data from the local dict instead of calling Alpaca. `BacktestEngine` sets `_bt.bars` at the start of each tick and clears it in a `finally` block. The backtest endpoint dispatches to a worker thread via `asyncio.to_thread(engine.run, ...)` so the live engine's APScheduler ticks (which run on the event loop thread) never see the thread-local override.
+3. **Thread-safe patch via thread-local** — `alpaca_client` exposes a `threading.local()` object `_bt`. `get_recent_bars` checks `_bt.bars` first; if set, it ignores the `days` argument entirely and returns `_bt.bars.get(symbol, [])` filtered to bars with `date <= _bt.current_date`. `BacktestEngine` sets `_bt.bars` to the full pre-fetched dict **once before the date loop begins**, and sets `_bt.current_date` at the start of each date iteration; both are cleared in a `finally` block wrapping the entire date loop. This means the thread-local is active for all `strategy.evaluate()` calls within that date, and cleared at the end of the full run (not per-evaluate and not per-date). The backtest endpoint dispatches via `asyncio.to_thread(engine.run, ...)` so the live engine's APScheduler ticks (which run on the event loop thread) never see the thread-local override.
 
 4. **Tick loop** — for each simulation date:
    - Call `strategy.evaluate(positions)` for each symbol
@@ -239,7 +240,10 @@ Functions:
 - If Alpaca returns no bars for a symbol/date range: return 400 with `{"detail": "No historical data found for AAPL in the given date range"}`
 - If strategy key is unknown: return 400 with `{"detail": "Unknown strategy: xyz"}`
 - If `end_date <= start_date`: return 422 from Pydantic validation
+- If `symbols` is empty: return 422 from Pydantic validation (`min_length=1`)
+- `PATCH /api/backtest/runs/{id}` and `DELETE /api/backtest/runs/{id}`: return 404 if `id` not found (same pattern as other mutating endpoints)
 - Frontend displays API `detail` messages in a red banner below the config card
+- Frontend stat pills must guard against `null` values for `win_rate_pct` and `sharpe_ratio` (display "—" rather than NaN)
 
 ---
 
