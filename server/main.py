@@ -83,11 +83,6 @@ class RiskSettingUpdate(BaseModel):
 class LoginIn(BaseModel):
     password: str
 
-class SetupTestIn(BaseModel):
-    api_key: str
-    api_secret: str
-    account_type: str = "paper"
-
 class SetupCompleteIn(BaseModel):
     notional: float = 500
     max_daily_loss_pct: float = 2.0
@@ -163,26 +158,6 @@ def logout(request: Request, response: Response):
         auth.revoke_session(token)
     response.delete_cookie("tb_session")
     return {"ok": True}
-
-@app.post("/api/setup/test_connection")
-def setup_test(body: SetupTestIn):
-    try:
-        endpoint = (
-            "https://paper-api.alpaca.markets"
-            if body.account_type == "paper"
-            else "https://api.alpaca.markets"
-        )
-        from alpaca.trading.client import TradingClient
-        tc = TradingClient(body.api_key, body.api_secret,
-                           paper=(body.account_type == "paper"))
-        acct = tc.get_account()
-        return {
-            "ok": True,
-            "account_id": str(acct.id)[:8] + "...",
-            "equity": float(acct.equity or 0),
-        }
-    except Exception as e:
-        raise HTTPException(400, str(e))
 
 @app.post("/api/setup/complete")
 def setup_complete(body: SetupCompleteIn):

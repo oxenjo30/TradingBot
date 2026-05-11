@@ -73,9 +73,14 @@ def run_tick():
                     )
                     acct_summary = acct_client.get_account_summary()
                     acct_dtc = acct_client.get_day_trade_count()
+                    raw_positions = acct_client.get_positions()
                     acct_positions = {
                         p["symbol"]: (p["qty"] if p["side"] == "long" else -p["qty"])
-                        for p in acct_client.get_positions()
+                        for p in raw_positions
+                    }
+                    acct_market_values = {
+                        p["symbol"]: p["market_value"]
+                        for p in raw_positions
                     }
                 except Exception as e:
                     log.warning("acct %d init failed: %s", acct_id, e)
@@ -85,6 +90,7 @@ def run_tick():
                     "account": acct_summary,
                     "dtc": acct_dtc,
                     "positions": acct_positions,
+                    "market_values": acct_market_values,
                 }
 
             acct_data = client_cache[acct_id]
@@ -110,7 +116,7 @@ def run_tick():
                     risk.check_all(
                         sig.symbol, sig.side, account, acct_data["dtc"],
                         open_positions_count=len(acct_data["positions"]),
-                        current_symbol_qty=abs(acct_data["positions"].get(sig.symbol, 0.0)),
+                        current_symbol_value=acct_data["market_values"].get(sig.symbol, 0.0),
                     )
                 except risk.RiskViolation as rv:
                     reason = f"RISK BLOCK: {rv}"
@@ -126,6 +132,7 @@ def run_tick():
                     continue
 
                 # ── position sizing ─────────────────────────────────────────
+                price = None
                 if sig.notional:
                     final_qty = None
                 else:
@@ -167,9 +174,15 @@ def run_tick():
                     })
                     if sig.side == "sell":
                         acct_data["dtc"] += 1
-                    delta = (final_qty or 0) if sig.side == "buy" else -(final_qty or 0)
+                    delta_qty = (final_qty or 0) if sig.side == "buy" else -(final_qty or 0)
                     acct_data["positions"][sig.symbol] = (
-                        acct_data["positions"].get(sig.symbol, 0.0) + delta
+                        acct_data["positions"].get(sig.symbol, 0.0) + delta_qty
+                    )
+                    value_delta = sig.notional if sig.notional else (final_qty or 0) * (price or 0)
+                    if sig.side == "sell":
+                        value_delta = -value_delta
+                    acct_data["market_values"][sig.symbol] = (
+                        acct_data["market_values"].get(sig.symbol, 0.0) + value_delta
                     )
                 except Exception as e:
                     log.exception("order submit failed for %s %s %s",
