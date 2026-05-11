@@ -1,14 +1,16 @@
+import asyncio
 import logging
 import os
 from contextlib import asynccontextmanager
+from datetime import date
 from typing import Literal
 
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
-from . import alpaca_client, auth, crypto, db, engine, notifications, risk, scanner, strategies
+from . import alpaca_client, auth, backtest as bt_mod, crypto, db, engine, notifications, risk, scanner, strategies
 from .config import STATIC_DIR, BASE_DIR
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
@@ -115,6 +117,7 @@ class BrokerAccountCreate(BaseModel):
     api_key: str
     api_secret: str
     account_type: Literal["paper", "live"] = "paper"
+    broker: str = "alpaca"
 
 class BrokerAccountPatch(BaseModel):
     label: str | None = None
@@ -325,6 +328,8 @@ def list_strategies():
     saved = {s["name"]: s for s in db.get_strategies()}
     out = []
     for cls in strategies.REGISTRY.values():
+        if cls.hidden:
+            continue
         s = saved.get(cls.name)
         out.append({
             **cls.describe(),
@@ -375,6 +380,7 @@ def create_broker_account(body: BrokerAccountCreate, request: Request):
             crypto.encrypt(body.api_key),
             crypto.encrypt(body.api_secret),
             body.account_type,
+            body.broker,
         )
     except Exception as e:
         raise HTTPException(400, str(e))
@@ -568,6 +574,32 @@ def update_risk_setting(key: str, body: RiskSettingUpdate, request: Request):
     except ValueError as e:
         raise HTTPException(400, str(e))
 
+@app.get("/api/risk/blacklist")
+def get_blacklist(request: Request):
+    _require_auth(request)
+    return {"symbols": db.get_symbol_blacklist()}
+
+@app.post("/api/risk/blacklist")
+def add_to_blacklist(body: dict, request: Request):
+    _require_auth(request)
+    symbol = str(body.get("symbol", "")).strip().upper()
+    if not symbol:
+        raise HTTPException(400, "symbol required")
+    db.add_symbol_to_blacklist(symbol)
+    return {"symbols": db.get_symbol_blacklist()}
+
+@app.delete("/api/risk/blacklist/{symbol}")
+def remove_from_blacklist(symbol: str, request: Request):
+    _require_auth(request)
+    db.remove_symbol_from_blacklist(symbol.upper())
+    return {"symbols": db.get_symbol_blacklist()}
+
+@app.post("/api/risk/reset_losses")
+def reset_losses(request: Request):
+    _require_auth(request)
+    db.reset_consecutive_losses()
+    return {"consecutive_losses": 0}
+
 
 # ── Notifications ──────────────────────────────────────────────────────────────
 
@@ -626,3 +658,79 @@ def index(request: Request):
     if auth.password_is_set() and not auth.validate_session(_get_token(request)):
         return RedirectResponse("/login")
     return FileResponse(str(STATIC_DIR / "index.html"))
+
+
+# ── Backtesting ───────────────────────────────────────────────────────────────
+
+class BacktestRequest(BaseModel):
+    strategy:          str
+    symbols:           list[str] = Field(..., min_length=1)
+    start_date:        date
+    end_date:          date
+    initial_capital:   float = 10000.0
+    position_size_pct: float = 2.0
+    commission_pct:    float = 0.1
+    slippage_pct:      float = 0.05
+
+    @field_validator("end_date", mode="after")
+    @classmethod
+    def end_after_start(cls, v, info):
+        if info.data.get("start_date") and v <= info.data["start_date"]:
+            raise ValueError("end_date must be after start_date")
+        return v
+
+
+class BacktestRunPatch(BaseModel):
+    name: str = Field(..., max_length=200)
+
+
+@app.post("/api/backtest")
+async def run_backtest(req: BacktestRequest, request: Request):
+    _require_auth(request)
+    engine_bt = bt_mod.BacktestEngine()
+    try:
+        result = await asyncio.to_thread(
+            engine_bt.run,
+            req.strategy,
+            req.symbols,
+            req.start_date,
+            req.end_date,
+            req.initial_capital,
+            req.position_size_pct,
+            req.commission_pct,
+            req.slippage_pct,
+        )
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return result
+
+
+@app.get("/api/backtest/runs")
+async def list_backtest_runs(request: Request):
+    _require_auth(request)
+    return db.list_backtest_runs()
+
+
+@app.get("/api/backtest/runs/{run_id}")
+async def get_backtest_run(run_id: int, request: Request):
+    _require_auth(request)
+    run = db.get_backtest_run(run_id)
+    if run is None:
+        raise HTTPException(404, f"Run {run_id} not found")
+    return run
+
+
+@app.patch("/api/backtest/runs/{run_id}")
+async def patch_backtest_run(run_id: int, body: BacktestRunPatch, request: Request):
+    _require_auth(request)
+    if not db.rename_backtest_run(run_id, body.name):
+        raise HTTPException(404, f"Run {run_id} not found")
+    return {"status": "ok"}
+
+
+@app.delete("/api/backtest/runs/{run_id}")
+async def delete_backtest_run(run_id: int, request: Request):
+    _require_auth(request)
+    if not db.delete_backtest_run(run_id):
+        raise HTTPException(404, f"Run {run_id} not found")
+    return {"status": "ok"}
