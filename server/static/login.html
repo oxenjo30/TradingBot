@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>TradeBot — Sign In</title>
+<title>TradeBot â€” Sign In</title>
 <link rel="icon" href="data:,">
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -31,7 +31,7 @@
     overflow: hidden;
   }
 
-  /* ── Animated background ── */
+  /* â”€â”€ Animated background â”€â”€ */
   .bg-canvas {
     position: fixed;
     inset: 0;
@@ -55,7 +55,7 @@
     to   { transform: translate(30px, 20px) scale(1.08); }
   }
 
-  /* ── SVG chart background ── */
+  /* â”€â”€ SVG chart background â”€â”€ */
   .chart-bg {
     position: fixed;
     inset: 0;
@@ -103,7 +103,7 @@
     to   { opacity: 1; transform: translateY(0); }
   }
 
-  /* ── Card ── */
+  /* â”€â”€ Card â”€â”€ */
   .card {
     position: relative;
     z-index: 10;
@@ -128,7 +128,7 @@
     to { opacity: 1; transform: translateY(0); }
   }
 
-  /* ── Logo ── */
+  /* â”€â”€ Logo â”€â”€ */
   .logo { text-align: center; margin-bottom: 2.25rem; }
   .logo-icon {
     width: 64px; height: 64px;
@@ -153,7 +153,7 @@
     text-transform: uppercase;
   }
 
-  /* ── Stats strip ── */
+  /* â”€â”€ Stats strip â”€â”€ */
   .stats-strip {
     display: flex;
     gap: 1px;
@@ -174,7 +174,7 @@
   .red   { color: var(--red); }
   .blue  { color: var(--accent); }
 
-  /* ── Form ── */
+  /* â”€â”€ Form â”€â”€ */
   .field { margin-bottom: 1.25rem; }
   .field label {
     display: block;
@@ -203,7 +203,7 @@
   }
   .field input::placeholder { color: #2a3a55; }
 
-  /* ── Error ── */
+  /* â”€â”€ Error â”€â”€ */
   .error-box {
     background: rgba(234,57,67,0.08);
     border: 1px solid rgba(234,57,67,0.3);
@@ -221,7 +221,7 @@
     40%,80%  { transform: translateX(5px); }
   }
 
-  /* ── Button ── */
+  /* â”€â”€ Button â”€â”€ */
   .sign-btn {
     width: 100%;
     padding: 0.85rem;
@@ -265,7 +265,7 @@
   }
   .footer-link:hover { color: var(--accent); }
 
-  /* ── Ticker tape ── */
+  /* â”€â”€ Ticker tape â”€â”€ */
   .ticker-wrap {
     position: fixed;
     bottom: 0; left: 0; right: 0;
@@ -377,7 +377,7 @@
   </div>
 
   <div class="error-box" id="error-msg">
-    ⚠ <span id="error-text">Incorrect password — please try again</span>
+    âš  <span id="error-text">Incorrect password â€” please try again</span>
   </div>
 
   <form id="login-form" onsubmit="doLogin(event)" autocomplete="on">
@@ -389,7 +389,7 @@
     <button class="sign-btn" type="submit" id="login-btn">Sign In</button>
   </form>
 
-  <a class="footer-link" href="/setup">Forgot password? Re-run setup wizard →</a>
+  <a class="footer-link" href="/setup">Forgot password? Re-run setup wizard â†’</a>
 </div>
 
 <!-- Ticker tape -->
@@ -428,7 +428,7 @@ async function doLogin(e) {
   const pw = document.getElementById('password').value;
 
   btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span>Signing in…';
+  btn.innerHTML = '<span class="spinner"></span>Signing inâ€¦';
   errBox.style.display = 'none';
 
   try {
@@ -438,11 +438,11 @@ async function doLogin(e) {
       body: JSON.stringify({ password: pw }),
     });
     if (r.ok) {
-      btn.innerHTML = '✓ Success';
+      btn.innerHTML = 'âœ“ Success';
       btn.style.background = 'linear-gradient(135deg,#16c784,#0fa066)';
       setTimeout(() => { window.location.href = '/static/index.html'; }, 400);
     } else {
-      document.getElementById('error-text').textContent = 'Incorrect password — please try again';
+      document.getElementById('error-text').textContent = 'Incorrect password â€” please try again';
       errBox.style.display = 'block';
       btn.disabled = false;
       btn.innerHTML = 'Sign In';
@@ -450,7 +450,7 @@ async function doLogin(e) {
       document.getElementById('password').focus();
     }
   } catch {
-    document.getElementById('error-text').textContent = 'Cannot reach server — is TradeBot running?';
+    document.getElementById('error-text').textContent = 'Cannot reach server â€” is TradeBot running?';
     errBox.style.display = 'block';
     btn.disabled = false;
     btn.innerHTML = 'Sign In';
@@ -459,3 +459,4 @@ async function doLogin(e) {
 </script>
 </body>
 </html>
+

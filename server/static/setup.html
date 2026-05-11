@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>TradeBot — Setup</title>
+<title>TradeBot â€” Setup</title>
 <link rel="stylesheet" href="/static/styles.css" />
 <style>
   body { background:#0d1117; min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:2rem; }
@@ -49,7 +49,7 @@
 <body>
 <div class="wizard">
   <div class="wizard-header">
-    <div class="wizard-icon">📈</div>
+    <div class="wizard-icon">ðŸ“ˆ</div>
     <div class="wizard-title">TradeBot Setup</div>
     <div class="wizard-sub">Let's get your trading bot ready in 4 easy steps</div>
   </div>
@@ -66,27 +66,27 @@
 
     <!-- Step 0: Welcome -->
     <div class="step active" id="step-0">
-      <div class="step-title">Welcome to TradeBot 👋</div>
-      <div class="step-desc">An automated stock trading bot that monitors the market 24/7 and executes trades based on proven strategies — no coding required.</div>
+      <div class="step-title">Welcome to TradeBot ðŸ‘‹</div>
+      <div class="step-desc">An automated stock trading bot that monitors the market 24/7 and executes trades based on proven strategies â€” no coding required.</div>
       <div class="welcome-features">
-        <div class="feature"><div class="feature-icon">🤖</div><div><div class="feature-title">7 Built-in Strategies</div><div class="feature-desc">SMA Crossover, RSI, Momentum, Bollinger Bands, 52-Week Breakout, MACD, Golden Cross</div></div></div>
-        <div class="feature"><div class="feature-icon">🛡️</div><div><div class="feature-title">Risk Controls Built-in</div><div class="feature-desc">Kill switch, daily loss limits, PDT protection, and position sizing</div></div></div>
-        <div class="feature"><div class="feature-icon">📊</div><div><div class="feature-title">Live Dashboard</div><div class="feature-desc">Monitor positions, P&L, signals, and market scanner in real time</div></div></div>
-        <div class="feature"><div class="feature-icon">🔔</div><div><div class="feature-title">Instant Notifications</div><div class="feature-desc">Get email or Telegram alerts every time a trade executes</div></div></div>
+        <div class="feature"><div class="feature-icon">ðŸ¤–</div><div><div class="feature-title">7 Built-in Strategies</div><div class="feature-desc">SMA Crossover, RSI, Momentum, Bollinger Bands, 52-Week Breakout, MACD, Golden Cross</div></div></div>
+        <div class="feature"><div class="feature-icon">ðŸ›¡ï¸</div><div><div class="feature-title">Risk Controls Built-in</div><div class="feature-desc">Kill switch, daily loss limits, PDT protection, and position sizing</div></div></div>
+        <div class="feature"><div class="feature-icon">ðŸ“Š</div><div><div class="feature-title">Live Dashboard</div><div class="feature-desc">Monitor positions, P&L, signals, and market scanner in real time</div></div></div>
+        <div class="feature"><div class="feature-icon">ðŸ””</div><div><div class="feature-title">Instant Notifications</div><div class="feature-desc">Get email or Telegram alerts every time a trade executes</div></div></div>
       </div>
       <div class="btn-row">
-        <button class="btn primary" style="flex:1;padding:.75rem" onclick="nextStep()">Get Started →</button>
+        <button class="btn primary" style="flex:1;padding:.75rem" onclick="nextStep()">Get Started â†’</button>
       </div>
     </div>
 
     <!-- Step 1: Broker Connection -->
     <div class="step" id="step-1">
       <div class="step-title">Connect Your Broker</div>
-      <div class="step-desc">TradeBot uses <strong style="color:#c8d6e8">Alpaca Markets</strong> — a free commission-free broker with a paper (practice) trading account. <a href="https://alpaca.markets" target="_blank" style="color:#5b8def">Create a free account →</a></div>
+      <div class="step-desc">TradeBot uses <strong style="color:#c8d6e8">Alpaca Markets</strong> â€” a free commission-free broker with a paper (practice) trading account. <a href="https://alpaca.markets" target="_blank" style="color:#5b8def">Create a free account â†’</a></div>
       <div class="form-row">
         <label>API Key</label>
         <input class="input" id="s-api-key" placeholder="PKXXXXXXXXXXXXXXXXXX" />
-        <div class="hint">Found in Alpaca dashboard → API Keys</div>
+        <div class="hint">Found in Alpaca dashboard â†’ Broker Accounts</div>
       </div>
       <div class="form-row">
         <label>API Secret</label>
@@ -95,16 +95,16 @@
       <div class="form-row">
         <label>Account Type</label>
         <select class="input" id="s-account-type">
-          <option value="paper">Paper Trading (Practice — Recommended for beginners)</option>
+          <option value="paper">Paper Trading (Practice â€” Recommended for beginners)</option>
           <option value="live">Live Trading (Real money)</option>
         </select>
-        <div class="hint">⚠️ Start with Paper Trading. Switch to Live only after testing your strategies.</div>
+        <div class="hint">âš ï¸ Start with Paper Trading. Switch to Live only after testing your strategies.</div>
       </div>
-      <button class="btn" onclick="testConnection()" id="test-btn">🔌 Test Connection</button>
+      <button class="btn" onclick="testConnection()" id="test-btn">ðŸ”Œ Test Connection</button>
       <div class="test-result" id="test-result"></div>
       <div class="btn-row">
-        <button class="btn" onclick="prevStep()">← Back</button>
-        <button class="btn primary" style="flex:1" id="next-1" onclick="nextStep()" disabled>Continue →</button>
+        <button class="btn" onclick="prevStep()">â† Back</button>
+        <button class="btn primary" style="flex:1" id="next-1" onclick="nextStep()" disabled>Continue â†’</button>
       </div>
     </div>
 
@@ -128,8 +128,8 @@
         <div class="hint">Maximum number of stocks the bot can hold at the same time.</div>
       </div>
       <div class="btn-row">
-        <button class="btn" onclick="prevStep()">← Back</button>
-        <button class="btn primary" style="flex:1" onclick="nextStep()">Continue →</button>
+        <button class="btn" onclick="prevStep()">â† Back</button>
+        <button class="btn primary" style="flex:1" onclick="nextStep()">Continue â†’</button>
       </div>
     </div>
 
@@ -141,42 +141,42 @@
         <label class="strategy-pick selected" onclick="selectStrategy('momentum')">
           <input type="radio" name="strategy" value="momentum" checked />
           <div class="strategy-info">
-            <div class="name">🚀 Momentum Breakout <span style="font-size:.7rem;background:#16c784;color:#000;padding:.1rem .4rem;border-radius:99px;margin-left:.3rem">Recommended</span></div>
+            <div class="name">ðŸš€ Momentum Breakout <span style="font-size:.7rem;background:#16c784;color:#000;padding:.1rem .4rem;border-radius:99px;margin-left:.3rem">Recommended</span></div>
             <div class="desc">Scans the market for trending stocks with strong momentum. Best for rising markets. Good for beginners.</div>
           </div>
         </label>
         <label class="strategy-pick" onclick="selectStrategy('breakout_52w')">
           <input type="radio" name="strategy" value="breakout_52w" />
           <div class="strategy-info">
-            <div class="name">📈 52-Week High Breakout</div>
+            <div class="name">ðŸ“ˆ 52-Week High Breakout</div>
             <div class="desc">Buys stocks hitting yearly highs on above-average volume. One of the most proven signals in trading research.</div>
           </div>
         </label>
         <label class="strategy-pick" onclick="selectStrategy('macd_volume')">
           <input type="radio" name="strategy" value="macd_volume" />
           <div class="strategy-info">
-            <div class="name">📉 MACD + Volume</div>
+            <div class="name">ðŸ“‰ MACD + Volume</div>
             <div class="desc">MACD crossover confirmed by volume. Fewer false signals than simple moving average crosses.</div>
           </div>
         </label>
         <label class="strategy-pick" onclick="selectStrategy('manual')">
           <input type="radio" name="strategy" value="manual" />
           <div class="strategy-info">
-            <div class="name">🖐️ Manual Only — I'll place trades myself</div>
+            <div class="name">ðŸ–ï¸ Manual Only â€” I'll place trades myself</div>
             <div class="desc">No automated trading. Use the dashboard to monitor markets and place orders manually.</div>
           </div>
         </label>
       </div>
       <div class="btn-row">
-        <button class="btn" onclick="prevStep()">← Back</button>
-        <button class="btn primary" style="flex:1" onclick="nextStep()">Continue →</button>
+        <button class="btn" onclick="prevStep()">â† Back</button>
+        <button class="btn primary" style="flex:1" onclick="nextStep()">Continue â†’</button>
       </div>
     </div>
 
     <!-- Step 4: Set Password -->
     <div class="step" id="step-4">
       <div class="step-title">Set Your Dashboard Password</div>
-      <div class="step-desc">Protect your dashboard with a password. Anyone on your network who knows the URL can access it — keep it secure.</div>
+      <div class="step-desc">Protect your dashboard with a password. Anyone on your network who knows the URL can access it â€” keep it secure.</div>
       <div class="form-row">
         <label>Password</label>
         <input class="input" id="s-password" type="password" placeholder="Choose a strong password" />
@@ -187,21 +187,21 @@
       </div>
       <div class="test-result" id="pw-error" style="display:none"></div>
       <div class="btn-row">
-        <button class="btn" onclick="prevStep()">← Back</button>
-        <button class="btn primary" style="flex:1" onclick="finishSetup()">✅ Finish Setup</button>
+        <button class="btn" onclick="prevStep()">â† Back</button>
+        <button class="btn primary" style="flex:1" onclick="finishSetup()">âœ… Finish Setup</button>
       </div>
     </div>
 
     <!-- Step 5: Done -->
     <div class="step" id="step-5">
-      <div class="success-icon">🎉</div>
+      <div class="success-icon">ðŸŽ‰</div>
       <div class="step-title" style="text-align:center">You're all set!</div>
       <div class="step-desc" style="text-align:center">TradeBot is configured and your first strategy is enabled. The bot will start scanning the market automatically when it opens.</div>
       <div class="welcome-features" style="margin-top:1.5rem">
-        <div class="feature"><div class="feature-icon">💡</div><div><div class="feature-title">Tip: Start with Paper Trading</div><div class="feature-desc">Watch how the bot performs for a week before switching to live money.</div></div></div>
-        <div class="feature"><div class="feature-icon">🔔</div><div><div class="feature-title">Set up Notifications</div><div class="feature-desc">Go to Settings → Notifications to get trade alerts via email or Telegram.</div></div></div>
+        <div class="feature"><div class="feature-icon">ðŸ’¡</div><div><div class="feature-title">Tip: Start with Paper Trading</div><div class="feature-desc">Watch how the bot performs for a week before switching to live money.</div></div></div>
+        <div class="feature"><div class="feature-icon">ðŸ””</div><div><div class="feature-title">Set up Notifications</div><div class="feature-desc">Go to Settings â†’ Notifications to get trade alerts via email or Telegram.</div></div></div>
       </div>
-      <button class="btn primary" style="width:100%;padding:.85rem;margin-top:1.5rem;font-size:1rem" onclick="window.location.href='/'">Open Dashboard →</button>
+      <button class="btn primary" style="width:100%;padding:.85rem;margin-top:1.5rem;font-size:1rem" onclick="window.location.href='/'">Open Dashboard â†’</button>
     </div>
 
   </div><!-- /card -->
@@ -250,18 +250,18 @@ async function testConnection() {
     const d = await r.json();
     if (r.ok && d.ok) {
       res.className = "test-result ok";
-      res.textContent = `✅ Connected! Account: ${d.account_id} | Equity: $${Number(d.equity).toLocaleString()}`;
+      res.textContent = `âœ… Connected! Account: ${d.account_id} | Equity: $${Number(d.equity).toLocaleString()}`;
       document.getElementById("next-1").disabled = false;
     } else {
       res.className = "test-result err";
-      res.textContent = `❌ ${d.detail || "Connection failed. Check your API key and secret."}`;
+      res.textContent = `âŒ ${d.detail || "Connection failed. Check your API key and secret."}`;
     }
   } catch {
     res.className = "test-result err";
-    res.textContent = "❌ Could not reach server.";
+    res.textContent = "âŒ Could not reach server.";
   }
   res.style.display = "block";
-  btn.disabled = false; btn.textContent = "🔌 Test Connection";
+  btn.disabled = false; btn.textContent = "ðŸ”Œ Test Connection";
 }
 
 async function finishSetup() {
@@ -304,3 +304,4 @@ async function finishSetup() {
 </script>
 </body>
 </html>
+

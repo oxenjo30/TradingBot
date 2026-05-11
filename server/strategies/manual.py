@@ -7,6 +7,7 @@ class ManualStrategy(Strategy):
     description = "No automated trading. Use the manual order panel only."
     default_params: dict = {}
     auto_trade = False
+    hidden = True
 
     def evaluate(self, positions):
         return []
