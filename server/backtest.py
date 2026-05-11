@@ -29,7 +29,10 @@ class BacktestEngine:
         lookback_days = (end_date - start_date).days + 200
         all_bars: dict[str, list[dict]] = {}
         for sym in symbols_up:
-            bars = alpaca_client.get_recent_bars(sym, days=lookback_days)
+            try:
+                bars = alpaca_client.get_recent_bars(sym, days=lookback_days)
+            except KeyError:
+                raise ValueError(f"No historical data found for {sym} in the given date range")
             in_range = [b for b in bars if start_date.isoformat() <= b["t"][:10] <= end_date.isoformat()]
             if not in_range:
                 raise ValueError(f"No historical data found for {sym} in the given date range")
