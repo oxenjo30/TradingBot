@@ -623,6 +623,32 @@ async function initDashboard() {
 }
 
 // ─────────────────────────────────────────
+// ── Logout ──────────────────────────────────────────────────────────────────
+async function doLogout() {
+  try { await fetch('/api/auth/logout', { method: 'POST' }); } catch {}
+  window.location.href = '/static/login.html';
+}
+
+// ── Strategy icons ───────────────────────────────────────────────────────────
+function stratIcon(name, active) {
+  const c = active ? '#a78bfa' : '#64748b';
+  const icons = {
+    momentum:  `<polyline points="23 6 13.5 15.5 8.5 10.5 1 18" stroke="${c}"/><polyline points="17 6 23 6 23 12" stroke="${c}"/>`,
+    sma_cross: `<line x1="18" y1="20" x2="18" y2="10" stroke="${c}"/><line x1="12" y1="20" x2="12" y2="4" stroke="${c}"/><line x1="6" y1="20" x2="6" y2="14" stroke="${c}"/>`,
+    rsi_mr:    `<circle cx="12" cy="12" r="10" stroke="${c}"/><path d="M8 14s1.5 2 4 2 4-2 4-2" stroke="${c}"/><line x1="9" y1="9" x2="9.01" y2="9" stroke="${c}" stroke-width="3"/><line x1="15" y1="9" x2="15.01" y2="9" stroke="${c}" stroke-width="3"/>`,
+    bollinger: `<rect x="3" y="5" width="18" height="14" rx="1" stroke="${c}"/><path d="M8 12h8" stroke="${c}"/><path d="M12 8v8" stroke="${c}"/>`,
+    breakout_52w: `<polyline points="22 12 18 12 15 21 9 3 6 12 2 12" stroke="${c}"/>`,
+    macd_volume:  `<path d="M3 3v18h18" stroke="${c}"/><path d="M7 16l4-8 4 5 3-3" stroke="${c}"/>`,
+    golden_cross: `<circle cx="12" cy="12" r="5" stroke="${c}"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4" stroke="${c}"/>`,
+  };
+  const path = icons[name] || `<circle cx="12" cy="12" r="8" stroke="${c}"/>`;
+  return `<svg width="14" height="14" fill="none" stroke-width="1.8" viewBox="0 0 24 24">${path}</svg>`;
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
 // initBots — bots.html
 // ─────────────────────────────────────────
 async function initBots() {
@@ -630,19 +656,25 @@ async function initBots() {
   let clock = await initClockChip(chipEl);
   const marketOpen = clock ? clock.is_open : null;
 
-  let account = null;
-  let killSwitchState = null; // null=unknown, true/false=known
+  let killSwitchState = null;
+  let currentAccount  = null;
 
+  // ── Kill switch UI ─────────────────────────────────────────────────────────
   function applyKillSwitchUI(on) {
     killSwitchState = on;
     document.getElementById('banner-kill').classList.toggle('hidden', !on);
-    document.getElementById('btn-ks-on').classList.toggle('hidden', on);
-    document.getElementById('btn-ks-off').classList.toggle('hidden', !on);
+    const btn = document.getElementById('btn-ks');
+    if (btn) {
+      btn.textContent = on ? 'Kill Switch OFF' : 'Kill Switch ON';
+      btn.className   = 'btn ' + (on ? 'btn-ghost' : 'btn-danger');
+      btn.classList.remove('hidden');
+    }
     updateRunBtnState();
   }
 
   function updateRunBtnState() {
     const btn = document.getElementById('btn-run-now');
+    if (!btn) return;
     if (killSwitchState === null) {
       btn.disabled = true;
       btn.title = 'Checking kill switch status…';
@@ -655,332 +687,230 @@ async function initBots() {
     }
   }
 
-  async function fetchAccount() {
+  // ── Initial data load ──────────────────────────────────────────────────────
+  async function loadData() {
+    let accounts, strats, engineStatus, risk;
     try {
-      account = await api('/api/account', { key: 'bots-account' });
-      if (account.account_type === 'paper') {
-        document.getElementById('banner-paper').classList.remove('hidden');
-        document.getElementById('paper-badge')?.classList.remove('hidden');
-      }
-    } catch {
-      document.getElementById('banner-paper').textContent = 'Trading mode unknown — Enable and Run Engine Now are disabled.';
-      document.getElementById('banner-paper').classList.remove('hidden');
-      document.getElementById('btn-run-now').disabled = true;
+      [accounts, strats, engineStatus, risk] = await Promise.all([
+        api('/api/broker-accounts', { key: 'bots-accounts' }),
+        api('/api/strategies',      { key: 'bots-strats'   }),
+        api('/api/engine',          { key: 'bots-engine'   }),
+        api('/api/risk',            { key: 'bots-risk'     }),
+      ]);
+    } catch { return; }
+
+    applyKillSwitchUI(risk.kill_switch);
+
+    const hasPaper = accounts.some(a => a.account_type === 'paper');
+    document.getElementById('banner-paper').classList.toggle('hidden', !hasPaper);
+    document.getElementById('paper-badge')?.classList.toggle('hidden', !hasPaper);
+
+    const enabledCount = strats.filter(s => s.enabled).length;
+    document.getElementById('engine-meta').textContent =
+      `${enabledCount} of ${strats.length} strategies globally enabled · ` +
+      `Last run: ${engineStatus.ts ? fmt.time(engineStatus.ts) : 'Never'}`;
+
+    renderAccountPanel(accounts);
+
+    if (accounts.length > 0) {
+      await selectAccount(accounts[0]);
+    } else {
+      document.getElementById('panel-title').textContent = 'No broker accounts';
+      document.getElementById('panel-meta').textContent = '';
+      document.getElementById('assigned-list').innerHTML =
+        '<div class="empty-state"><div class="empty-state-icon">&#x1F511;</div>' +
+        '<div class="empty-state-title">No accounts connected</div>' +
+        '<div class="empty-state-desc">Add a broker account to start assigning strategies.</div></div>';
     }
   }
 
-  async function fetchRiskState() {
-    try {
-      const risk = await api('/api/risk', { key: 'bots-risk' });
-      applyKillSwitchUI(risk.kill_switch);
-      document.getElementById('risk-error').classList.add('hidden');
-    } catch {
-      document.getElementById('risk-error').classList.remove('hidden');
-      killSwitchState = null;
-      updateRunBtnState();
-    }
-  }
+  // ── Left panel ─────────────────────────────────────────────────────────────
+  function renderAccountPanel(accounts) {
+    const list = document.getElementById('acct-list');
+    list.innerHTML = '';
+    accounts.forEach(acct => {
+      const item = document.createElement('div');
+      item.className = 'acct-item' + (currentAccount?.id === acct.id ? ' active' : '');
+      item.dataset.acctId = acct.id;
+      item.onclick = () => selectAccount(acct);
 
-  async function fetchStrategies() {
-    const [strats, engineStatus, allAccounts] = await Promise.all([
-      api('/api/strategies',      { key: 'bots-strats' }),
-      api('/api/engine',          { key: 'bots-engine' }),
-      api('/api/broker-accounts', { key: 'bots-all-accts' }),
-    ]);
+      const dot = document.createElement('div');
+      dot.className = 'acct-dot';
+      dot.style.background = acct.account_type === 'live' ? '#f59e0b' : '#3b82f6';
 
-    const ranMap = {};
-    (engineStatus.ran || []).forEach(r => { ranMap[r.strategy] = r; });
+      const lbl = document.createElement('div');
+      lbl.className = 'acct-item-label';
+      lbl.innerHTML = `<div class="acct-item-name">${escHtml(acct.label)}</div>` +
+        `<div class="acct-item-type">${acct.account_type === 'live' ? 'Live trading' : 'Paper trading'}</div>`;
 
-    const enabled = strats.filter(s => s.enabled).length;
-    document.getElementById('engine-status-txt').textContent =
-      `${enabled} of ${strats.length} strategies enabled · Last run: ${engineStatus.ts ? fmt.time(engineStatus.ts) : 'Never'}`;
-
-    const tbody = document.getElementById('strat-body');
-    tbody.innerHTML = '';
-
-    for (const s of strats) {
-      let stratAccounts = [];
-      try {
-        stratAccounts = await api(`/api/strategies/${s.name}/accounts`, { key: `sa-${s.name}` });
-      } catch { /* no assignments yet — empty array is fine */ }
-
-      // ── main strategy row ──────────────────────────────────────────────────
-      const tr = document.createElement('tr');
-      tr.style.cursor = 'pointer';
-      tr.dataset.expanded = 'false';
-
-      const tdLeft = document.createElement('td');
-      tdLeft.style.cssText = 'white-space:nowrap;';
-      const leftWrap = document.createElement('div');
-      leftWrap.style.cssText = 'display:flex;align-items:center;gap:8px;';
-      const chevronEl = document.createElement('span');
-      chevronEl.style.cssText = 'color:#64748B;font-size:10px;user-select:none;display:inline-block;transition:transform .2s;flex-shrink:0;';
-      chevronEl.textContent = '▶';
-      const iconEl = document.createElement('div');
-      iconEl.className = 'icon-circle icon-purple';
-      iconEl.style.cssText = 'width:24px;height:24px;flex-shrink:0;';
-      iconEl.innerHTML = '<svg width="11" height="11" fill="none" stroke="#8B5CF6" stroke-width="2" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="2" height="2"/><rect x="13" y="9" width="2" height="2"/><path d="M9 13a3 3 0 0 0 6 0"/></svg>';
-      leftWrap.append(chevronEl, iconEl);
-      tdLeft.appendChild(leftWrap);
-
-      const tdName = document.createElement('td');
-      const nameWrap = document.createElement('div');
-      nameWrap.style.cssText = 'display:flex;align-items:center;gap:6px;min-width:0;';
-      const nameDiv = document.createElement('div');
-      nameDiv.className = 'truncate';
-      nameDiv.style.fontWeight = '500';
-      nameDiv.textContent = s.label;
-      const countPill = document.createElement('span');
-      countPill.className = 'acct-pill';
-      countPill.textContent = stratAccounts.length ? `${stratAccounts.length} acct${stratAccounts.length !== 1 ? 's' : ''}` : 'no accts';
-      if (!stratAccounts.length) countPill.classList.add('acct-pill-empty');
-      nameWrap.append(nameDiv, countPill);
-      tdName.appendChild(nameWrap);
-
-      const tdDesc = document.createElement('td');
-      tdDesc.className = 'text-muted truncate';
-      tdDesc.textContent = s.description;
-
-      const tdBadge = document.createElement('td');
       const badge = document.createElement('span');
-      let bc, bt;
-      if (!s.enabled) { bc = 'b-disabled'; bt = 'Disabled'; }
-      else if (ranMap[s.name]?.error) { bc = 'b-error'; bt = 'Last Run Error'; }
-      else if (ranMap[s.name]) { bc = 'b-enabled'; }
-      else { bc = 'b-notrun'; bt = 'Not Run Yet'; }
-      badge.className = 'badge ' + bc;
-      if (bc === 'b-enabled') {
-        const dot = document.createElement('span'); dot.className = 'pdot'; badge.appendChild(dot);
-        badge.appendChild(document.createTextNode('Enabled'));
-      } else {
-        badge.textContent = bt;
-      }
-      tdBadge.appendChild(badge);
+      badge.className = 'badge ' + (acct.account_type === 'live' ? 'b-live' : 'b-paper');
+      badge.textContent = acct.account_type;
 
-      const tdAction = document.createElement('td');
-      tdAction.style.textAlign = 'right';
-      const toggleBtn = document.createElement('button');
-      toggleBtn.className = 'btn btn-sm ' + (s.enabled ? 'btn-ghost' : 'btn-primary');
-      toggleBtn.textContent = s.enabled ? 'Disable' : 'Enable';
-      toggleBtn.addEventListener('click', (e) => { e.stopPropagation(); confirmToggle(s, !s.enabled, toggleBtn); });
-      tdAction.appendChild(toggleBtn);
-
-      tr.append(tdLeft, tdName, tdDesc, tdBadge, tdAction);
-      tbody.appendChild(tr);
-
-      // ── expandable sub-row ─────────────────────────────────────────────────
-      const subTr = document.createElement('tr');
-      subTr.className = 'hidden';
-      subTr.style.background = 'rgba(17,24,39,0.4)';
-      const subTd = document.createElement('td');
-      subTd.colSpan = 5;
-      subTd.style.cssText = 'padding:0 .75rem .75rem 2.5rem;border-left:2px solid rgba(139,92,246,.3);';
-
-      function buildSubTable(currentAccounts) {
-        subTd.innerHTML = '';
-        // update the count pill on the parent row
-        countPill.textContent = currentAccounts.length ? `${currentAccounts.length} acct${currentAccounts.length !== 1 ? 's' : ''}` : 'no accts';
-        countPill.classList.toggle('acct-pill-empty', !currentAccounts.length);
-
-        const panelHeader = document.createElement('div');
-        panelHeader.style.cssText = 'font-size:11px;font-weight:600;color:#64748B;text-transform:uppercase;letter-spacing:.06em;padding:.6rem 0 .2rem;';
-        panelHeader.textContent = 'Broker Accounts';
-        const panelSub = document.createElement('div');
-        panelSub.style.cssText = 'font-size:11px;color:#64748B;padding-bottom:.5rem;';
-        panelSub.textContent = 'This strategy can run on multiple accounts simultaneously. Each account is toggled independently below.';
-        subTd.append(panelHeader, panelSub);
-
-        const subTable = document.createElement('table');
-        subTable.className = 'dtable';
-
-        const thead = document.createElement('thead');
-        thead.innerHTML = '<tr><th>Account</th><th>Type</th><th>Status</th><th style="text-align:right;">Action</th></tr>';
-        const stbody = document.createElement('tbody');
-
-        if (!currentAccounts.length) {
-          const emptyTr = document.createElement('tr');
-          const emptyTd = document.createElement('td');
-          emptyTd.colSpan = 4;
-          emptyTd.style.cssText = 'padding:.75rem 0;text-align:center;';
-          emptyTd.innerHTML = '<span style="font-size:12px;color:#64748B;">No broker accounts assigned — click <strong style="color:#E6EBF5;">+ Assign Account</strong> below to link one.</span>';
-          emptyTr.appendChild(emptyTd);
-          stbody.appendChild(emptyTr);
-        }
-
-        currentAccounts.forEach(acct => {
-          const atr = document.createElement('tr');
-
-          const tdLbl = document.createElement('td');
-          tdLbl.textContent = acct.label;
-
-          const tdType = document.createElement('td');
-          tdType.innerHTML = `<span class="badge ${acct.account_type === 'live' ? 'b-enabled' : 'b-disabled'}">${acct.account_type}</span>`;
-
-          const tdSt = document.createElement('td');
-          const enBadge = document.createElement('span');
-          enBadge.className = 'badge ' + (acct.enabled ? 'b-enabled' : 'b-disabled');
-          if (acct.enabled) {
-            const dot = document.createElement('span'); dot.className = 'pdot'; enBadge.appendChild(dot);
-            enBadge.appendChild(document.createTextNode('Enabled'));
-          } else {
-            enBadge.textContent = 'Disabled';
-          }
-          tdSt.appendChild(enBadge);
-
-          const tdAct = document.createElement('td');
-          tdAct.style.textAlign = 'right';
-
-          const perToggleBtn = document.createElement('button');
-          perToggleBtn.className = 'btn btn-sm btn-ghost';
-          perToggleBtn.style.fontSize = '11px';
-          perToggleBtn.textContent = acct.enabled ? 'Disable' : 'Enable';
-          perToggleBtn.addEventListener('click', async () => {
-            perToggleBtn.disabled = true;
-            try {
-              await api(`/api/strategies/${s.name}/accounts/${acct.id}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ enabled: !acct.enabled }),
-                key: `sa-toggle-${s.name}-${acct.id}`,
-              });
-              stratAccounts = await api(`/api/strategies/${s.name}/accounts`, { key: `sa-${s.name}` });
-              buildSubTable(stratAccounts);
-            } catch { perToggleBtn.disabled = false; }
-          });
-
-          const removeBtn = document.createElement('button');
-          removeBtn.className = 'btn btn-sm';
-          removeBtn.style.cssText = 'font-size:11px;color:#EF4444;background:none;border:none;margin-left:.25rem;';
-          removeBtn.textContent = '×';
-          removeBtn.title = 'Unassign account';
-          removeBtn.addEventListener('click', () => {
-            const descEl = document.getElementById('unassign-desc');
-            descEl.innerHTML = '';
-            descEl.appendChild(document.createTextNode('Remove '));
-            const strong = document.createElement('strong'); strong.textContent = acct.label;
-            descEl.appendChild(strong);
-            descEl.appendChild(document.createTextNode(` from ${s.label}?`));
-            openModal(document.getElementById('modal-unassign'), async () => {
-              await api(`/api/strategies/${s.name}/accounts/${acct.id}`, {
-                method: 'DELETE', key: `sa-del-${s.name}-${acct.id}`,
-              });
-              stratAccounts = await api(`/api/strategies/${s.name}/accounts`, { key: `sa-${s.name}` });
-              buildSubTable(stratAccounts);
-            });
-          });
-
-          tdAct.append(perToggleBtn, removeBtn);
-          atr.append(tdLbl, tdType, tdSt, tdAct);
-          stbody.appendChild(atr);
-        });
-
-        // ── Assign Account button ────────────────────────────────────────────
-        const assignTr = document.createElement('tr');
-        const assignTd = document.createElement('td');
-        assignTd.colSpan = 4;
-        assignTd.style.cssText = 'padding-top:.6rem;border-bottom:none;';
-        const assignBtn = document.createElement('button');
-        assignBtn.className = 'btn btn-sm';
-        assignBtn.style.cssText = 'font-size:11px;background:rgba(139,92,246,.15);color:#A78BFA;border:1px solid rgba(139,92,246,.25);';
-        assignBtn.textContent = '+ Assign Account';
-        assignBtn.addEventListener('click', () => {
-          const assignedIds = new Set(stratAccounts.map(a => a.id));
-          const available = allAccounts.filter(a => !assignedIds.has(a.id));
-          const sel = document.getElementById('assign-account-select');
-          sel.innerHTML = available.length
-            ? '<option value="">Select a broker account…</option>'
-            : '<option value="">No available accounts — add one in Broker Accounts</option>';
-          available.forEach(a => {
-            const opt = document.createElement('option');
-            opt.value = a.id;
-            opt.textContent = `${a.label} (${a.account_type})`;
-            sel.appendChild(opt);
-          });
-          document.getElementById('assign-strategy-name').textContent = s.label;
-          document.getElementById('assign-error').classList.add('hidden');
-          openModal(document.getElementById('modal-assign-account'), async () => {
-            const acctId = parseInt(sel.value);
-            const errEl = document.getElementById('assign-error');
-            if (!acctId) { errEl.textContent = 'Please select an account.'; errEl.classList.remove('hidden'); return; }
-            try {
-              await api(`/api/strategies/${s.name}/accounts`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ account_id: acctId, enabled: true }),
-                key: `sa-assign-${s.name}`,
-              });
-              stratAccounts = await api(`/api/strategies/${s.name}/accounts`, { key: `sa-${s.name}` });
-              buildSubTable(stratAccounts);
-            } catch {
-              errEl.textContent = 'Assign failed.';
-              errEl.classList.remove('hidden');
-            }
-          });
-        });
-        assignTd.appendChild(assignBtn);
-        assignTr.appendChild(assignTd);
-        stbody.appendChild(assignTr);
-
-        subTable.append(thead, stbody);
-        subTd.appendChild(subTable);
-      }
-
-      buildSubTable(stratAccounts);
-      subTr.appendChild(subTd);
-      tbody.appendChild(subTr);
-
-      tr.addEventListener('click', () => {
-        const isExpanded = tr.dataset.expanded === 'true';
-        tr.dataset.expanded = isExpanded ? 'false' : 'true';
-        chevronEl.style.transform = isExpanded ? '' : 'rotate(90deg)';
-        subTr.classList.toggle('hidden', isExpanded);
-      });
-    }
-  }
-
-  function confirmToggle(strategy, enable, triggerBtn) {
-    const overlay = document.getElementById('modal-toggle');
-    document.getElementById('modal-toggle-title').textContent =
-      (enable ? 'Enable' : 'Disable') + ' Strategy';
-    const body = document.getElementById('modal-toggle-body');
-    body.innerHTML = '';
-    const txt = document.createTextNode(
-      'Are you sure you want to ' + (enable ? 'enable' : 'disable') + ' '
-    );
-    const strong = document.createElement('strong');
-    strong.textContent = strategy.label;
-    body.appendChild(txt);
-    body.appendChild(strong);
-    body.appendChild(document.createTextNode('?'));
-
-    openModal(overlay, async () => {
-      triggerBtn.disabled = true;
-      triggerBtn.textContent = '…';
-      try {
-        await api(`/api/strategies/${strategy.name}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ enabled: enable }),
-          key: 'bots-toggle-' + strategy.name
-        });
-        await fetchStrategies();
-      } catch {
-        triggerBtn.disabled = false;
-        triggerBtn.textContent = enable ? 'Enable' : 'Disable';
-        triggerBtn.closest('td').textContent = 'Action failed — check logs.';
-      }
+      item.append(dot, lbl, badge);
+      list.appendChild(item);
     });
   }
 
+  // ── Right panel ────────────────────────────────────────────────────────────
+  async function selectAccount(acct) {
+    currentAccount = acct;
+    document.querySelectorAll('.acct-item').forEach(el => {
+      el.classList.toggle('active', el.dataset.acctId == acct.id);
+    });
+
+    document.getElementById('panel-title').textContent =
+      `${acct.label} — ${acct.account_type === 'live' ? 'Live' : 'Paper'}`;
+    document.getElementById('panel-meta').textContent = 'Loading…';
+
+    let acctStrats;
+    try {
+      acctStrats = await api(`/api/broker-accounts/${acct.id}/strategies`,
+        { key: `bots-acct-strats-${acct.id}` });
+    } catch {
+      document.getElementById('panel-meta').textContent = 'Failed to load';
+      return;
+    }
+    renderStratPanel(acct, acctStrats);
+  }
+
+  function renderStratPanel(acct, acctStrats) {
+    const assigned   = acctStrats.filter(s => s.assigned);
+    const unassigned = acctStrats.filter(s => !s.assigned);
+
+    document.getElementById('panel-meta').textContent =
+      `${assigned.length} of ${acctStrats.length} strategies assigned`;
+
+    const aLabel = document.getElementById('assigned-label');
+    const uLabel = document.getElementById('unassigned-label');
+    aLabel.style.display = '';
+    uLabel.style.display = '';
+
+    const aList = document.getElementById('assigned-list');
+    aList.innerHTML = '';
+    if (assigned.length === 0) {
+      aList.innerHTML = '<div style="padding:.85rem 1.25rem;font-size:12px;color:#64748B;font-style:italic;">No strategies assigned. Use + Assign below to add one.</div>';
+    } else {
+      assigned.forEach(s => aList.appendChild(buildAssignedRow(acct, s)));
+    }
+
+    const uList = document.getElementById('unassigned-list');
+    uList.innerHTML = '';
+    if (unassigned.length === 0) {
+      uList.innerHTML = '<div style="padding:.85rem 1.25rem;font-size:12px;color:#64748B;font-style:italic;">All strategies are assigned to this account.</div>';
+    } else {
+      unassigned.forEach(s => uList.appendChild(buildUnassignedRow(acct, s)));
+    }
+  }
+
+  function buildAssignedRow(acct, s) {
+    const row = document.createElement('div');
+    row.className = 'strat-row';
+
+    const icon = document.createElement('div');
+    icon.className = 'strat-icon ' + (s.enabled ? 'si-active' : 'si-inactive');
+    icon.innerHTML = stratIcon(s.name, s.enabled);
+
+    const info = document.createElement('div');
+    info.className = 'strat-info';
+    info.innerHTML = `<div class="strat-name">${escHtml(s.label)}</div>` +
+      `<div class="strat-desc">${escHtml(s.description)}</div>`;
+
+    const actions = document.createElement('div');
+    actions.className = 'strat-actions';
+
+    const statusBadge = document.createElement('span');
+    if (s.enabled) {
+      statusBadge.className = 'badge b-enabled';
+      statusBadge.innerHTML = '<span class="pdot"></span> Running';
+    } else {
+      statusBadge.className = 'badge b-paused';
+      statusBadge.textContent = 'Paused';
+    }
+
+    const toggle = document.createElement('div');
+    toggle.className = 'strat-toggle' + (s.enabled ? ' on' : '');
+    toggle.title = s.enabled ? 'Disable on this account' : 'Enable on this account';
+    toggle.onclick = async () => {
+      toggle.classList.add('disabled');
+      try {
+        await api(`/api/strategies/${s.name}/accounts/${acct.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ enabled: !s.enabled }),
+          key: `bots-toggle-${s.name}-${acct.id}`,
+        });
+        await selectAccount(acct);
+      } catch { toggle.classList.remove('disabled'); }
+    };
+
+    const removeBtn = document.createElement('button');
+    removeBtn.className = 'btn-remove';
+    removeBtn.textContent = 'Remove';
+    removeBtn.onclick = async () => {
+      removeBtn.disabled = true;
+      try {
+        await api(`/api/strategies/${s.name}/accounts/${acct.id}`, {
+          method: 'DELETE',
+          key: `bots-remove-${s.name}-${acct.id}`,
+        });
+        await selectAccount(acct);
+      } catch { removeBtn.disabled = false; }
+    };
+
+    actions.append(statusBadge, toggle, removeBtn);
+    row.append(icon, info, actions);
+    return row;
+  }
+
+  function buildUnassignedRow(acct, s) {
+    const row = document.createElement('div');
+    row.className = 'strat-row unassigned';
+
+    const icon = document.createElement('div');
+    icon.className = 'strat-icon si-inactive';
+    icon.innerHTML = stratIcon(s.name, false);
+
+    const info = document.createElement('div');
+    info.className = 'strat-info';
+    info.innerHTML = `<div class="strat-name">${escHtml(s.label)}</div>` +
+      `<div class="strat-desc">${escHtml(s.description)}</div>`;
+
+    const actions = document.createElement('div');
+    actions.className = 'strat-actions';
+
+    const assignBtn = document.createElement('button');
+    assignBtn.className = 'btn-assign';
+    assignBtn.textContent = '+ Assign';
+    assignBtn.onclick = async () => {
+      assignBtn.disabled = true;
+      try {
+        await api(`/api/strategies/${s.name}/accounts`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ account_id: acct.id, enabled: true }),
+          key: `bots-assign-${s.name}-${acct.id}`,
+        });
+        await selectAccount(acct);
+      } catch { assignBtn.disabled = false; }
+    };
+
+    actions.appendChild(assignBtn);
+    row.append(icon, info, actions);
+    return row;
+  }
+
+  // ── Engine controls ────────────────────────────────────────────────────────
   document.getElementById('btn-run-now').addEventListener('click', () => {
-    const modeText = account?.account_type === 'paper' ? 'Paper Trading' : 'Live Trading';
-    const modeEl = document.getElementById('modal-run-mode');
-    modeEl.innerHTML = '';
-    modeEl.appendChild(document.createTextNode('Account mode: '));
-    const strong = document.createElement('strong');
-    strong.textContent = modeText;
-    modeEl.appendChild(strong);
     openModal(document.getElementById('modal-run'), runEngine);
+  });
+
+  document.getElementById('btn-ks').addEventListener('click', () => {
+    const on = killSwitchState;
+    openModal(
+      document.getElementById(on ? 'modal-ks-off' : 'modal-ks-on'),
+      () => setKillSwitch(!on)
+    );
   });
 
   async function runEngine() {
@@ -995,29 +925,30 @@ async function initBots() {
       const errors = (result.ran || []).filter(r => r.error);
       resultEl.className = 'result-panel' + (errors.length || result.error ? ' error' : '');
       resultEl.innerHTML = '';
-
       const lines = [
         'Strategies evaluated: ' + (result.ran?.length || 0),
-        'Signals generated: ' + (result.signals?.length || 0),
+        'Signals generated: '    + (result.signals?.length || 0),
       ];
       if (result.error) lines.push('Engine error: ' + result.error);
       errors.forEach(e => lines.push('Error in ' + e.strategy + ': ' + e.error));
-
       lines.forEach(line => {
-        const p = document.createElement('div');
-        p.textContent = line;
-        resultEl.appendChild(p);
+        const p = document.createElement('div'); p.textContent = line; resultEl.appendChild(p);
       });
       resultEl.classList.remove('hidden');
       setTimeout(() => resultEl.classList.add('hidden'), 10_000);
-      await fetchStrategies();
+
+      const engineStatus = await api('/api/engine', { key: 'bots-engine-post' });
+      const strats = await api('/api/strategies', { key: 'bots-strats-post' });
+      const enabledCount = strats.filter(s => s.enabled).length;
+      document.getElementById('engine-meta').textContent =
+        `${enabledCount} of ${strats.length} strategies globally enabled · ` +
+        `Last run: ${engineStatus.ts ? fmt.time(engineStatus.ts) : 'Never'}`;
     } catch {
       resultEl.className = 'result-panel error';
-      resultEl.innerHTML = '';
       resultEl.textContent = 'Action failed — check logs.';
       resultEl.classList.remove('hidden');
     } finally {
-      btn.innerHTML = '<svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg> Run Engine Now';
+      btn.innerHTML = '<svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg> Run Now';
       updateRunBtnState();
     }
   }
@@ -1028,26 +959,16 @@ async function initBots() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ on }),
-        key: 'bots-ks'
+        key: 'bots-ks',
       });
       applyKillSwitchUI(res.kill_switch);
-      api('/api/engine', { key: 'bots-engine-bg' }).then(() => {}).catch(() => {});
-    } catch {
-      alert('Kill switch action failed. Check logs.');
-    }
+    } catch {}
   }
 
-  document.getElementById('btn-ks-on').addEventListener('click', () => {
-    openModal(document.getElementById('modal-ks-on'), () => setKillSwitch(true));
-  });
-  document.getElementById('btn-ks-off').addEventListener('click', () => {
-    openModal(document.getElementById('modal-ks-off'), () => setKillSwitch(false));
-  });
-
-  await fetchAccount();
-  await fetchRiskState();
-  createPoller(fetchStrategies, 30_000).start();
+  updateRunBtnState();
+  await loadData();
 }
+
 
 // ─────────────────────────────────────────
 // initPositions — positions.html

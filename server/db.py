@@ -499,6 +499,16 @@ def unassign_strategy_account(strategy_name: str, account_id: int) -> None:
         )
 
 
+def get_account_strategy_assignments(account_id: int) -> dict[str, bool]:
+    """Return {strategy_name: enabled} for all strategies assigned to this account."""
+    with get_conn() as c:
+        rows = c.execute(
+            "SELECT strategy_name, enabled FROM strategy_accounts WHERE account_id=?",
+            (account_id,)
+        ).fetchall()
+        return {r["strategy_name"]: bool(r["enabled"]) for r in rows}
+
+
 # ── Symbol Blacklist ───────────────────────────────────────────────────────────
 
 def get_symbol_blacklist() -> list[str]:

@@ -404,6 +404,26 @@ def broker_account_assignments(account_id: int, request: Request):
     return {"strategies": db.get_broker_account_assignments(account_id)}
 
 
+@app.get("/api/broker-accounts/{account_id}/strategies")
+def broker_account_strategy_view(account_id: int, request: Request):
+    """All strategies with per-account assignment + enabled status. Used by Bots page."""
+    _require_auth(request)
+    if not db.get_broker_account(account_id):
+        raise HTTPException(404, "account not found")
+    assignments = db.get_account_strategy_assignments(account_id)
+    return [
+        {
+            "name": name,
+            "label": cls.label,
+            "description": cls.description,
+            "assigned": name in assignments,
+            "enabled": assignments.get(name, False),
+        }
+        for name, cls in strategies.REGISTRY.items()
+        if not cls.hidden
+    ]
+
+
 @app.delete("/api/broker-accounts/{account_id}")
 def delete_broker_account(account_id: int, request: Request):
     _require_auth(request)
