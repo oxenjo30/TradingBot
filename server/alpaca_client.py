@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+import threading
 from typing import Literal
 
 from alpaca.trading.client import TradingClient
@@ -9,6 +10,8 @@ from alpaca.data.requests import StockBarsRequest, StockLatestQuoteRequest
 from alpaca.data.timeframe import TimeFrame
 
 from .config import ALPACA_API_KEY, ALPACA_API_SECRET, PAPER
+
+_bt = threading.local()
 
 _trading: TradingClient | None = None
 _data: StockHistoricalDataClient | None = None
@@ -145,6 +148,11 @@ def get_latest_quote(symbol: str) -> dict:
 
 
 def get_recent_bars(symbol: str, days: int = 60) -> list[dict]:
+    if getattr(_bt, "bars", None) is not None:
+        sym = symbol.upper()
+        cutoff = _bt.current_date.isoformat()
+        return [b for b in _bt.bars.get(sym, []) if b["t"][:10] <= cutoff]
+
     end = datetime.now(timezone.utc) - timedelta(minutes=20)
     start = end - timedelta(days=days)
     req = StockBarsRequest(

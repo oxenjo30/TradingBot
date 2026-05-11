@@ -1,5 +1,10 @@
 from dataclasses import dataclass, field
-from typing import Literal, ClassVar
+from typing import Literal, ClassVar, Protocol, runtime_checkable
+
+
+@runtime_checkable
+class BarsProvider(Protocol):
+    def get_bars(self, symbol: str, limit: int) -> list[dict]: ...
 
 
 @dataclass
@@ -22,6 +27,7 @@ class Strategy:
     default_params: ClassVar[dict] = {}
     params_schema: ClassVar[list] = []
     auto_trade: ClassVar[bool] = True
+    hidden: ClassVar[bool] = False  # if True, excluded from the bots UI list
 
     def __init__(self, params: dict):
         merged = dict(self.default_params)
@@ -50,4 +56,5 @@ class Strategy:
             "default_params": cls.default_params,
             "params_schema": cls.params_schema,
             "auto_trade": cls.auto_trade,
+            "hidden": cls.hidden,
         }
