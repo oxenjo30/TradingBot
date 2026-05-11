@@ -895,7 +895,7 @@ async function initBots() {
           const sel = document.getElementById('assign-account-select');
           sel.innerHTML = available.length
             ? '<option value="">Select a broker account…</option>'
-            : '<option value="">No available accounts — add one in API Keys</option>';
+            : '<option value="">No available accounts — add one in Broker Accounts</option>';
           available.forEach(a => {
             const opt = document.createElement('option');
             opt.value = a.id;
