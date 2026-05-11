@@ -649,15 +649,9 @@ async function initBots() {
     } else if (killSwitchState === true) {
       btn.disabled = true;
       btn.title = 'Kill switch is active.';
-    } else if (marketOpen === null) {
-      btn.disabled = true;
-      btn.title = 'Market status unavailable.';
-    } else if (!marketOpen) {
-      btn.disabled = true;
-      btn.title = 'Market is closed.';
     } else {
       btn.disabled = false;
-      btn.title = '';
+      btn.title = marketOpen ? '' : 'Market is closed — engine will run but skip trading.';
     }
   }
 
