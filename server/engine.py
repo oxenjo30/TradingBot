@@ -29,6 +29,8 @@ def run_tick():
         log.exception("clock fetch failed")
         return
 
+    active_mode = db.get_risk_settings().get("trading_mode", "paper")
+
     if not clock["is_open"]:
         _last_run["error"] = "market closed"
         log.info("market closed; skipping strategy tick")
@@ -58,6 +60,8 @@ def run_tick():
             continue
 
         for acct in accounts:
+            if acct["account_type"] != active_mode:
+                continue
             acct_id = acct["id"]
 
             if acct_id not in client_cache:
@@ -103,7 +107,11 @@ def run_tick():
             for sig in signals:
                 # ── risk check ──────────────────────────────────────────────
                 try:
-                    risk.check_all(sig.symbol, sig.side, account, acct_data["dtc"])
+                    risk.check_all(
+                        sig.symbol, sig.side, account, acct_data["dtc"],
+                        open_positions_count=len(acct_data["positions"]),
+                        current_symbol_qty=abs(acct_data["positions"].get(sig.symbol, 0.0)),
+                    )
                 except risk.RiskViolation as rv:
                     reason = f"RISK BLOCK: {rv}"
                     log.warning("%s %s blocked — %s", sig.side, sig.symbol, rv)
@@ -152,6 +160,7 @@ def run_tick():
                         s["name"], sig.symbol, sig.side,
                         final_qty, sig.notional, sig.reason, order["id"]
                     )
+                    db.reset_consecutive_losses()
                     _last_run["signals"].append({
                         "strategy": s["name"], "symbol": sig.symbol, "side": sig.side,
                         "qty": final_qty, "reason": sig.reason, "order_id": order["id"],
@@ -165,6 +174,7 @@ def run_tick():
                 except Exception as e:
                     log.exception("order submit failed for %s %s %s",
                                   sig.symbol, sig.side, final_qty)
+                    db.increment_consecutive_losses()
                     db.log_signal(s["name"], sig.symbol, sig.side, final_qty,
                                   f"{sig.reason} | submit error: {e}", None, "error")
 

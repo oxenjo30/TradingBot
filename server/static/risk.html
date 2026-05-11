@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Risk Management — TradeBot</title>
+  <title>Risk Management &ndash; TradeBot</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="icon" href="data:,">
@@ -11,7 +11,7 @@
 </head>
 <body data-page="risk">
 
-<!-- ── Sidebar ── -->
+<!-- Sidebar -->
 <aside class="sidebar">
   <div class="logo">
     <div class="logo-mark icon-blue">
@@ -54,7 +54,7 @@
       Bots &amp; Strategies
     </a>
     <p class="nav-section">System</p>
-    <a href="/static/risk.html" class="nav-item" data-page="risk">
+    <a href="/static/risk.html" class="nav-item active" data-page="risk">
       <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
       Risk
     </a>
@@ -64,7 +64,7 @@
     </a>
     <a href="/static/apikeys.html" class="nav-item" data-page="apikeys">
       <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
-      API Keys
+      Broker Accounts
     </a>
     <a href="/static/settings.html" class="nav-item" data-page="settings">
       <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -76,29 +76,28 @@
     <div class="paper-card">
       <p class="paper-label">Paper Trading Mode</p>
       <p style="font-size:12px;color:#E6EBF5;margin-top:2px;">Safe sandbox environment</p>
-      <a href="#" class="go-live">Go Live →</a>
+      <a href="#" class="go-live">Go Live &rarr;</a>
     </div>
   </div>
 </aside>
 
-<!-- ── Page wrapper ── -->
+<!-- Page wrapper -->
 <div class="main">
 
-  <!-- ── Header ── -->
+  <!-- Header -->
   <header class="page-header">
     <div class="title-wrap flex-1 min-w-0">
       <div class="page-title">Risk Management</div>
-      <div class="page-sub">Risk controls (Phase 2)</div>
+      <div class="page-sub">Monitor and configure trading guardrails</div>
     </div>
     <div class="search-bar">
       <svg width="14" height="14" fill="none" stroke="#64748B" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-      <span class="search-text">Search…</span>
+      <span class="search-text">Search&hellip;</span>
     </div>
     <div class="bell-wrap">
       <svg width="18" height="18" fill="none" stroke="#64748B" stroke-width="1.8" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-      
     </div>
-    <div id="market-chip" class="market-chip">US Equities…</div>
+    <div id="market-chip" class="market-chip">US Equities&hellip;</div>
     <span id="paper-badge" class="plan-badge hidden">Paper Mode</span>
     <div class="flex items-center gap-2">
       <div class="avatar">JR</div>
@@ -110,17 +109,315 @@
     </div>
   </header>
 
-  <!-- ── Main ── -->
-  <main class="content">
-    <div class="card">
-      <div class="placeholder-wrap">
-        <svg width="40" height="40" fill="none" stroke="#64748B" stroke-width="1.5" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-        <div style="font-size:15px;font-weight:600;">Risk Management</div>
-        <div class="text-muted" style="font-size:13px;text-align:center;max-width:340px;">Full risk settings UI is planned for Phase 2. Kill Switch controls are available on the Bots &amp; Strategies page.</div>
+  <!-- Main -->
+  <main class="content flex flex-col gap-4">
+
+    <!-- ── Live Status ── -->
+    <div class="card" id="risk-status-card">
+      <div style="font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.875rem;">Today&rsquo;s Status</div>
+      <div class="risk-status-row">
+
+        <div class="risk-stat">
+          <div class="risk-stat-label">Day P&amp;L</div>
+          <div id="risk-live-pl" class="risk-stat-value">&mdash;</div>
+          <div id="risk-pl-bar-wrap" class="risk-pl-bar-wrap">
+            <div id="risk-pl-bar" class="risk-pl-bar"></div>
+          </div>
+        </div>
+
+        <div class="risk-stat-divider"></div>
+
+        <div class="risk-stat">
+          <div class="risk-stat-label">Day Trades</div>
+          <div id="risk-live-dt" class="risk-stat-value">&mdash;</div>
+          <div id="risk-pdt-label" class="risk-stat-sub text-muted">&mdash;</div>
+        </div>
+
+        <div class="risk-stat-divider"></div>
+
+        <div class="risk-stat">
+          <div class="risk-stat-label">Daily Loss Limit</div>
+          <div id="risk-live-limit" class="risk-stat-value">&mdash;</div>
+          <div id="risk-limit-label" class="risk-stat-sub text-muted">&mdash;</div>
+        </div>
+
+        <div class="risk-stat-divider"></div>
+
+        <div class="risk-stat">
+          <div class="risk-stat-label">Engine Status</div>
+          <div id="risk-engine-status" class="risk-stat-value" style="font-size:14px;">&mdash;</div>
+          <div id="risk-engine-sub" class="risk-stat-sub text-muted">&mdash;</div>
+        </div>
+
+      </div>
+
+      <!-- Warnings -->
+      <div id="risk-warnings" class="hidden" style="margin-top:1rem;display:flex;flex-direction:column;gap:.4rem;"></div>
+    </div>
+
+    <!-- ── Kill Switch ── -->
+    <div class="card" id="ks-card" style="border-color:rgba(239,68,68,.25);">
+      <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
+        <div class="icon-circle icon-red" style="width:44px;height:44px;flex-shrink:0;">
+          <svg width="20" height="20" fill="none" stroke="#EF4444" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        </div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:15px;font-weight:700;">Kill Switch</div>
+          <div id="ks-desc" class="text-muted" style="font-size:12px;margin-top:2px;">When active, all engine ticks are blocked. No strategies will execute.</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:.75rem;flex-shrink:0;">
+          <span id="ks-badge" class="badge b-disabled">OFF</span>
+          <button id="btn-ks" class="btn btn-danger" style="min-width:160px;">Activate Kill Switch</button>
+        </div>
       </div>
     </div>
-  </main>
 
+    <!-- ── Risk Limits ── -->
+    <div class="card">
+      <div style="font-size:14px;font-weight:600;margin-bottom:1rem;">Risk Limits</div>
+      <div class="risk-grid">
+
+        <!-- Max Daily Loss -->
+        <div class="risk-item">
+          <div class="risk-item-header">
+            <div class="icon-circle icon-orange" style="width:34px;height:34px;">
+              <svg width="15" height="15" fill="none" stroke="#F59E0B" stroke-width="2" viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+            </div>
+            <div>
+              <div style="font-size:13px;font-weight:600;">Max Daily Loss</div>
+              <div class="text-muted" style="font-size:11px;">Engine halts when daily P&amp;L drops below this threshold</div>
+            </div>
+          </div>
+          <div class="risk-input-row">
+            <input id="inp-max-loss" type="number" step="0.1" min="0.1" max="100" class="input-field risk-input">
+            <span class="risk-unit">%</span>
+            <button class="btn btn-sm btn-ghost risk-save-btn" data-key="max_daily_loss_pct" data-source="inp-max-loss">Save</button>
+          </div>
+        </div>
+
+        <!-- Max Day Trades -->
+        <div class="risk-item">
+          <div class="risk-item-header">
+            <div class="icon-circle icon-purple" style="width:34px;height:34px;">
+              <svg width="15" height="15" fill="none" stroke="#8B5CF6" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+            </div>
+            <div>
+              <div style="font-size:13px;font-weight:600;">Max Day Trades</div>
+              <div class="text-muted" style="font-size:11px;">Maximum same-day round-trip trades (PDT rule protection)</div>
+            </div>
+          </div>
+          <div class="risk-input-row">
+            <input id="inp-max-dt" type="number" step="1" min="0" max="100" class="input-field risk-input">
+            <span class="risk-unit">trades</span>
+            <button class="btn btn-sm btn-ghost risk-save-btn" data-key="max_day_trades" data-source="inp-max-dt">Save</button>
+          </div>
+        </div>
+
+        <!-- Max Position Size -->
+        <div class="risk-item">
+          <div class="risk-item-header">
+            <div class="icon-circle icon-cyan" style="width:34px;height:34px;">
+              <svg width="15" height="15" fill="none" stroke="#06B6D4" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+            </div>
+            <div>
+              <div style="font-size:13px;font-weight:600;">Max Position Size</div>
+              <div class="text-muted" style="font-size:11px;">Max portfolio percentage any single position can occupy</div>
+            </div>
+          </div>
+          <div class="risk-input-row">
+            <input id="inp-max-pos" type="number" step="0.5" min="1" max="100" class="input-field risk-input">
+            <span class="risk-unit">%</span>
+            <button class="btn btn-sm btn-ghost risk-save-btn" data-key="max_position_pct" data-source="inp-max-pos">Save</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ── Position Sizing ── -->
+    <div class="card">
+      <div style="font-size:14px;font-weight:600;margin-bottom:.25rem;">Position Sizing</div>
+      <div class="text-muted" style="font-size:12px;margin-bottom:1rem;">Controls how the engine calculates order size when a strategy signals without an explicit notional.</div>
+
+      <div style="display:flex;gap:.75rem;margin-bottom:1rem;">
+        <div class="type-opt" id="sizing-fixed" data-mode="fixed" style="flex:1;">
+          <div class="type-opt-dot" style="background:#3B82F6;box-shadow:0 0 6px rgba(59,130,246,.5);"></div>
+          <div>
+            <div class="type-opt-name">Fixed Notional</div>
+            <div class="type-opt-desc">Use strategy&rsquo;s configured dollar amount</div>
+          </div>
+        </div>
+        <div class="type-opt" id="sizing-pct" data-mode="pct" style="flex:1;">
+          <div class="type-opt-dot" style="background:#8B5CF6;box-shadow:0 0 6px rgba(139,92,246,.5);"></div>
+          <div>
+            <div class="type-opt-name">Portfolio %</div>
+            <div class="type-opt-desc">Size each order as a % of account equity</div>
+          </div>
+        </div>
+      </div>
+
+      <div id="pct-sizing-row" class="risk-input-row hidden" style="align-items:center;gap:.75rem;">
+        <span style="font-size:13px;color:#94A3B8;">Order size:</span>
+        <input id="inp-size-pct" type="number" step="0.1" min="0.1" max="100" class="input-field risk-input">
+        <span class="risk-unit">% of equity</span>
+        <button class="btn btn-sm btn-ghost risk-save-btn" data-key="position_size_pct" data-source="inp-size-pct">Save</button>
+      </div>
+    </div>
+
+    <!-- ── Circuit Breakers ── -->
+    <div class="card">
+      <div style="font-size:14px;font-weight:600;margin-bottom:.25rem;">Circuit Breakers</div>
+      <div class="text-muted" style="font-size:12px;margin-bottom:1rem;">Automatically pause trading when repetitive losses or excessive activity are detected.</div>
+      <div class="risk-grid">
+
+        <!-- Consecutive Loss Limit -->
+        <div class="risk-item">
+          <div class="risk-item-header">
+            <div class="icon-circle icon-red" style="width:34px;height:34px;">
+              <svg width="15" height="15" fill="none" stroke="#EF4444" stroke-width="2" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            </div>
+            <div>
+              <div style="font-size:13px;font-weight:600;">Consecutive Failure Limit</div>
+              <div class="text-muted" style="font-size:11px;">Block trading after N consecutive order errors. Resets on next success.</div>
+            </div>
+          </div>
+          <div class="risk-input-row" style="flex-wrap:wrap;gap:.5rem;">
+            <input id="inp-consec" type="number" step="1" min="0" max="50" class="input-field risk-input" placeholder="0">
+            <span class="risk-unit">errors</span>
+            <button class="btn btn-sm btn-ghost risk-save-btn" data-key="consecutive_loss_limit" data-source="inp-consec">Save</button>
+            <button id="btn-reset-losses" class="btn btn-sm btn-ghost" style="color:var(--orange);border-color:rgba(245,158,11,.3);">Reset Counter</button>
+          </div>
+          <div id="consec-current" class="text-muted" style="font-size:11px;margin-top:.25rem;"></div>
+        </div>
+
+        <!-- Weekly Loss Limit -->
+        <div class="risk-item">
+          <div class="risk-item-header">
+            <div class="icon-circle icon-orange" style="width:34px;height:34px;">
+              <svg width="15" height="15" fill="none" stroke="#F59E0B" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            </div>
+            <div>
+              <div style="font-size:13px;font-weight:600;">Weekly Loss Limit</div>
+              <div class="text-muted" style="font-size:11px;">Engage kill switch if week P&amp;L drops below threshold. Resets each Monday.</div>
+            </div>
+          </div>
+          <div class="risk-input-row">
+            <input id="inp-weekly-loss" type="number" step="0.1" min="0" max="100" class="input-field risk-input" placeholder="0">
+            <span class="risk-unit">%</span>
+            <button class="btn btn-sm btn-ghost risk-save-btn" data-key="weekly_loss_limit_pct" data-source="inp-weekly-loss">Save</button>
+          </div>
+          <div id="weekly-current" class="text-muted" style="font-size:11px;margin-top:.25rem;"></div>
+        </div>
+
+        <!-- Max Orders Per Day -->
+        <div class="risk-item">
+          <div class="risk-item-header">
+            <div class="icon-circle icon-indigo" style="width:34px;height:34px;">
+              <svg width="15" height="15" fill="none" stroke="#6366F1" stroke-width="2" viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+            </div>
+            <div>
+              <div style="font-size:13px;font-weight:600;">Max Orders Per Day</div>
+              <div class="text-muted" style="font-size:11px;">Total filled orders cap across all strategies. 0 = unlimited.</div>
+            </div>
+          </div>
+          <div class="risk-input-row">
+            <input id="inp-max-orders" type="number" step="1" min="0" max="500" class="input-field risk-input" placeholder="0">
+            <span class="risk-unit">orders</span>
+            <button class="btn btn-sm btn-ghost risk-save-btn" data-key="max_orders_per_day" data-source="inp-max-orders">Save</button>
+          </div>
+          <div id="orders-current" class="text-muted" style="font-size:11px;margin-top:.25rem;"></div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ── Exposure Controls ── -->
+    <div class="card">
+      <div style="font-size:14px;font-weight:600;margin-bottom:.25rem;">Exposure Controls</div>
+      <div class="text-muted" style="font-size:12px;margin-bottom:1rem;">Prevent over-concentration in too many positions or a single ticker.</div>
+      <div class="risk-grid">
+
+        <!-- Max Open Positions -->
+        <div class="risk-item">
+          <div class="risk-item-header">
+            <div class="icon-circle icon-cyan" style="width:34px;height:34px;">
+              <svg width="15" height="15" fill="none" stroke="#06B6D4" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>
+            </div>
+            <div>
+              <div style="font-size:13px;font-weight:600;">Max Open Positions</div>
+              <div class="text-muted" style="font-size:11px;">Block new buys when this many positions are already open. 0 = unlimited.</div>
+            </div>
+          </div>
+          <div class="risk-input-row">
+            <input id="inp-max-open" type="number" step="1" min="0" max="200" class="input-field risk-input">
+            <span class="risk-unit">positions</span>
+            <button class="btn btn-sm btn-ghost risk-save-btn" data-key="max_open_positions" data-source="inp-max-open">Save</button>
+          </div>
+        </div>
+
+        <!-- Max Symbol Exposure -->
+        <div class="risk-item">
+          <div class="risk-item-header">
+            <div class="icon-circle icon-purple" style="width:34px;height:34px;">
+              <svg width="15" height="15" fill="none" stroke="#8B5CF6" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            </div>
+            <div>
+              <div style="font-size:13px;font-weight:600;">Max Symbol Exposure</div>
+              <div class="text-muted" style="font-size:11px;">Block buys if existing position already represents this % of portfolio. 0 = unlimited.</div>
+            </div>
+          </div>
+          <div class="risk-input-row">
+            <input id="inp-sym-exp" type="number" step="0.5" min="0" max="100" class="input-field risk-input" placeholder="0">
+            <span class="risk-unit">%</span>
+            <button class="btn btn-sm btn-ghost risk-save-btn" data-key="max_symbol_exposure_pct" data-source="inp-sym-exp">Save</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ── Trading Hours ── -->
+    <div class="card">
+      <div style="font-size:14px;font-weight:600;margin-bottom:.25rem;">Trading Hours</div>
+      <div class="text-muted" style="font-size:12px;margin-bottom:1rem;">Only allow order submission within this window (Eastern Time). Leave blank to allow all market hours.</div>
+      <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
+        <div style="display:flex;align-items:center;gap:.5rem;">
+          <label style="font-size:12px;color:var(--muted);white-space:nowrap;">Start (ET)</label>
+          <input id="inp-hours-start" type="time" class="input-field" style="width:120px;" value="09:35">
+        </div>
+        <div style="color:var(--muted);font-size:13px;">&ndash;</div>
+        <div style="display:flex;align-items:center;gap:.5rem;">
+          <label style="font-size:12px;color:var(--muted);white-space:nowrap;">End (ET)</label>
+          <input id="inp-hours-end" type="time" class="input-field" style="width:120px;" value="15:45">
+        </div>
+        <button id="btn-save-hours" class="btn btn-sm btn-ghost">Save</button>
+        <button id="btn-clear-hours" class="btn btn-sm btn-ghost" style="color:var(--muted);">Clear (disable)</button>
+      </div>
+      <div id="hours-status" class="text-muted" style="font-size:11px;margin-top:.75rem;"></div>
+    </div>
+
+    <!-- ── No-Trade List ── -->
+    <div class="card">
+      <div style="font-size:14px;font-weight:600;margin-bottom:.25rem;">No-Trade List</div>
+      <div class="text-muted" style="font-size:12px;margin-bottom:1rem;">Symbols on this list are blocked from all strategy orders. Manual orders are not affected.</div>
+
+      <div style="display:flex;gap:.5rem;margin-bottom:1rem;">
+        <input id="inp-blacklist-add" type="text" class="input-field" style="width:140px;text-transform:uppercase;" placeholder="AAPL" maxlength="10">
+        <button id="btn-blacklist-add" class="btn btn-sm btn-ghost">
+          <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Add
+        </button>
+      </div>
+
+      <div id="blacklist-chips" style="display:flex;flex-wrap:wrap;gap:.4rem;min-height:28px;">
+        <span class="text-muted" id="blacklist-empty" style="font-size:12px;">No symbols on the no-trade list.</span>
+      </div>
+    </div>
+
+    <!-- Save feedback toast -->
+    <div id="risk-toast" class="hidden" style="position:fixed;bottom:1.5rem;right:1.5rem;background:#10B981;color:#fff;padding:.6rem 1.1rem;border-radius:10px;font-size:13px;font-weight:600;box-shadow:0 4px 20px rgba(16,185,129,.4);z-index:60;transition:opacity .3s;">Settings saved</div>
+
+  </main>
 </div>
 
 <script src="/static/app.js"></script>
