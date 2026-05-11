@@ -4,13 +4,23 @@ import pytest
 import server.alpaca_client as ac
 
 
+@pytest.fixture(autouse=True)
+def _reset_bt():
+    """Ensure _bt state is clean before and after every test."""
+    ac._bt.bars = None
+    ac._bt.current_date = None
+    yield
+    ac._bt.bars = None
+    ac._bt.current_date = None
+
+
 def test_bt_thread_local_not_active_by_default():
     """Without setting _bt.bars, get_recent_bars should NOT short-circuit."""
     # Verify attribute is absent (or None) on a fresh thread-local
     assert not getattr(ac._bt, "bars", None)
 
 
-def test_bt_override_filters_by_date(monkeypatch):
+def test_bt_override_filters_by_date():
     """When _bt.bars is set, get_recent_bars returns bars up to current_date."""
     from datetime import date
 
