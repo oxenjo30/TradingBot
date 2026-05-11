@@ -80,15 +80,15 @@ def _get_weekly_pl_pct(account: dict) -> float:
 # ── Pre-order checks ──────────────────────────────────────────────────────────
 
 def check_all(symbol: str, side: str, account: dict, day_trade_count: int,
-              open_positions_count: int = 0, current_symbol_qty: float = 0.0):
+              open_positions_count: int = 0, current_symbol_value: float = 0.0):
     """
     Raises RiskViolation if any guard fails.
     Call before every auto-order submission.
 
-    account              — dict from alpaca_client.get_account_summary()
-    day_trade_count      — int from Alpaca account.daytrade_count
-    open_positions_count — number of currently open positions
-    current_symbol_qty   — current absolute position qty in this symbol
+    account               — dict from alpaca_client.get_account_summary()
+    day_trade_count       — int from Alpaca account.daytrade_count
+    open_positions_count  — number of currently open positions
+    current_symbol_value  — current market value (USD) held in this symbol
     """
     settings = get_settings()
 
@@ -160,10 +160,10 @@ def check_all(symbol: str, side: str, account: dict, day_trade_count: int,
 
     # 8. Max symbol exposure (buy side only)
     max_sym_exp = settings.get("max_symbol_exposure_pct", 0.0)
-    if side == "buy" and max_sym_exp > 0 and current_symbol_qty > 0:
+    if side == "buy" and max_sym_exp > 0 and current_symbol_value > 0:
         portfolio_value = account.get("portfolio_value", 0.0)
         if portfolio_value > 0:
-            sym_exposure_pct = (current_symbol_qty / portfolio_value) * 100.0
+            sym_exposure_pct = (current_symbol_value / portfolio_value) * 100.0
             if sym_exposure_pct >= max_sym_exp:
                 raise RiskViolation(
                     f"{symbol} exposure {sym_exposure_pct:.1f}% exceeds max {max_sym_exp:.1f}%"

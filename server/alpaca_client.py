@@ -249,6 +249,7 @@ class AccountClient:
                 "symbol": p.symbol,
                 "qty": float(p.qty),
                 "side": str(p.side).lower().replace("positionside.", ""),
+                "market_value": float(p.market_value) if p.market_value else 0.0,
             })
         return out
 
