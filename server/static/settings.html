@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Settings — TradeBot</title>
+  <title>Settings &ndash; TradeBot</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="icon" href="data:,">
@@ -11,7 +11,7 @@
 </head>
 <body data-page="settings">
 
-<!-- ── Sidebar ── -->
+<!-- Sidebar -->
 <aside class="sidebar">
   <div class="logo">
     <div class="logo-mark icon-blue">
@@ -64,9 +64,9 @@
     </a>
     <a href="/static/apikeys.html" class="nav-item" data-page="apikeys">
       <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
-      API Keys
+      Broker Accounts
     </a>
-    <a href="/static/settings.html" class="nav-item" data-page="settings">
+    <a href="/static/settings.html" class="nav-item active" data-page="settings">
       <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
       Settings
     </a>
@@ -76,29 +76,28 @@
     <div class="paper-card">
       <p class="paper-label">Paper Trading Mode</p>
       <p style="font-size:12px;color:#E6EBF5;margin-top:2px;">Safe sandbox environment</p>
-      <a href="#" class="go-live">Go Live →</a>
+      <a href="#" class="go-live">Go Live &rarr;</a>
     </div>
   </div>
 </aside>
 
-<!-- ── Page wrapper ── -->
+<!-- Page wrapper -->
 <div class="main">
 
-  <!-- ── Header ── -->
+  <!-- Header -->
   <header class="page-header">
     <div class="title-wrap flex-1 min-w-0">
       <div class="page-title">Settings</div>
-      <div class="page-sub">Notifications and preferences (Phase 2)</div>
+      <div class="page-sub">Notifications &amp; alert preferences</div>
     </div>
     <div class="search-bar">
       <svg width="14" height="14" fill="none" stroke="#64748B" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-      <span class="search-text">Search…</span>
+      <span class="search-text">Search&hellip;</span>
     </div>
     <div class="bell-wrap">
       <svg width="18" height="18" fill="none" stroke="#64748B" stroke-width="1.8" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-      
     </div>
-    <div id="market-chip" class="market-chip">US Equities…</div>
+    <div id="market-chip" class="market-chip">US Equities&hellip;</div>
     <span id="paper-badge" class="plan-badge hidden">Paper Mode</span>
     <div class="flex items-center gap-2">
       <div class="avatar">JR</div>
@@ -110,17 +109,161 @@
     </div>
   </header>
 
-  <!-- ── Main ── -->
-  <main class="content">
+  <!-- Main content -->
+  <main class="content flex flex-col gap-4">
+
+    <!-- ── Email Notifications ── -->
     <div class="card">
-      <div class="placeholder-wrap">
-        <svg width="40" height="40" fill="none" stroke="#64748B" stroke-width="1.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-        <div style="font-size:15px;font-weight:600;">Settings</div>
-        <div class="text-muted" style="font-size:13px;text-align:center;max-width:340px;">Notification settings and preferences are planned for Phase 2.</div>
+      <div class="settings-section-head">
+        <div class="icon-circle icon-blue" style="width:38px;height:38px;flex-shrink:0;">
+          <svg width="17" height="17" fill="none" stroke="#3B82F6" stroke-width="2" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+        </div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:14px;font-weight:600;">Email Notifications</div>
+          <div class="text-muted" style="font-size:12px;margin-top:2px;">Send trade alerts and summaries via SMTP email</div>
+        </div>
+        <label class="toggle-switch">
+          <input type="checkbox" id="email-enabled">
+          <span class="toggle-track"><span class="toggle-thumb"></span></span>
+        </label>
+      </div>
+
+      <div id="email-fields" class="settings-fields hidden">
+        <div class="settings-field-grid">
+          <div class="field-group">
+            <label class="field-label">Recipient Email</label>
+            <input id="email-to" type="email" class="input-field" placeholder="you@example.com">
+          </div>
+          <div class="field-group">
+            <label class="field-label">SMTP Host</label>
+            <input id="email-smtp" type="text" class="input-field" placeholder="smtp.gmail.com">
+          </div>
+          <div class="field-group">
+            <label class="field-label">SMTP Port</label>
+            <input id="email-port" type="number" class="input-field" placeholder="587" min="1" max="65535">
+          </div>
+          <div class="field-group">
+            <label class="field-label">Username</label>
+            <input id="email-user" type="text" class="input-field" placeholder="your@gmail.com">
+          </div>
+          <div class="field-group" style="grid-column: 1 / -1;">
+            <label class="field-label">App Password</label>
+            <div style="display:flex;gap:.5rem;">
+              <input id="email-pass" type="password" class="input-field" style="flex:1;" placeholder="App password (not your login password)">
+              <button id="btn-test-email" class="btn btn-ghost btn-sm" style="white-space:nowrap;flex-shrink:0;">
+                <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="22 2 11 13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                Send Test
+              </button>
+            </div>
+            <div id="email-test-msg" class="field-msg hidden"></div>
+          </div>
+        </div>
       </div>
     </div>
-  </main>
 
+    <!-- ── Telegram Notifications ── -->
+    <div class="card">
+      <div class="settings-section-head">
+        <div class="icon-circle" style="width:38px;height:38px;flex-shrink:0;background:rgba(0,136,204,.15);border-color:rgba(0,136,204,.3);">
+          <svg width="17" height="17" fill="#0088CC" viewBox="0 0 24 24"><path d="M9.78 18.65l.28-4.23 7.68-6.92c.34-.31-.07-.46-.52-.19L7.74 13.3 3.64 12c-.88-.25-.89-.86.2-1.3l15.97-6.16c.73-.33 1.43.18 1.15 1.3l-2.72 12.81c-.19.91-.74 1.13-1.5.71L12.6 16.3l-1.99 1.93c-.23.23-.42.42-.83.42z"/></svg>
+        </div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:14px;font-weight:600;">Telegram Notifications</div>
+          <div class="text-muted" style="font-size:12px;margin-top:2px;">Push alerts to a Telegram bot in real time</div>
+        </div>
+        <label class="toggle-switch">
+          <input type="checkbox" id="telegram-enabled">
+          <span class="toggle-track"><span class="toggle-thumb"></span></span>
+        </label>
+      </div>
+
+      <div id="telegram-fields" class="settings-fields hidden">
+        <div class="settings-field-grid">
+          <div class="field-group">
+            <label class="field-label">Bot Token</label>
+            <input id="telegram-token" type="text" class="input-field" placeholder="123456:ABCdef...">
+            <div class="field-hint">Create a bot via <span style="color:var(--blue);">@BotFather</span> on Telegram</div>
+          </div>
+          <div class="field-group">
+            <label class="field-label">Chat ID</label>
+            <div style="display:flex;gap:.5rem;">
+              <input id="telegram-chat-id" type="text" class="input-field" style="flex:1;" placeholder="-100123456789">
+              <button id="btn-test-telegram" class="btn btn-ghost btn-sm" style="white-space:nowrap;flex-shrink:0;">
+                <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="22 2 11 13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                Send Test
+              </button>
+            </div>
+            <div class="field-hint">Send a message to your bot, then visit:<br>
+              <code style="font-size:11px;color:var(--muted);">api.telegram.org/bot&lt;TOKEN&gt;/getUpdates</code>
+            </div>
+            <div id="telegram-test-msg" class="field-msg hidden"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Event Triggers ── -->
+    <div class="card">
+      <div style="font-size:14px;font-weight:600;margin-bottom:.25rem;">Event Triggers</div>
+      <div class="text-muted" style="font-size:12px;margin-bottom:1.25rem;">Choose which events send notifications (applies to all enabled channels)</div>
+
+      <div class="event-trigger-list">
+
+        <div class="event-trigger-row">
+          <div class="icon-circle icon-green" style="width:34px;height:34px;flex-shrink:0;">
+            <svg width="14" height="14" fill="none" stroke="#10B981" stroke-width="2" viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+          </div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:13px;font-weight:500;">Trade Executed</div>
+            <div class="text-muted" style="font-size:11px;">Alert whenever a buy or sell order is placed</div>
+          </div>
+          <label class="toggle-switch toggle-sm">
+            <input type="checkbox" id="notify-on-trade">
+            <span class="toggle-track"><span class="toggle-thumb"></span></span>
+          </label>
+        </div>
+
+        <div class="event-trigger-row">
+          <div class="icon-circle icon-orange" style="width:34px;height:34px;flex-shrink:0;">
+            <svg width="14" height="14" fill="none" stroke="#F59E0B" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          </div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:13px;font-weight:500;">Trade Blocked</div>
+            <div class="text-muted" style="font-size:11px;">Alert when a signal is blocked by risk controls or kill switch</div>
+          </div>
+          <label class="toggle-switch toggle-sm">
+            <input type="checkbox" id="notify-on-block">
+            <span class="toggle-track"><span class="toggle-thumb"></span></span>
+          </label>
+        </div>
+
+        <div class="event-trigger-row" style="border-bottom:none;">
+          <div class="icon-circle icon-purple" style="width:34px;height:34px;flex-shrink:0;">
+            <svg width="14" height="14" fill="none" stroke="#8B5CF6" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          </div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:13px;font-weight:500;">Daily Summary</div>
+            <div class="text-muted" style="font-size:11px;">Receive an end-of-day P&amp;L and activity digest</div>
+          </div>
+          <label class="toggle-switch toggle-sm">
+            <input type="checkbox" id="notify-daily-summary">
+            <span class="toggle-track"><span class="toggle-thumb"></span></span>
+          </label>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ── Save Bar ── -->
+    <div style="display:flex;align-items:center;justify-content:flex-end;gap:.75rem;padding-bottom:.5rem;">
+      <span id="settings-save-msg" class="field-msg hidden"></span>
+      <button id="btn-save-settings" class="btn btn-primary" style="min-width:120px;">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+        Save Settings
+      </button>
+    </div>
+
+  </main>
 </div>
 
 <script src="/static/app.js"></script>
