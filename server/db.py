@@ -52,6 +52,11 @@ CREATE TABLE IF NOT EXISTS strategy_perf (
 CREATE INDEX IF NOT EXISTS idx_signals_ts ON signals(ts DESC);
 CREATE INDEX IF NOT EXISTS idx_perf_strategy ON strategy_perf(strategy, date DESC);
 
+CREATE TABLE IF NOT EXISTS symbol_blacklist (
+  symbol     TEXT PRIMARY KEY,
+  added_at   TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS broker_accounts (
   id           INTEGER PRIMARY KEY AUTOINCREMENT,
   label        TEXT NOT NULL UNIQUE,
@@ -70,15 +75,45 @@ CREATE TABLE IF NOT EXISTS strategy_accounts (
   created_at    TEXT NOT NULL DEFAULT (datetime('now')),
   PRIMARY KEY (strategy_name, account_id)
 );
+
+CREATE TABLE IF NOT EXISTS backtest_runs (
+  id                INTEGER PRIMARY KEY AUTOINCREMENT,
+  created_at        TEXT NOT NULL,
+  name              TEXT,
+  strategy          TEXT NOT NULL,
+  symbols           TEXT NOT NULL,
+  start_date        TEXT NOT NULL,
+  end_date          TEXT NOT NULL,
+  initial_capital   REAL NOT NULL,
+  position_size_pct REAL NOT NULL,
+  commission_pct    REAL NOT NULL,
+  slippage_pct      REAL NOT NULL,
+  total_return_pct  REAL,
+  max_drawdown_pct  REAL,
+  win_rate_pct      REAL,
+  sharpe_ratio      REAL,
+  total_trades      INTEGER,
+  equity_curve      TEXT,
+  trades            TEXT
+);
 """
 
 RISK_DEFAULTS = {
-    "kill_switch":          "false",
-    "max_daily_loss_pct":   "2.0",
-    "max_day_trades":       "3",
-    "position_size_mode":   "fixed",
-    "position_size_pct":    "2.0",
-    "max_position_pct":     "10.0",
+    "kill_switch":             "false",
+    "max_daily_loss_pct":      "2.0",
+    "max_day_trades":          "3",
+    "position_size_mode":      "fixed",
+    "position_size_pct":       "2.0",
+    "max_position_pct":        "10.0",
+    "trading_mode":            "paper",
+    # Extended guards
+    "consecutive_loss_limit":  "0",     # 0 = disabled
+    "weekly_loss_limit_pct":   "0",     # 0 = disabled
+    "max_orders_per_day":      "0",     # 0 = disabled
+    "max_open_positions":      "10",    # 0 = disabled
+    "max_symbol_exposure_pct": "0",     # 0 = disabled
+    "trading_hours_start":     "",      # "" = disabled (HH:MM ET)
+    "trading_hours_end":       "",      # "" = disabled (HH:MM ET)
 }
 
 
@@ -98,13 +133,27 @@ def _migrate_env_account() -> None:
         secret_enc = crypto.encrypt(api_secret)
     except RuntimeError:
         return  # crypto not initialised — skip migration silently
+    label = "Alpaca Paper" if account_type == "paper" else "Alpaca Live"
     with get_conn() as c:
         c.execute(
             """INSERT INTO broker_accounts (id, label, api_key, api_secret, account_type)
-               VALUES (1, 'Default', ?, ?, ?)
+               VALUES (1, ?, ?, ?, ?)
                ON CONFLICT(id) DO NOTHING""",
-            (key_enc, secret_enc, account_type)
+            (label, key_enc, secret_enc, account_type)
         )
+        # rename legacy 'Default' label for existing installs
+        c.execute(
+            "UPDATE broker_accounts SET label=? WHERE id=1 AND label='Default'",
+            (label,)
+        )
+
+
+def _migrate_broker_column() -> None:
+    """Add broker column to broker_accounts if it doesn't exist (one-time)."""
+    with get_conn() as c:
+        cols = [row[1] for row in c.execute("PRAGMA table_info(broker_accounts)")]
+        if "broker" not in cols:
+            c.execute("ALTER TABLE broker_accounts ADD COLUMN broker TEXT NOT NULL DEFAULT 'alpaca'")
 
 
 def init_db():
@@ -116,6 +165,7 @@ def init_db():
             c.execute(
                 "INSERT OR IGNORE INTO risk_settings(key, value) VALUES(?,?)", (k, v)
             )
+    _migrate_broker_column()
     _migrate_env_account()
 
 
@@ -125,12 +175,20 @@ def get_risk_settings() -> dict:
     base = dict(RISK_DEFAULTS)
     base.update({r["key"]: r["value"] for r in rows})
     return {
-        "kill_switch":        base["kill_switch"] == "true",
-        "max_daily_loss_pct": float(base["max_daily_loss_pct"]),
-        "max_day_trades":     int(base["max_day_trades"]),
-        "position_size_mode": base["position_size_mode"],
-        "position_size_pct":  float(base["position_size_pct"]),
-        "max_position_pct":   float(base["max_position_pct"]),
+        "kill_switch":             base["kill_switch"] == "true",
+        "max_daily_loss_pct":      float(base["max_daily_loss_pct"]),
+        "max_day_trades":          int(base["max_day_trades"]),
+        "position_size_mode":      base["position_size_mode"],
+        "position_size_pct":       float(base["position_size_pct"]),
+        "max_position_pct":        float(base["max_position_pct"]),
+        "trading_mode":            base["trading_mode"],
+        "consecutive_loss_limit":  int(base["consecutive_loss_limit"]),
+        "weekly_loss_limit_pct":   float(base["weekly_loss_limit_pct"]),
+        "max_orders_per_day":      int(base["max_orders_per_day"]),
+        "max_open_positions":      int(base["max_open_positions"]),
+        "max_symbol_exposure_pct": float(base["max_symbol_exposure_pct"]),
+        "trading_hours_start":     base["trading_hours_start"],
+        "trading_hours_end":       base["trading_hours_end"],
     }
 
 
@@ -311,12 +369,12 @@ def daily_signal_counts(days: int = 30) -> list[dict]:
 
 # ── Broker Accounts ───────────────────────────────────────────────────────────
 
-def create_broker_account(label: str, api_key_enc: str, api_secret_enc: str, account_type: str) -> int:
+def create_broker_account(label: str, api_key_enc: str, api_secret_enc: str, account_type: str, broker: str = "alpaca") -> int:
     """Insert new account. Returns new row id. Raises IntegrityError if label not unique."""
     with get_conn() as c:
         cur = c.execute(
-            "INSERT INTO broker_accounts (label, api_key, api_secret, account_type) VALUES (?,?,?,?)",
-            (label, api_key_enc, api_secret_enc, account_type)
+            "INSERT INTO broker_accounts (label, api_key, api_secret, account_type, broker) VALUES (?,?,?,?,?)",
+            (label, api_key_enc, api_secret_enc, account_type, broker)
         )
         return cur.lastrowid
 
@@ -325,14 +383,14 @@ def get_broker_accounts() -> list[dict]:
     """Return all accounts. api_secret excluded; api_key returned as ciphertext for masking in main.py."""
     with get_conn() as c:
         return [dict(r) for r in c.execute(
-            "SELECT id, label, api_key, account_type, created_at, updated_at FROM broker_accounts ORDER BY id"
+            "SELECT id, label, api_key, account_type, broker, created_at, updated_at FROM broker_accounts ORDER BY id"
         )]
 
 
 def get_broker_account(account_id: int) -> dict | None:
     with get_conn() as c:
         r = c.execute(
-            "SELECT id, label, api_key, account_type, created_at, updated_at FROM broker_accounts WHERE id=?",
+            "SELECT id, label, api_key, account_type, broker, created_at, updated_at FROM broker_accounts WHERE id=?",
             (account_id,)
         ).fetchone()
         return dict(r) if r else None
@@ -439,3 +497,130 @@ def unassign_strategy_account(strategy_name: str, account_id: int) -> None:
             "DELETE FROM strategy_accounts WHERE strategy_name=? AND account_id=?",
             (strategy_name, account_id)
         )
+
+
+# ── Symbol Blacklist ───────────────────────────────────────────────────────────
+
+def get_symbol_blacklist() -> list[str]:
+    with get_conn() as c:
+        rows = c.execute("SELECT symbol FROM symbol_blacklist ORDER BY symbol").fetchall()
+    return [r["symbol"] for r in rows]
+
+
+def add_symbol_to_blacklist(symbol: str) -> None:
+    with get_conn() as c:
+        c.execute("INSERT OR IGNORE INTO symbol_blacklist (symbol) VALUES (?)", (symbol.upper(),))
+
+
+def remove_symbol_from_blacklist(symbol: str) -> None:
+    with get_conn() as c:
+        c.execute("DELETE FROM symbol_blacklist WHERE symbol=?", (symbol.upper(),))
+
+
+# ── Extended risk helpers ──────────────────────────────────────────────────────
+
+def count_signals_today() -> int:
+    """Count non-blocked, non-error signals placed today (UTC date)."""
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    with get_conn() as c:
+        row = c.execute(
+            "SELECT COUNT(*) FROM signals WHERE DATE(ts)=? AND status NOT IN ('blocked','error')",
+            (today,)
+        ).fetchone()
+    return row[0]
+
+
+def get_consecutive_losses() -> int:
+    val = get_app_config("consecutive_losses", "0")
+    try:
+        return int(val)
+    except ValueError:
+        return 0
+
+
+def increment_consecutive_losses() -> int:
+    n = get_consecutive_losses() + 1
+    set_app_config("consecutive_losses", str(n))
+    return n
+
+
+def reset_consecutive_losses() -> None:
+    set_app_config("consecutive_losses", "0")
+
+
+# ── Backtest Runs ─────────────────────────────────────────────────────────────
+
+def save_backtest_run(params: dict, results: dict) -> int:
+    with get_conn() as c:
+        cur = c.execute(
+            """INSERT INTO backtest_runs (
+                created_at, name, strategy, symbols, start_date, end_date,
+                initial_capital, position_size_pct, commission_pct, slippage_pct,
+                total_return_pct, max_drawdown_pct, win_rate_pct, sharpe_ratio,
+                total_trades, equity_curve, trades
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (
+                now_iso(),
+                None,
+                params["strategy"],
+                json.dumps(params["symbols"]),
+                params["start_date"],
+                params["end_date"],
+                params["initial_capital"],
+                params["position_size_pct"],
+                params["commission_pct"],
+                params["slippage_pct"],
+                results.get("total_return_pct"),
+                results.get("max_drawdown_pct"),
+                results.get("win_rate_pct"),
+                results.get("sharpe_ratio"),
+                results.get("total_trades"),
+                json.dumps(results.get("equity_curve", [])),
+                json.dumps(results.get("trades", [])),
+            ),
+        )
+        return cur.lastrowid
+
+
+def list_backtest_runs() -> list[dict]:
+    with get_conn() as c:
+        rows = c.execute(
+            """SELECT id, created_at, name, strategy, symbols, start_date, end_date,
+                      initial_capital, position_size_pct, commission_pct, slippage_pct,
+                      total_return_pct, max_drawdown_pct, win_rate_pct, sharpe_ratio, total_trades
+               FROM backtest_runs ORDER BY id DESC"""
+        ).fetchall()
+    result = []
+    for r in rows:
+        d = dict(r)
+        d["symbols"] = json.loads(d["symbols"])
+        result.append(d)
+    return result
+
+
+def get_backtest_run(run_id: int) -> dict | None:
+    with get_conn() as c:
+        r = c.execute(
+            "SELECT * FROM backtest_runs WHERE id=?", (run_id,)
+        ).fetchone()
+    if r is None:
+        return None
+    d = dict(r)
+    d["symbols"] = json.loads(d["symbols"])
+    d["equity_curve"] = json.loads(d["equity_curve"]) if d["equity_curve"] else []
+    d["trades"] = json.loads(d["trades"]) if d["trades"] else []
+    return d
+
+
+def delete_backtest_run(run_id: int) -> bool:
+    with get_conn() as c:
+        cur = c.execute("DELETE FROM backtest_runs WHERE id=?", (run_id,))
+        return cur.rowcount > 0
+
+
+def rename_backtest_run(run_id: int, name: str) -> bool:
+    with get_conn() as c:
+        cur = c.execute(
+            "UPDATE backtest_runs SET name=? WHERE id=?", (name, run_id)
+        )
+        return cur.rowcount > 0
