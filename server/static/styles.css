@@ -194,6 +194,13 @@ button { cursor: pointer; font-family: inherit; }
   font-size: 12px; font-weight: 600; color: var(--blue);
   display: block; margin-top: 4px;
 }
+.logout-btn {
+  width: 100%; margin-top: .5rem;
+  border: none; background: none;
+  border-radius: 8px; text-align: left;
+  color: var(--muted);
+}
+.logout-btn:hover { color: var(--red); background: rgba(239,68,68,.06); }
 
 /* ── Header ── */
 .page-header {
