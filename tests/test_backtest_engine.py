@@ -129,6 +129,21 @@ def test_slippage_worsens_fills(monkeypatch):
     assert result_slip["equity_curve"][-1]["equity"] < result_clean["equity_curve"][-1]["equity"]
 
 
+def test_pnl_includes_buy_commission(monkeypatch):
+    """Per-trade pnl must account for buy-side commission in cost basis."""
+    bars = _make_bars("2024-01-02", 12)
+    result = _run_engine(monkeypatch, bars, commission_pct=1.0, slippage_pct=0.0)
+    assert result["total_trades"] == 1
+    trade = result["trades"][0]
+    # With 1% commission on both legs, the trade should be less profitable
+    # than the same run without commission.
+    result_clean = _run_engine(monkeypatch, bars, commission_pct=0.0, slippage_pct=0.0)
+    clean_trade = result_clean["trades"][0]
+    assert trade["pnl"] < clean_trade["pnl"]
+    # Also verify pnl is not obviously wrong (shouldn't be > gross proceeds)
+    assert trade["pnl"] < trade["price"] * trade["qty"]
+
+
 def test_no_trades_win_rate_null(monkeypatch):
     """When no signals fire, win_rate_pct is None."""
     class _NoOp(Strategy):

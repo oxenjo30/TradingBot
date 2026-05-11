@@ -1,3 +1,4 @@
+import logging
 import math
 from datetime import date
 from statistics import mean, stdev
@@ -82,14 +83,18 @@ class BacktestEngine:
                             cost = qty * fill_price
                             commission = cost * commission_pct / 100
                             cash -= cost + commission
-                            positions[sym] = {"qty": float(qty), "entry_price": fill_price}
+                            positions[sym] = {
+                                "qty": float(qty),
+                                "entry_price": fill_price,
+                                "cost_basis": cost + commission,
+                            }
                     elif side == "sell" and sym in positions:
                         pos = positions.pop(sym)
                         fill_price = bar["o"] * (1 - slippage_pct / 100)
                         proceeds = pos["qty"] * fill_price
                         commission = proceeds * commission_pct / 100
                         cash += proceeds - commission
-                        pnl = (proceeds - commission) - pos["qty"] * pos["entry_price"]
+                        pnl = (proceeds - commission) - pos["cost_basis"]
                         closed_trades.append({
                             "date": date_str,
                             "symbol": sym,
@@ -119,7 +124,10 @@ class BacktestEngine:
                 simple_pos = {sym: pos["qty"] for sym, pos in positions.items()}
                 try:
                     signals = strategy.evaluate(simple_pos)
-                except Exception:
+                except Exception as exc:
+                    logging.getLogger(__name__).warning(
+                        "strategy.evaluate() raised on %s: %s", date_str, exc
+                    )
                     signals = []
                 for sig in signals:
                     sym_up = sig.symbol.upper()
