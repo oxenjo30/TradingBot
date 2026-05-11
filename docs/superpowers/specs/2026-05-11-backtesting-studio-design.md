@@ -84,9 +84,13 @@ CREATE TABLE backtest_runs (
 - `delete_backtest_run(id)` → None
 - `rename_backtest_run(id, name)` → None
 
+`backtest_runs` must be added to the `SCHEMA` constant in `db.py` (alongside existing `CREATE TABLE IF NOT EXISTS` statements). No separate migration function is needed — `init_db()` re-runs the full schema script at startup; the `IF NOT EXISTS` clause handles both fresh installs and upgrades to existing databases.
+
 ---
 
 ## API Endpoints
+
+All 5 endpoints require authentication via `_require_auth(request)` (same pattern as all other mutating endpoints in `main.py`).
 
 ```
 POST   /api/backtest              Run engine, auto-save result, return full result
@@ -96,7 +100,29 @@ PATCH  /api/backtest/runs/{id}    Update run name — body: {"name": "..."}
 DELETE /api/backtest/runs/{id}    Delete a saved run
 ```
 
-**`POST /api/backtest` request body:**
+**Pydantic request models:**
+```python
+class BacktestRequest(BaseModel):
+    strategy:          str
+    symbols:           list[str]
+    start_date:        date          # FastAPI validates ISO format automatically
+    end_date:          date
+    initial_capital:   float = 10000.0
+    position_size_pct: float = 2.0
+    commission_pct:    float = 0.1
+    slippage_pct:      float = 0.05
+
+    @validator("end_date")
+    def end_after_start(cls, v, values):
+        if "start_date" in values and v <= values["start_date"]:
+            raise ValueError("end_date must be after start_date")
+        return v
+
+class BacktestRunPatch(BaseModel):
+    name: str = Field(..., max_length=200)
+```
+
+**`POST /api/backtest` request body example:**
 ```json
 {
   "strategy":          "momentum",
@@ -130,25 +156,25 @@ Runs synchronously. For typical date ranges (1–3 years, 1–5 symbols) this co
 
 ## Engine Logic (`BacktestEngine.run`)
 
-1. **Fetch full history** — call `alpaca_client.get_recent_bars(symbol, limit=N)` for each symbol, where N = trading days in the date range + 200 (buffer for strategy lookback windows). Store as `{symbol: [bars]}` sorted ascending by date.
+1. **Fetch full history** — call `alpaca_client.get_recent_bars(symbol, days=N)` for each symbol, where N = trading days in the date range + 200 (buffer for strategy lookback windows). Store as `{symbol: [bars]}` sorted ascending by date.
 
-2. **Build trading calendar** — union of all bar dates across symbols, filtered to `[start_date, end_date]`.
+2. **Build trading calendar** — union of all bar dates across symbols, filtered to `[start_date, end_date]`. If a symbol has no bars for a given date, that symbol is silently skipped on that date (no signal generated, existing position marked to last known close price).
 
-3. **Context-manager patch** — `get_recent_bars` is monkeypatched inside a `with` block. On each tick, the patch returns only bars with `date <= current_simulation_date`, so the strategy never sees future data.
+3. **Thread-safe patch via thread-local** — `alpaca_client` exposes a `threading.local()` object `_bt`. `get_recent_bars` checks `_bt.bars` first; if set, it returns the date-sliced data from the local dict instead of calling Alpaca. `BacktestEngine` sets `_bt.bars` at the start of each tick and clears it in a `finally` block. The backtest endpoint dispatches to a worker thread via `asyncio.to_thread(engine.run, ...)` so the live engine's APScheduler ticks (which run on the event loop thread) never see the thread-local override.
 
 4. **Tick loop** — for each simulation date:
-   - Call `strategy.generate_signals()` for each symbol
-   - On BUY signal: calculate `notional = portfolio_equity × position_size_pct / 100`, compute shares; skip if symbol already held
+   - Call `strategy.evaluate(positions)` for each symbol
+   - On BUY signal: calculate `notional = portfolio_equity × position_size_pct / 100`, compute shares = `floor(notional / fill_price)`; skip if symbol already held
    - On SELL signal: close existing position if held; silently skip if no position open for that symbol
    - Fill at **next bar's open**: BUY fills at `open × (1 + slippage_pct/100)`, SELL at `open × (1 - slippage_pct/100)`
-   - Commission deducted: `notional × commission_pct / 100` from cash
-   - Mark-to-market portfolio equity updated each bar
+   - Commission deducted on **both buy and sell legs**: `fill_value × commission_pct / 100` from cash
+   - Mark-to-market portfolio equity updated each bar using each position's **close price**
 
 5. **Summary stats computed at end:**
    - `total_return_pct` = `(final_equity − initial_capital) / initial_capital × 100`
    - `max_drawdown_pct` = largest peak-to-trough equity drop
-   - `win_rate_pct` = profitable closed trades / total closed trades × 100
-   - `sharpe_ratio` = annualised mean daily return / std dev of daily returns × √252
+   - `win_rate_pct` = profitable closed trades / total closed trades × 100; returns `null` if `total_trades = 0`
+   - `sharpe_ratio` = annualised mean daily return / std dev of daily returns × √252; returns `0.0` if std dev is zero (flat equity curve)
 
 6. **Result persisted** — `db.save_backtest_run()` called before returning to caller.
 
@@ -197,15 +223,14 @@ PAGE_INIT entry:  backtesting: initBacktesting
 Functions:
   initBacktesting()     — populate strategy dropdown, wire all handlers, load history
   runBacktest()         — POST /api/backtest, show spinner, call renderResults()
-  renderResults(data)   — draw stat pills + ApexCharts equity curve + trades table
+  renderResults(data)   — draw stat pills + ApexCharts equity curve + trades table; stores data.id as currentRunId for the rename PATCH call
   renderHistory(runs)   — render saved runs list with Load/Delete handlers
   loadRun(id)           — GET /api/backtest/runs/{id}, call renderResults()
   deleteRun(id)         — DELETE /api/backtest/runs/{id}, refresh history
   renameRun(id, name)   — PATCH  /api/backtest/runs/{id}, update history row label
 ```
 
-**Strategy dropdown** — populated from a hardcoded list matching the strategies registered in `server/strategies/`:
-`SMA Cross`, `Golden Cross`, `RSI Mean Reversion`, `MACD + Volume`, `Bollinger Bands`, `Momentum`, `52-Week Breakout`, `Manual`
+**Strategy dropdown** — populated at page load from `GET /api/strategies` (same endpoint used by the Bots page), not hardcoded. This keeps the dropdown in sync automatically when strategies are added or removed.
 
 ---
 
