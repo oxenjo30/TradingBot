@@ -42,8 +42,8 @@ A full backtesting feature for TradeBot that lets users run any registered strat
 
 | File | Change |
 |---|---|
-| `server/db.py` | New `backtest_runs` table + 4 CRUD functions |
-| `server/main.py` | 4 new REST endpoints |
+| `server/db.py` | New `backtest_runs` table + 5 CRUD functions |
+| `server/main.py` | 5 new REST endpoints |
 | `server/static/backtesting.html` | Full rewrite (stacked layout) |
 | `server/static/app.js` | `initBacktesting()` + PAGE_INIT entry |
 
@@ -82,7 +82,7 @@ CREATE TABLE backtest_runs (
 - `list_backtest_runs()` → list of summary dicts (no equity_curve/trades)
 - `get_backtest_run(id)` → full run dict including equity_curve + trades
 - `delete_backtest_run(id)` → None
-- `update_backtest_run_name(id, name)` → None
+- `rename_backtest_run(id, name)` → None
 
 ---
 
@@ -92,6 +92,7 @@ CREATE TABLE backtest_runs (
 POST   /api/backtest              Run engine, auto-save result, return full result
 GET    /api/backtest/runs         List saved runs (summary only — no curves/trades)
 GET    /api/backtest/runs/{id}    Full run detail (equity curve + trades included)
+PATCH  /api/backtest/runs/{id}    Update run name — body: {"name": "..."}
 DELETE /api/backtest/runs/{id}    Delete a saved run
 ```
 
@@ -129,7 +130,7 @@ Runs synchronously. For typical date ranges (1–3 years, 1–5 symbols) this co
 
 ## Engine Logic (`BacktestEngine.run`)
 
-1. **Fetch full history** — call `alpaca_client.get_recent_bars(symbol, limit=N)` for each symbol, where N is enough bars to cover the date range plus the strategy's lookback window. Store as `{symbol: [bars]}` sorted ascending by date.
+1. **Fetch full history** — call `alpaca_client.get_recent_bars(symbol, limit=N)` for each symbol, where N = trading days in the date range + 200 (buffer for strategy lookback windows). Store as `{symbol: [bars]}` sorted ascending by date.
 
 2. **Build trading calendar** — union of all bar dates across symbols, filtered to `[start_date, end_date]`.
 
@@ -138,7 +139,7 @@ Runs synchronously. For typical date ranges (1–3 years, 1–5 symbols) this co
 4. **Tick loop** — for each simulation date:
    - Call `strategy.generate_signals()` for each symbol
    - On BUY signal: calculate `notional = portfolio_equity × position_size_pct / 100`, compute shares; skip if symbol already held
-   - On SELL signal: close existing position if held
+   - On SELL signal: close existing position if held; silently skip if no position open for that symbol
    - Fill at **next bar's open**: BUY fills at `open × (1 + slippage_pct/100)`, SELL at `open × (1 - slippage_pct/100)`
    - Commission deducted: `notional × commission_pct / 100` from cash
    - Mark-to-market portfolio equity updated each bar
@@ -180,7 +181,7 @@ Existing strategies continue calling `alpaca_client.get_recent_bars()` directly.
 **Results section** (hidden until first run):
 - 5 stat pills: Total Return (green if positive, red if negative) | Max Drawdown (red) | Win Rate | Sharpe Ratio | Total Trades
 - ApexCharts area chart — equity curve, blue gradient fill matching app style
-- Save row: optional text input for run name + "Save Run" button (patches run name via separate call, run already saved)
+- Name row: optional text input for run name + "Save Name" button → `PATCH /api/backtest/runs/{id}` (run is already auto-saved on completion)
 - Trades table (`.dtable`): Date | Symbol | Side (BUY/SELL badge) | Shares | Fill Price | P&L
 
 **History section** (always visible below results):
@@ -200,6 +201,7 @@ Functions:
   renderHistory(runs)   — render saved runs list with Load/Delete handlers
   loadRun(id)           — GET /api/backtest/runs/{id}, call renderResults()
   deleteRun(id)         — DELETE /api/backtest/runs/{id}, refresh history
+  renameRun(id, name)   — PATCH  /api/backtest/runs/{id}, update history row label
 ```
 
 **Strategy dropdown** — populated from a hardcoded list matching the strategies registered in `server/strategies/`:
