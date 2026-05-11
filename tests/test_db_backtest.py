@@ -52,13 +52,6 @@ def test_list_returns_summary_only():
     assert "trades" not in row
 
 
-def test_list_excludes_equity_curve_and_trades():
-    db_mod.save_backtest_run(_PARAMS, _RESULTS)
-    rows = db_mod.list_backtest_runs()
-    assert "equity_curve" not in rows[0]
-    assert "trades" not in rows[0]
-
-
 def test_get_includes_equity_and_trades():
     run_id = db_mod.save_backtest_run(_PARAMS, _RESULTS)
     run = db_mod.get_backtest_run(run_id)
