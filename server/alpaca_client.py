@@ -150,8 +150,11 @@ def get_latest_quote(symbol: str) -> dict:
 def get_recent_bars(symbol: str, days: int = 60) -> list[dict]:
     if getattr(_bt, "bars", None) is not None:
         sym = symbol.upper()
-        cutoff = _bt.current_date.isoformat()
-        return [b for b in _bt.bars.get(sym, []) if b["t"][:10] <= cutoff]
+        # days is intentionally ignored; caller pre-loads all bars into _bt.bars
+        current_date = getattr(_bt, "current_date", None)
+        if current_date is None:
+            raise RuntimeError("_bt.bars is set but _bt.current_date is not — set both before calling get_recent_bars")
+        return [b for b in _bt.bars.get(sym, []) if b["t"][:10] <= current_date.isoformat()]
 
     end = datetime.now(timezone.utc) - timedelta(minutes=20)
     start = end - timedelta(days=days)
