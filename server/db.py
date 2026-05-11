@@ -601,7 +601,12 @@ def list_backtest_runs() -> list[dict]:
 def get_backtest_run(run_id: int) -> dict | None:
     with get_conn() as c:
         r = c.execute(
-            "SELECT * FROM backtest_runs WHERE id=?", (run_id,)
+            """SELECT id, created_at, name, strategy, symbols, start_date, end_date,
+                      initial_capital, position_size_pct, commission_pct, slippage_pct,
+                      total_return_pct, max_drawdown_pct, win_rate_pct, sharpe_ratio,
+                      total_trades, equity_curve, trades
+               FROM backtest_runs WHERE id=?""",
+            (run_id,)
         ).fetchone()
     if r is None:
         return None
