@@ -378,7 +378,8 @@ def portfolio_history(request: Request, period: str = "1M", timeframe: str = "1D
 # ── Strategies ─────────────────────────────────────────────────────────────────
 
 @app.get("/api/strategies")
-def list_strategies():
+def list_strategies(response: Response):
+    response.headers["Cache-Control"] = "no-store"
     saved = {s["name"]: s for s in db.get_strategies()}
     out = []
     for cls in strategies.REGISTRY.values():
@@ -534,6 +535,7 @@ def broker_account_strategy_view(account_id: int, request: Request):
     if not db.get_broker_account(account_id):
         raise HTTPException(404, "account not found")
     assignments = db.get_account_strategy_assignments(account_id)
+    global_strats = {s["name"]: s for s in db.list_strategies()}
     return [
         {
             "name": name,
@@ -541,6 +543,8 @@ def broker_account_strategy_view(account_id: int, request: Request):
             "description": cls.description,
             "assigned": name in assignments,
             "enabled": assignments.get(name, False),
+            "active_start": global_strats.get(name, {}).get("active_start"),
+            "active_end":   global_strats.get(name, {}).get("active_end"),
         }
         for name, cls in strategies.REGISTRY.items()
         if not cls.hidden
