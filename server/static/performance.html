@@ -128,21 +128,25 @@
       <!-- Strategy Stats -->
       <div class="card">
         <div style="font-size:14px;font-weight:600;margin-bottom:.75rem;">Strategy Statistics</div>
-        <table class="dtable">
-          <colgroup><col><col style="width:50px"><col style="width:50px"><col style="width:50px"><col style="width:60px"></colgroup>
-          <thead><tr><th>Strategy</th><th>Total</th><th>Buys</th><th>Sells</th><th>Blocked</th></tr></thead>
-          <tbody id="strat-stats-body"><tr><td colspan="5" class="state-empty">Loading&hellip;</td></tr></tbody>
-        </table>
+        <div class="dtable-wrap">
+          <table class="dtable">
+            <colgroup><col><col style="width:50px"><col style="width:50px"><col style="width:50px"><col style="width:60px"></colgroup>
+            <thead><tr><th>Strategy</th><th>Total</th><th>Buys</th><th>Sells</th><th>Blocked</th></tr></thead>
+            <tbody id="strat-stats-body"><tr><td colspan="5" class="state-empty">Loading&hellip;</td></tr></tbody>
+          </table>
+        </div>
       </div>
 
       <!-- Top Symbols -->
       <div class="card">
         <div style="font-size:14px;font-weight:600;margin-bottom:.75rem;">Top Symbols</div>
-        <table class="dtable">
-          <colgroup><col style="width:70px"><col style="width:60px"><col style="width:60px"><col style="width:60px"></colgroup>
-          <thead><tr><th>Symbol</th><th>Total</th><th>Buys</th><th>Sells</th></tr></thead>
-          <tbody id="topsym-body"><tr><td colspan="4" class="state-empty">Loading&hellip;</td></tr></tbody>
-        </table>
+        <div class="dtable-wrap">
+          <table class="dtable">
+            <colgroup><col style="width:70px"><col style="width:60px"><col style="width:60px"><col style="width:60px"></colgroup>
+            <thead><tr><th>Symbol</th><th>Total</th><th>Buys</th><th>Sells</th></tr></thead>
+            <tbody id="topsym-body"><tr><td colspan="4" class="state-empty">Loading&hellip;</td></tr></tbody>
+          </table>
+        </div>
       </div>
     </div>
 
@@ -155,11 +159,13 @@
     <!-- Recent signals -->
     <div class="card">
       <div style="font-size:14px;font-weight:600;margin-bottom:.75rem;">Recent Signals</div>
-      <table class="dtable">
-        <colgroup><col style="width:90px"><col style="width:80px"><col style="width:70px"><col style="width:50px"><col><col style="width:70px"></colgroup>
-        <thead><tr><th>Time</th><th>Strategy</th><th>Symbol</th><th>Side</th><th>Reason</th><th>Status</th></tr></thead>
-        <tbody id="signals-body"><tr><td colspan="6" class="state-empty">Loading&hellip;</td></tr></tbody>
-      </table>
+      <div class="dtable-wrap">
+        <table class="dtable">
+          <colgroup><col style="width:90px"><col style="width:80px"><col style="width:70px"><col style="width:50px"><col><col style="width:70px"></colgroup>
+          <thead><tr><th>Time</th><th>Strategy</th><th>Symbol</th><th>Side</th><th>Reason</th><th>Status</th></tr></thead>
+          <tbody id="signals-body"><tr><td colspan="6" class="state-empty">Loading&hellip;</td></tr></tbody>
+        </table>
+      </div>
     </div>
 
   </main>
