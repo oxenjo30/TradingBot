@@ -80,7 +80,7 @@
   <div class="sidebar-footer">
     <div class="paper-card" id="mode-card">
       <p class="paper-label">Paper Trading Mode</p>
-      <p style="font-size:12px;color:#E6EBF5;margin-top:2px;">Safe sandbox environment</p>
+      <p style="font-size:12px;color:var(--muted);margin-top:2px;">Safe sandbox environment</p>
       <a href="/static/apikeys.html" class="go-live">Go Live &rarr;</a>
     </div>
     <button class="nav-item logout-btn" onclick="doLogout()">
@@ -123,11 +123,12 @@
   <main class="content flex flex-col gap-4">
 
     <!-- Account summary cards -->
-    <div class="row-2col" style="grid-template-columns:repeat(4,minmax(0,1fr));">
+    <div class="row-2col" style="grid-template-columns:repeat(5,minmax(0,1fr));">
       <div class="card"><div class="text-muted mb-1" style="font-size:12px;">Equity</div><div id="bal-equity" class="text-tabular" style="font-size:22px;font-weight:700;">&mdash;</div></div>
       <div class="card"><div class="text-muted mb-1" style="font-size:12px;">Cash</div><div id="bal-cash" class="text-tabular" style="font-size:22px;font-weight:700;">&mdash;</div></div>
       <div class="card"><div class="text-muted mb-1" style="font-size:12px;">Buying Power</div><div id="bal-bp" class="text-tabular" style="font-size:22px;font-weight:700;">&mdash;</div></div>
       <div class="card"><div class="text-muted mb-1" style="font-size:12px;">Portfolio Value</div><div id="bal-pv" class="text-tabular" style="font-size:22px;font-weight:700;">&mdash;</div></div>
+      <div class="card"><div class="text-muted mb-1" style="font-size:12px;">Unrealized P&amp;L</div><div id="bal-upnl" class="text-tabular" style="font-size:22px;font-weight:700;">&mdash;</div><div id="bal-upnl-sub" style="font-size:11px;margin-top:2px;"></div></div>
     </div>
 
     <!-- Positions value table -->

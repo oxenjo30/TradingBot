@@ -81,7 +81,7 @@
   <div class="sidebar-footer">
     <div class="paper-card" id="mode-card">
       <p class="paper-label">Paper Trading Mode</p>
-      <p style="font-size:12px;color:#E6EBF5;margin-top:2px;">Safe sandbox environment</p>
+      <p style="font-size:12px;color:var(--muted);margin-top:2px;">Safe sandbox environment</p>
       <a href="/static/apikeys.html" class="go-live">Go Live &rarr;</a>
     </div>
     <button class="nav-item logout-btn" onclick="doLogout()">
@@ -172,6 +172,15 @@
         </div>
       </div>
 
+      <!-- Advanced Parameters (collapsed by default, populated by JS) -->
+      <details id="bt-advanced" style="margin-bottom:.875rem;">
+        <summary style="font-size:12px;font-weight:600;color:#64748B;cursor:pointer;user-select:none;list-style:none;display:flex;align-items:center;gap:6px;">
+          <svg id="bt-adv-arrow" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="transition:transform .2s;"><polyline points="9 18 15 12 9 6"/></svg>
+          Advanced Strategy Parameters
+        </summary>
+        <div id="bt-params-grid" class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3"></div>
+      </details>
+
       <div class="flex justify-end items-center gap-3">
         <span id="bt-status" style="font-size:12px;color:#64748B;display:none;"></span>
         <button id="bt-run-btn" class="btn btn-primary" onclick="runBacktest()">Run Backtest</button>
@@ -220,6 +229,19 @@
         </div>
       </div>
 
+      <!-- Per-symbol breakdown -->
+      <div class="card" id="bt-breakdown-card" style="display:none;">
+        <div style="font-size:14px;font-weight:600;margin-bottom:.875rem;">Per-Symbol Breakdown</div>
+        <div class="dtable-wrap">
+          <table class="dtable">
+            <thead><tr>
+              <th>Symbol</th><th>Trades</th><th>Wins</th><th>Win Rate</th><th>Total P&amp;L</th>
+            </tr></thead>
+            <tbody id="bt-breakdown-body"></tbody>
+          </table>
+        </div>
+      </div>
+
       <!-- Trades table -->
       <div class="card">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.875rem;">
@@ -249,6 +271,11 @@
         <div class="state-empty">No saved runs yet.</div>
       </div>
     </div>
+
+    <style>
+      #bt-advanced summary::-webkit-details-marker { display:none; }
+      #bt-advanced[open] #bt-adv-arrow { transform: rotate(90deg); }
+    </style>
 
   </main>
 </div>

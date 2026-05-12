@@ -52,7 +52,11 @@ async function api(path, opts = {}) {
   const res = await fetch(path, { ...opts, signal });
   if (res.status === 402) { location.href = '/static/license.html'; throw new Error('license required'); }
   if (res.status === 401) { location.href = '/static/login.html'; throw new Error('unauthorized'); }
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  if (!res.ok) {
+    let msg = `HTTP ${res.status}`;
+    try { const d = await res.json(); msg = d.detail || d.message || msg; } catch (_) {}
+    throw new Error(msg);
+  }
   return res.json();
 }
 
