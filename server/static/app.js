@@ -290,8 +290,34 @@ const PAGE_INIT = {
   // login excluded — uses own inline script
 };
 
+// ── Account mode badge (sidebar card reflects live vs paper) ──
+async function initAccountModeBadge() {
+  const card = document.getElementById('mode-card');
+  if (!card) return;
+  try {
+    const accounts = await api('/api/broker-accounts', { key: 'broker-accounts-badge' });
+    const liveAccounts = (accounts || []).filter(a => a.account_type === 'live');
+    const label = card.querySelector('.paper-label');
+    const sub   = label ? label.nextElementSibling : null;
+    const link  = card.querySelector('.go-live');
+    if (liveAccounts.length > 0) {
+      card.classList.add('live-card');
+      if (label) label.textContent = 'Live Trading Active';
+      if (sub) {
+        sub.textContent = liveAccounts.length === 1
+          ? liveAccounts[0].label || 'Live account connected'
+          : `${liveAccounts.length} live accounts connected`;
+      }
+      if (link) { link.textContent = 'Manage Accounts →'; link.href = '/static/apikeys.html'; }
+    } else {
+      if (link) link.href = '/static/apikeys.html';
+    }
+  } catch { /* silently keep default paper state */ }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   setActiveNav();
+  initAccountModeBadge();
   const page = document.body.dataset.page;
   if (PAGE_INIT[page]) PAGE_INIT[page]();
 });

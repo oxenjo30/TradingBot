@@ -919,3 +919,11 @@ button { cursor: pointer; font-family: inherit; }
 }
 .blacklist-chip button:hover { opacity: 1; }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Mode card — live trading state ── */
+.live-card {
+  background: rgba(16,185,129,.08);
+  border-color: rgba(16,185,129,.25);
+}
+.live-card .paper-label { color: var(--green); }
+.live-card .go-live { color: var(--green); }
