@@ -170,6 +170,32 @@ def get_latest_quote(symbol: str) -> dict:
     }
 
 
+_asset_cache: list[dict] = []
+
+def _load_asset_cache():
+    global _asset_cache
+    try:
+        assets = trading().get_all_assets()
+        _asset_cache = [
+            {"symbol": a.symbol, "name": a.name or "", "tradable": a.tradable}
+            for a in assets if a.status.value == "active"
+        ]
+    except Exception:
+        _asset_cache = []
+
+def search_assets(q: str, limit: int = 8) -> list[dict]:
+    if not _asset_cache:
+        _load_asset_cache()
+    q = q.upper().strip()
+    if not q:
+        return []
+    # Symbol prefix matches first, then name contains
+    sym_matches  = [a for a in _asset_cache if a["symbol"].startswith(q)]
+    name_matches = [a for a in _asset_cache if q in a["name"].upper() and not a["symbol"].startswith(q)]
+    results = (sym_matches + name_matches)[:limit]
+    return [{"symbol": a["symbol"], "name": a["name"], "tradable": a["tradable"]} for a in results]
+
+
 def get_snapshots(symbols: list[str]) -> list[dict]:
     syms = [s.upper() for s in symbols if s]
     if not syms:

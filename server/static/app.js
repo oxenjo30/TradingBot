@@ -912,16 +912,91 @@ async function initDashboard() {
 
   // ── Watchlist wiring ──
   (function initWatchlistPanel() {
-    const addInp = document.getElementById('wl-add-input');
-    const addBtn = document.getElementById('wl-add-btn');
+    const addInp  = document.getElementById('wl-add-input');
+    const addBtn  = document.getElementById('wl-add-btn');
+    const sugEl   = document.getElementById('wl-suggestions');
     if (!addInp) return;
 
-    const doAdd = async () => {
+    // ── Autocomplete ──
+    let _sugDebounce = null;
+    let _sugSelected = -1;
+    let _sugItems = [];
+
+    function _hideSug() { sugEl.style.display = 'none'; _sugSelected = -1; }
+
+    function _renderSug(results) {
+      _sugItems = results;
+      if (!results.length) { _hideSug(); return; }
+      sugEl.innerHTML = results.map((r, i) => `
+        <div data-i="${i}" style="display:flex;align-items:center;gap:8px;padding:7px 12px;cursor:pointer;
+          border-bottom:1px solid rgba(255,255,255,.05);transition:background .1s;"
+          onmouseover="this.style.background='rgba(99,102,241,.15)'"
+          onmouseout="this.style.background=''"
+          onmousedown="window._wlPickSug(${i})">
+          <span style="font-size:12px;font-weight:700;color:var(--text);min-width:52px;">${escHtml(r.symbol)}</span>
+          <span style="font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(r.name)}</span>
+          ${r.tradable ? '' : '<span style="font-size:10px;color:#F59E0B;margin-left:auto;flex-shrink:0;">not tradable</span>'}
+        </div>`).join('');
+      sugEl.style.display = 'block';
+    }
+
+    window._wlPickSug = function(i) {
+      const r = _sugItems[i];
+      if (!r) return;
+      addInp.value = r.symbol;
+      _hideSug();
+      _doAdd();
+    };
+
+    addInp.addEventListener('input', () => {
+      clearTimeout(_sugDebounce);
+      const q = addInp.value.trim();
+      if (q.length < 1) { _hideSug(); return; }
+      _sugDebounce = setTimeout(async () => {
+        try {
+          const res = await fetch(`/api/assets/search?q=${encodeURIComponent(q)}`);
+          if (res.ok) _renderSug(await res.json());
+        } catch { _hideSug(); }
+      }, 180);
+    });
+
+    addInp.addEventListener('keydown', e => {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        _sugSelected = Math.min(_sugSelected + 1, _sugItems.length - 1);
+        _highlightSug();
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        _sugSelected = Math.max(_sugSelected - 1, -1);
+        _highlightSug();
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (_sugSelected >= 0 && _sugItems[_sugSelected]) {
+          addInp.value = _sugItems[_sugSelected].symbol;
+          _hideSug();
+        }
+        _doAdd();
+      } else if (e.key === 'Escape') {
+        _hideSug();
+      }
+    });
+
+    function _highlightSug() {
+      sugEl.querySelectorAll('[data-i]').forEach(el => {
+        el.style.background = Number(el.dataset.i) === _sugSelected ? 'rgba(99,102,241,.2)' : '';
+      });
+    }
+
+    document.addEventListener('click', e => {
+      if (!addInp.contains(e.target) && !sugEl.contains(e.target)) _hideSug();
+    });
+
+    // ── Add symbol ──
+    async function _doAdd() {
       const sym = addInp.value.trim().toUpperCase();
-      if (!sym) return;
-      if (!_wlId) return;
-      if (_wlSymbols.includes(sym)) { addInp.value = ''; return; }
-      addBtn && (addBtn.disabled = true);
+      if (!sym || !_wlId) return;
+      if (_wlSymbols.includes(sym)) { addInp.value = ''; _hideSug(); return; }
+      addBtn.disabled = true;
       try {
         await api(`/api/watchlists/${_wlId}/symbols`, {
           method: 'POST',
@@ -930,16 +1005,15 @@ async function initDashboard() {
         });
         addInp.value = '';
         addInp.focus();
+        _hideSug();
         await _wlLoad();
       } catch { alert('Could not add symbol.'); }
-      finally { addBtn && (addBtn.disabled = false); }
-    };
+      finally { addBtn.disabled = false; }
+    }
 
-    addBtn.addEventListener('click', doAdd);
-    addInp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); doAdd(); } });
+    addBtn.addEventListener('click', _doAdd);
 
     _wlLoad();
-    // Refresh prices every 30s
     setInterval(() => { if (_wlSymbols.length) _wlRefreshPrices(); }, 30_000);
   })();
 
