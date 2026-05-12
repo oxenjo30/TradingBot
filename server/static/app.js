@@ -1302,7 +1302,11 @@ async function initBots() {
       document.getElementById(`sched-save-${s.name}`)?.addEventListener('click', () => {
         const start = document.getElementById(`sched-start-${s.name}`)?.value;
         const end   = document.getElementById(`sched-end-${s.name}`)?.value;
-        if (!start || !end) return;
+        if (!start || !end) {
+          const msgEl = document.getElementById(`sched-msg-${s.name}`);
+          if (msgEl) { msgEl.style.color = '#F59E0B'; msgEl.textContent = 'Enter both start and end times'; msgEl.style.display = 'inline'; setTimeout(() => { msgEl.style.display = 'none'; msgEl.style.color = '#10B981'; msgEl.textContent = 'Saved'; }, 2500); }
+          return;
+        }
         saveSchedule(start, end);
       });
       document.getElementById(`sched-clear-${s.name}`)?.addEventListener('click', () => {
