@@ -1226,6 +1226,13 @@ async function initBots() {
       statusBadge.textContent = 'Paused';
     }
 
+    // Configure button (params)
+    const cfgBtn = document.createElement('button');
+    cfgBtn.className = 'btn-remove';
+    cfgBtn.title = 'Configure parameters';
+    cfgBtn.innerHTML = `<svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`;
+    cfgBtn.onclick = () => openConfigureModal(s);
+
     // Schedule expand button
     const schedBtn = document.createElement('button');
     schedBtn.className = 'btn-remove';
@@ -1248,7 +1255,7 @@ async function initBots() {
       } catch { toggle.classList.remove('disabled'); }
     };
 
-    actions.append(statusBadge, schedBtn, toggle);
+    actions.append(statusBadge, cfgBtn, schedBtn, toggle);
     row.append(icon, info, actions);
 
     // ── Schedule sub-row (hidden by default) ──
@@ -1318,6 +1325,111 @@ async function initBots() {
 
     wrap.append(row, schedRow);
     return wrap;
+  }
+
+  // ── Configure Strategy modal ───────────────────────────────────────────────
+  function openConfigureModal(s) {
+    const modal   = document.getElementById('modal-configure');
+    const titleEl = document.getElementById('cfg-modal-title');
+    const bodyEl  = document.getElementById('cfg-modal-body');
+    const msgEl   = document.getElementById('cfg-modal-msg');
+
+    titleEl.textContent = `Configure: ${s.label}`;
+    msgEl.textContent = '';
+    bodyEl.innerHTML = '';
+
+    const schema = s.params_schema || [];
+    const params = s.params || {};
+
+    if (!schema.length) {
+      bodyEl.innerHTML = '<div style="font-size:13px;color:var(--muted);">This strategy has no configurable parameters.</div>';
+    }
+
+    // Track bool toggle state separately
+    const boolState = {};
+
+    schema.forEach(field => {
+      const wrap = document.createElement('div');
+      wrap.className = 'cfg-field';
+      const val = params[field.key] !== undefined ? params[field.key] : '';
+
+      if (field.type === 'bool') {
+        boolState[field.key] = !!val;
+        wrap.innerHTML = `
+          <div class="cfg-toggle-row">
+            <div class="cfg-toggle-text">
+              <div class="cfg-label">${escHtml(field.label)}</div>
+              ${field.hint ? `<div class="cfg-hint">${escHtml(field.hint)}</div>` : ''}
+            </div>
+            <div class="cfg-bool-toggle${val ? ' on' : ''}" data-key="${escHtml(field.key)}"></div>
+          </div>`;
+        wrap.querySelector('.cfg-bool-toggle').onclick = function() {
+          boolState[field.key] = !boolState[field.key];
+          this.classList.toggle('on', boolState[field.key]);
+        };
+
+      } else if (field.type === 'symbols') {
+        const displayVal = Array.isArray(val) ? val.join(', ') : (val || '');
+        wrap.innerHTML = `
+          <div class="cfg-label">${escHtml(field.label)}</div>
+          ${field.hint ? `<div class="cfg-hint">${escHtml(field.hint)}</div>` : ''}
+          <input class="cfg-input" data-key="${escHtml(field.key)}" data-type="symbols"
+            type="text" value="${escHtml(displayVal)}" placeholder="e.g. BTC, ETH, SOL">`;
+
+      } else if (field.type === 'number') {
+        const minAttr = field.min !== undefined ? `min="${field.min}"` : '';
+        const maxAttr = field.max !== undefined ? `max="${field.max}"` : '';
+        const stepAttr = Number.isInteger(field.min) && Number.isInteger(field.max) ? 'step="1"' : 'step="any"';
+        wrap.innerHTML = `
+          <div class="cfg-label">${escHtml(field.label)}</div>
+          ${field.hint ? `<div class="cfg-hint">${escHtml(field.hint)}</div>` : ''}
+          <input class="cfg-input" data-key="${escHtml(field.key)}" data-type="number"
+            type="number" value="${val !== null && val !== undefined ? val : ''}" ${minAttr} ${maxAttr} ${stepAttr}>`;
+      }
+
+      bodyEl.appendChild(wrap);
+    });
+
+    modal.classList.remove('hidden');
+
+    document.getElementById('cfg-cancel').onclick = () => modal.classList.add('hidden');
+    modal.onclick = e => { if (e.target === modal) modal.classList.add('hidden'); };
+
+    document.getElementById('cfg-save').onclick = async () => {
+      const updated = {};
+      schema.forEach(field => {
+        if (field.type === 'bool') {
+          updated[field.key] = boolState[field.key];
+        } else {
+          const input = bodyEl.querySelector(`[data-key="${field.key}"]`);
+          if (!input) return;
+          if (field.type === 'symbols') {
+            updated[field.key] = input.value.split(',').map(x => x.trim().toUpperCase()).filter(Boolean);
+          } else if (field.type === 'number') {
+            const n = parseFloat(input.value);
+            updated[field.key] = isNaN(n) ? null : n;
+          }
+        }
+      });
+
+      msgEl.style.color = '#64748B';
+      msgEl.textContent = 'Saving…';
+      try {
+        await api(`/api/strategies/${s.name}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ params: updated }),
+          key: `cfg-save-${s.name}`,
+        });
+        Object.assign(s.params, updated);
+        msgEl.style.color = '#10B981';
+        msgEl.textContent = 'Saved successfully.';
+        setTimeout(() => modal.classList.add('hidden'), 900);
+      } catch {
+        msgEl.style.color = '#EF4444';
+        msgEl.textContent = 'Save failed. Please try again.';
+      }
+    };
   }
 
   // ── Engine controls ────────────────────────────────────────────────────────

@@ -591,6 +591,8 @@ def broker_account_strategy_view(account_id: int, request: Request):
             "enabled": assignments.get(name, False),
             "active_start": global_strats.get(name, {}).get("active_start"),
             "active_end":   global_strats.get(name, {}).get("active_end"),
+            "params": global_strats.get(name, {}).get("params") or cls.default_params,
+            "params_schema": cls.params_schema,
         }
         for name, cls in strategies.REGISTRY.items()
         if not cls.hidden
