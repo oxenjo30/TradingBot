@@ -406,6 +406,25 @@ def get_broker_account(account_id: int, request: Request):
     return _mask_account(row)
 
 
+class BrokerCredentialsTest(BaseModel):
+    api_key: str
+    api_secret: str
+    account_type: Literal["paper", "live"] = "paper"
+    broker: str = "alpaca"
+
+@app.post("/api/broker-accounts/test-credentials")
+def test_broker_credentials(body: BrokerCredentialsTest, request: Request):
+    """Validate API credentials without saving them."""
+    _require_auth(request)
+    try:
+        from alpaca.trading.client import TradingClient
+        paper = (body.account_type == "paper")
+        client = TradingClient(body.api_key, body.api_secret, paper=paper)
+        acct = client.get_account()
+        return {"ok": True, "account_number": str(acct.account_number), "status": str(acct.status)}
+    except Exception as e:
+        raise HTTPException(400, f"Connection failed: {e}")
+
 @app.post("/api/broker-accounts", status_code=201)
 def create_broker_account(body: BrokerAccountCreate, request: Request):
     _require_auth(request)

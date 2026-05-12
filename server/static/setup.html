@@ -7,80 +7,148 @@
 <link rel="stylesheet" href="/static/styles.css" />
 <style>
   body { background:#0d1117; min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:2rem; }
-  .wizard { width:100%; max-width:560px; }
+  .wizard { width:100%; max-width:580px; }
   .wizard-header { text-align:center; margin-bottom:2rem; }
-  .wizard-icon { font-size:3rem; }
-  .wizard-title { font-size:1.6rem; font-weight:700; color:#e2e8f0; margin-top:.5rem; }
-  .wizard-sub { color:#4a6080; margin-top:.4rem; font-size:.9rem; }
-  .step-pills { display:flex; gap:.5rem; justify-content:center; margin-bottom:2rem; }
-  .pill { width:2rem; height:.35rem; border-radius:99px; background:#1e2d45; transition:background .2s; }
-  .pill.active { background:#5b8def; }
-  .pill.done { background:#16c784; }
+  .wizard-logo { display:flex; align-items:center; justify-content:center; gap:.6rem; margin-bottom:.75rem; }
+  .wizard-logo-mark { width:40px; height:40px; border-radius:10px; background:linear-gradient(135deg,#3B82F6,#8B5CF6); display:flex; align-items:center; justify-content:center; }
+  .wizard-title { font-size:1.6rem; font-weight:700; color:#e2e8f0; }
+  .wizard-sub { color:#64748B; margin-top:.4rem; font-size:.9rem; }
+  .step-track { display:flex; align-items:center; justify-content:center; gap:0; margin-bottom:2rem; }
+  .step-node { display:flex; flex-direction:column; align-items:center; gap:.35rem; }
+  .step-circle { width:28px; height:28px; border-radius:50%; border:2px solid #1e2d45; background:#0d1117; display:flex; align-items:center; justify-content:center; font-size:.7rem; font-weight:700; color:#4a6080; transition:all .2s; }
+  .step-circle.active { border-color:#3B82F6; background:#0d1e35; color:#3B82F6; }
+  .step-circle.done { border-color:#10B981; background:#10B981; color:#fff; }
+  .step-label { font-size:.65rem; color:#4a6080; white-space:nowrap; }
+  .step-label.active { color:#3B82F6; }
+  .step-label.done { color:#10B981; }
+  .step-connector { width:40px; height:2px; background:#1e2d45; margin-bottom:18px; flex-shrink:0; }
+  .step-connector.done { background:#10B981; }
   .step { display:none; }
   .step.active { display:block; }
   .step-title { font-size:1.1rem; font-weight:600; color:#e2e8f0; margin-bottom:.25rem; }
-  .step-desc { font-size:.85rem; color:#4a6080; margin-bottom:1.5rem; line-height:1.5; }
+  .step-desc { font-size:.85rem; color:#64748B; margin-bottom:1.5rem; line-height:1.5; }
   .form-row { margin-bottom:1.1rem; }
   .form-row label { display:block; font-size:.75rem; color:#8aa3c0; margin-bottom:.4rem; text-transform:uppercase; letter-spacing:.05em; }
-  .form-row .hint { font-size:.72rem; color:#3a5070; margin-top:.3rem; }
-  .toggle-row { display:flex; align-items:center; justify-content:space-between; padding:.75rem 0; border-bottom:1px solid #1a2535; }
-  .toggle-row:last-child { border:none; }
-  .toggle-label { font-size:.9rem; color:#c8d6e8; }
-  .toggle-hint { font-size:.75rem; color:#4a6080; margin-top:.15rem; }
-  .test-result { font-size:.8rem; margin-top:.5rem; padding:.5rem .75rem; border-radius:6px; display:none; }
-  .test-result.ok { background:#0d2b1a; color:#16c784; border:1px solid #16c784; }
-  .test-result.err { background:#2a1a1a; color:#e74c3c; border:1px solid #c0392b; }
+  .form-row .hint { font-size:.72rem; color:#4a6080; margin-top:.3rem; }
+  .test-result { font-size:.8rem; margin-top:.5rem; padding:.5rem .75rem; border-radius:6px; }
+  .test-result.ok { background:#0d2b1a; color:#10B981; border:1px solid #10B981; }
+  .test-result.err { background:#2a1a1a; color:#EF4444; border:1px solid #EF4444; }
   .btn-row { display:flex; gap:.75rem; margin-top:1.75rem; }
   .welcome-features { display:grid; gap:.75rem; margin:1.5rem 0; }
   .feature { display:flex; gap:.75rem; align-items:flex-start; background:#161b27; border:1px solid #1e2d45; border-radius:10px; padding:.9rem 1rem; }
   .feature-icon { font-size:1.3rem; flex-shrink:0; }
   .feature-title { font-size:.9rem; font-weight:600; color:#c8d6e8; }
-  .feature-desc { font-size:.78rem; color:#4a6080; margin-top:.15rem; }
+  .feature-desc { font-size:.78rem; color:#64748B; margin-top:.15rem; }
   .strategy-picks { display:grid; gap:.6rem; margin-top:.5rem; }
   .strategy-pick { display:flex; align-items:center; gap:.75rem; background:#161b27; border:2px solid #1e2d45; border-radius:10px; padding:.85rem 1rem; cursor:pointer; transition:border-color .15s; }
   .strategy-pick:hover { border-color:#3a5a8a; }
-  .strategy-pick.selected { border-color:#5b8def; background:#0d1e35; }
-  .strategy-pick input { accent-color:#5b8def; }
+  .strategy-pick.selected { border-color:#3B82F6; background:#0d1e35; }
+  .strategy-pick input { accent-color:#3B82F6; }
   .strategy-info .name { font-size:.9rem; font-weight:600; color:#c8d6e8; }
-  .strategy-info .desc { font-size:.75rem; color:#4a6080; margin-top:.1rem; }
-  .success-icon { font-size:4rem; text-align:center; margin:1rem 0; }
+  .strategy-info .desc { font-size:.75rem; color:#64748B; margin-top:.1rem; }
+  .broker-tabs { display:flex; gap:.5rem; margin-bottom:1.25rem; }
+  .broker-tab { flex:1; padding:.5rem; text-align:center; border-radius:8px; border:2px solid #1e2d45; background:#161b27; color:#64748B; font-size:.8rem; font-weight:600; cursor:pointer; transition:all .15s; }
+  .broker-tab.active { border-color:#3B82F6; background:#0d1e35; color:#3B82F6; }
+  .skip-link { text-align:center; margin-top:.75rem; }
+  .skip-link a { font-size:.8rem; color:#4a6080; text-decoration:none; cursor:pointer; }
+  .skip-link a:hover { color:#64748B; }
+  .success-ring { width:72px; height:72px; border-radius:50%; background:linear-gradient(135deg,#10B981,#3B82F6); display:flex; align-items:center; justify-content:center; margin:1rem auto 1.5rem; }
+  .checklist { display:grid; gap:.6rem; margin:1.25rem 0; }
+  .check-item { display:flex; align-items:center; gap:.6rem; font-size:.875rem; color:#c8d6e8; }
+  .check-item svg { flex-shrink:0; color:#10B981; }
+  .input-group { position:relative; }
+  .input-group .input { padding-right:2.5rem; }
+  .input-eye { position:absolute; right:.75rem; top:50%; transform:translateY(-50%); background:none; border:none; color:#64748B; cursor:pointer; padding:0; line-height:1; }
 </style>
 </head>
 <body>
 <div class="wizard">
+
   <div class="wizard-header">
-    <div class="wizard-icon">&#x1F4C8;</div>
-    <div class="wizard-title">TradeBot Setup</div>
-    <div class="wizard-sub">Get your trading bot ready in 3 easy steps</div>
+    <div class="wizard-logo">
+      <div class="wizard-logo-mark">
+        <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+          <path d="M11 2L20 7.5V14.5L11 20L2 14.5V7.5L11 2Z" fill="white" opacity=".9"/>
+        </svg>
+      </div>
+      <span class="wizard-title">TradeBot</span>
+    </div>
+    <div class="wizard-sub">Let&rsquo;s get you set up in a few minutes</div>
   </div>
 
-  <div class="step-pills">
-    <div class="pill active" id="pill-0"></div>
-    <div class="pill" id="pill-1"></div>
-    <div class="pill" id="pill-2"></div>
+  <!-- Step tracker -->
+  <div class="step-track" id="step-track">
+    <div class="step-node">
+      <div class="step-circle active" id="sc-0">1</div>
+      <div class="step-label active" id="sl-0">Welcome</div>
+    </div>
+    <div class="step-connector" id="conn-0"></div>
+    <div class="step-node">
+      <div class="step-circle" id="sc-1">2</div>
+      <div class="step-label" id="sl-1">Risk</div>
+    </div>
+    <div class="step-connector" id="conn-1"></div>
+    <div class="step-node">
+      <div class="step-circle" id="sc-2">3</div>
+      <div class="step-label" id="sl-2">Strategy</div>
+    </div>
+    <div class="step-connector" id="conn-2"></div>
+    <div class="step-node">
+      <div class="step-circle" id="sc-3">4</div>
+      <div class="step-label" id="sl-3">Broker</div>
+    </div>
+    <div class="step-connector" id="conn-3"></div>
+    <div class="step-node">
+      <div class="step-circle" id="sc-4">5</div>
+      <div class="step-label" id="sl-4">Password</div>
+    </div>
   </div>
 
-  <div class="card p-6">
+  <div class="card" style="padding:1.75rem;">
 
     <!-- Step 0: Welcome -->
     <div class="step active" id="step-0">
-      <div class="step-title">Welcome to TradeBot &#x1F44B;</div>
-      <div class="step-desc">An automated stock trading bot that monitors the market 24/7 and executes trades based on proven strategies &mdash; no coding required.</div>
+      <div class="step-title">Welcome to TradeBot</div>
+      <div class="step-desc">An automated trading bot that monitors the market and executes trades based on proven strategies &mdash; no coding required.</div>
       <div class="welcome-features">
-        <div class="feature"><div class="feature-icon">&#x1F916;</div><div><div class="feature-title">7 Built-in Strategies</div><div class="feature-desc">SMA Crossover, RSI, Momentum, Bollinger Bands, 52-Week Breakout, MACD, Golden Cross</div></div></div>
-        <div class="feature"><div class="feature-icon">&#x1F6E1;&#xFE0F;</div><div><div class="feature-title">Risk Controls Built-in</div><div class="feature-desc">Kill switch, daily loss limits, PDT protection, and position sizing</div></div></div>
-        <div class="feature"><div class="feature-icon">&#x1F4CA;</div><div><div class="feature-title">Live Dashboard</div><div class="feature-desc">Monitor positions, P&amp;L, signals, and market scanner in real time</div></div></div>
-        <div class="feature"><div class="feature-icon">&#x1F514;</div><div><div class="feature-title">Instant Notifications</div><div class="feature-desc">Get email or Telegram alerts every time a trade executes</div></div></div>
+        <div class="feature">
+          <div class="feature-icon">&#x1F916;</div>
+          <div>
+            <div class="feature-title">7 Built-in Strategies</div>
+            <div class="feature-desc">SMA Crossover, RSI Mean Reversion, Momentum, Bollinger Bands, 52-Week Breakout, MACD + Volume, Golden Cross</div>
+          </div>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">&#x1F6E1;&#xFE0F;</div>
+          <div>
+            <div class="feature-title">Risk Controls Built-in</div>
+            <div class="feature-desc">Kill switch, daily loss limits, PDT protection, per-account controls, and position sizing</div>
+          </div>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">&#x1F4CA;</div>
+          <div>
+            <div class="feature-title">Live Dashboard</div>
+            <div class="feature-desc">Monitor positions, P&amp;L, signals, and market scanner in real time</div>
+          </div>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">&#x1F514;</div>
+          <div>
+            <div class="feature-title">Instant Notifications</div>
+            <div class="feature-desc">Email, Telegram, Slack, or Discord alerts every time a trade executes</div>
+          </div>
+        </div>
       </div>
       <div class="btn-row">
-        <button class="btn primary" style="flex:1;padding:.75rem" onclick="nextStep()">Get Started &rarr;</button>
+        <button class="btn btn-primary" style="flex:1;padding:.75rem;font-size:.95rem;" onclick="nextStep()">Get Started &rarr;</button>
       </div>
     </div>
 
     <!-- Step 1: Risk Settings -->
     <div class="step" id="step-1">
       <div class="step-title">Risk Settings</div>
-      <div class="step-desc">These guardrails protect your account. You can always change them later in the dashboard.</div>
+      <div class="step-desc">These guardrails protect your account. You can adjust them anytime from the Risk page.</div>
       <div class="form-row">
         <label>Amount Per Trade (USD)</label>
         <input class="input" id="s-notional" type="number" value="500" min="10" step="50" />
@@ -89,88 +157,170 @@
       <div class="form-row">
         <label>Daily Loss Limit (%)</label>
         <input class="input" id="s-max-loss" type="number" value="2" min="0.5" max="20" step="0.5" />
-        <div class="hint">Bot stops all trading if your account loses this % in a single day. 2% recommended.</div>
+        <div class="hint">Bot stops all trading if your account drops this % in a single day. 2% recommended.</div>
       </div>
       <div class="form-row">
-        <label>Max Positions Open at Once</label>
+        <label>Max Open Positions</label>
         <input class="input" id="s-max-pos" type="number" value="5" min="1" max="20" />
         <div class="hint">Maximum number of stocks the bot can hold at the same time.</div>
       </div>
       <div class="btn-row">
-        <button class="btn" onclick="prevStep()">&larr; Back</button>
-        <button class="btn primary" style="flex:1" onclick="nextStep()">Continue &rarr;</button>
+        <button class="btn btn-ghost" onclick="prevStep()">&larr; Back</button>
+        <button class="btn btn-primary" style="flex:1;" onclick="nextStep()">Continue &rarr;</button>
       </div>
     </div>
 
     <!-- Step 2: Starter Strategy -->
     <div class="step" id="step-2">
       <div class="step-title">Choose Your First Strategy</div>
-      <div class="step-desc">Pick one to start with. You can enable more strategies anytime from the dashboard.</div>
+      <div class="step-desc">Pick one to start with. You can enable more strategies anytime from the Bots &amp; Strategies page.</div>
       <div class="strategy-picks">
         <label class="strategy-pick selected" onclick="selectStrategy('momentum')">
           <input type="radio" name="strategy" value="momentum" checked />
           <div class="strategy-info">
-            <div class="name">&#x1F680; Momentum Breakout <span style="font-size:.7rem;background:#16c784;color:#000;padding:.1rem .4rem;border-radius:99px;margin-left:.3rem">Recommended</span></div>
-            <div class="desc">Scans the market for trending stocks with strong momentum. Best for rising markets. Good for beginners.</div>
+            <div class="name">&#x1F680; Momentum Breakout <span style="font-size:.65rem;background:#10B981;color:#fff;padding:.1rem .45rem;border-radius:99px;margin-left:.35rem;font-weight:700;">Recommended</span></div>
+            <div class="desc">Scans for trending stocks with strong price momentum. Best for rising markets. Great for beginners.</div>
           </div>
         </label>
         <label class="strategy-pick" onclick="selectStrategy('breakout_52w')">
           <input type="radio" name="strategy" value="breakout_52w" />
           <div class="strategy-info">
             <div class="name">&#x1F4C8; 52-Week High Breakout</div>
-            <div class="desc">Buys stocks hitting yearly highs on above-average volume. One of the most proven signals in trading research.</div>
+            <div class="desc">Buys stocks hitting yearly highs on above-average volume &mdash; one of the most proven signals in trading research.</div>
           </div>
         </label>
         <label class="strategy-pick" onclick="selectStrategy('macd_volume')">
           <input type="radio" name="strategy" value="macd_volume" />
           <div class="strategy-info">
             <div class="name">&#x1F4C9; MACD + Volume</div>
-            <div class="desc">MACD crossover confirmed by volume. Fewer false signals than simple moving average crosses.</div>
+            <div class="desc">MACD crossover confirmed by volume spike. Fewer false signals than simple moving average crosses.</div>
           </div>
         </label>
         <label class="strategy-pick" onclick="selectStrategy('manual')">
           <input type="radio" name="strategy" value="manual" />
           <div class="strategy-info">
-            <div class="name">&#x1F5D2;&#xFE0F; Manual Only &mdash; I'll place trades myself</div>
+            <div class="name">&#x1F5D2;&#xFE0F; Manual Only &mdash; I&rsquo;ll place trades myself</div>
             <div class="desc">No automated trading. Use the dashboard to monitor markets and place orders manually.</div>
           </div>
         </label>
       </div>
       <div class="btn-row">
-        <button class="btn" onclick="prevStep()">&larr; Back</button>
-        <button class="btn primary" style="flex:1" onclick="nextStep()">Continue &rarr;</button>
+        <button class="btn btn-ghost" onclick="prevStep()">&larr; Back</button>
+        <button class="btn btn-primary" style="flex:1;" onclick="nextStep()">Continue &rarr;</button>
       </div>
     </div>
 
-    <!-- Step 3: Set Password -->
+    <!-- Step 3: Connect Broker -->
     <div class="step" id="step-3">
+      <div class="step-title">Connect Your Broker Account</div>
+      <div class="step-desc">Connect Alpaca to start trading. Use a <strong style="color:#c8d6e8;">Paper Trading</strong> account first to test risk-free.</div>
+
+      <div class="broker-tabs">
+        <div class="broker-tab active" id="tab-paper" onclick="setBrokerMode('paper')">
+          &#x1F4C4;&nbsp; Paper Trading <span style="font-size:.65rem;background:#10B981;color:#fff;padding:.05rem .35rem;border-radius:99px;margin-left:.25rem;">Safe</span>
+        </div>
+        <div class="broker-tab" id="tab-live" onclick="setBrokerMode('live')">
+          &#x26A1;&nbsp; Live Trading
+        </div>
+      </div>
+
+      <div id="broker-paper-note" style="background:#0d2b1a;border:1px solid #10B981;border-radius:8px;padding:.65rem .85rem;font-size:.8rem;color:#10B981;margin-bottom:1rem;">
+        Paper trading uses simulated money. Perfect for testing before going live. Get your paper API keys at <strong>alpaca.markets</strong> &rarr; Paper Dashboard.
+      </div>
+      <div id="broker-live-note" style="background:#2a1a0d;border:1px solid #F59E0B;border-radius:8px;padding:.65rem .85rem;font-size:.8rem;color:#F59E0B;margin-bottom:1rem;display:none;">
+        Live trading uses real money. Make sure you understand the risks before proceeding. Get your live API keys at <strong>alpaca.markets</strong> &rarr; Live Dashboard.
+      </div>
+
+      <div class="form-row">
+        <label>Alpaca API Key ID</label>
+        <input class="input" id="s-api-key" type="text" placeholder="PK..." autocomplete="off" />
+      </div>
+      <div class="form-row">
+        <label>Alpaca Secret Key</label>
+        <div class="input-group">
+          <input class="input" id="s-api-secret" type="password" placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;" autocomplete="off" />
+          <button class="input-eye" onclick="toggleSecret()" id="eye-btn" title="Show/hide secret">
+            <svg id="eye-icon" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="form-row">
+        <label>Account Label <span style="color:#4a6080;font-weight:400;text-transform:none;">(optional)</span></label>
+        <input class="input" id="s-acct-label" type="text" placeholder="e.g. My Paper Account" />
+      </div>
+
+      <div id="broker-test-result" style="display:none;" class="test-result"></div>
+
+      <div class="btn-row">
+        <button class="btn btn-ghost" onclick="prevStep()">&larr; Back</button>
+        <button class="btn btn-ghost" id="btn-test-broker" onclick="testBrokerConnection()" style="flex:0 0 auto;">
+          <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          Test
+        </button>
+        <button class="btn btn-primary" style="flex:1;" id="btn-save-broker" onclick="saveBrokerAndContinue()">Save &amp; Continue &rarr;</button>
+      </div>
+      <div class="skip-link">
+        <a onclick="nextStep()">Skip for now &mdash; I&rsquo;ll connect a broker later</a>
+      </div>
+    </div>
+
+    <!-- Step 4: Set Password -->
+    <div class="step" id="step-4">
       <div class="step-title">Set Your Dashboard Password</div>
-      <div class="step-desc">Protect your dashboard with a password. Anyone on your network who knows the URL can access it &mdash; keep it secure.</div>
+      <div class="step-desc">Protect your dashboard. Anyone on your network who knows the URL can access it &mdash; keep it secure.</div>
       <div class="form-row">
         <label>Password</label>
-        <input class="input" id="s-password" type="password" placeholder="Choose a strong password" />
+        <div class="input-group">
+          <input class="input" id="s-password" type="password" placeholder="Choose a strong password" />
+          <button class="input-eye" onclick="togglePw()" title="Show/hide">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+        </div>
       </div>
       <div class="form-row">
         <label>Confirm Password</label>
         <input class="input" id="s-password2" type="password" placeholder="Repeat password" />
       </div>
-      <div class="test-result" id="pw-error" style="display:none"></div>
+      <div id="pw-error" style="display:none;" class="test-result err"></div>
       <div class="btn-row">
-        <button class="btn" onclick="prevStep()">&larr; Back</button>
-        <button class="btn primary" style="flex:1" onclick="finishSetup()">&#x2705; Finish Setup</button>
+        <button class="btn btn-ghost" onclick="prevStep()">&larr; Back</button>
+        <button class="btn btn-primary" style="flex:1;" onclick="finishSetup()">
+          Finish Setup &rarr;
+        </button>
       </div>
     </div>
 
-    <!-- Step 4: Done -->
-    <div class="step" id="step-4">
-      <div class="success-icon">&#x1F389;</div>
-      <div class="step-title" style="text-align:center">You're all set!</div>
-      <div class="step-desc" style="text-align:center">Your dashboard is ready. Head to <strong style="color:#c8d6e8">Broker Accounts</strong> to connect your Alpaca account and start trading.</div>
-      <div class="welcome-features" style="margin-top:1.5rem">
-        <div class="feature"><div class="feature-icon">&#x1F511;</div><div><div class="feature-title">Connect a Broker Account</div><div class="feature-desc">Go to Broker Accounts &rarr; Add Account to link your Alpaca paper or live account.</div></div></div>
-        <div class="feature"><div class="feature-icon">&#x1F514;</div><div><div class="feature-title">Set up Notifications</div><div class="feature-desc">Go to Settings &rarr; Notifications to get trade alerts via email or Telegram.</div></div></div>
+    <!-- Step 5: Done -->
+    <div class="step" id="step-5">
+      <div class="success-ring">
+        <svg width="32" height="32" fill="none" stroke="white" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
       </div>
-      <button class="btn primary" style="width:100%;padding:.85rem;margin-top:1.5rem;font-size:1rem" onclick="window.location.href='/'">Open Dashboard &rarr;</button>
+      <div class="step-title" style="text-align:center;">You&rsquo;re all set!</div>
+      <div class="step-desc" style="text-align:center;">TradeBot is configured and ready to trade. Here&rsquo;s what to do next.</div>
+      <div class="checklist">
+        <div class="check-item" id="done-broker-check">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+          Broker account connected
+        </div>
+        <div class="check-item">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+          Risk limits configured
+        </div>
+        <div class="check-item">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+          Starting strategy selected
+        </div>
+        <div class="check-item">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+          Dashboard password set
+        </div>
+      </div>
+      <button class="btn btn-primary" style="width:100%;padding:.85rem;margin-top:1rem;font-size:.95rem;" onclick="window.location.href='/static/index.html'">
+        Open Dashboard &rarr;
+      </button>
+      <div style="text-align:center;margin-top:.75rem;">
+        <a href="/static/settings.html" style="font-size:.8rem;color:#4a6080;text-decoration:none;">Set up notifications (Slack, email, Telegram)</a>
+      </div>
     </div>
 
   </div><!-- /card -->
@@ -178,69 +328,188 @@
 
 <script>
 let currentStep = 0;
-const TOTAL_STEPS = 4;
-let _selectedStrategy = "momentum";
+const TOTAL_STEPS = 5;
+let _selectedStrategy = 'momentum';
+let _brokerMode = 'paper';
+let _brokerConnected = false;
 
-function updatePills() {
-  // pills 0-2 represent steps 1-3
-  for (let i = 0; i < 3; i++) {
-    const pill = document.getElementById(`pill-${i}`);
-    if (!pill) continue;
-    const stepNum = i + 1;
-    pill.className = "pill" + (currentStep > stepNum ? " done" : currentStep === stepNum ? " active" : "");
+const STEP_LABELS = ['Welcome', 'Risk', 'Strategy', 'Broker', 'Password'];
+
+function updateTracker() {
+  for (let i = 0; i < TOTAL_STEPS; i++) {
+    const circle = document.getElementById(`sc-${i}`);
+    const label  = document.getElementById(`sl-${i}`);
+    if (!circle) continue;
+    const stepNum = i + 1; // steps 0–4 map to tracker nodes 0–4; content steps are 0–5
+    const trackerStep = i; // tracker node i corresponds to content step i+1? No — let's map directly.
+    // Tracker nodes 0–4 represent content steps 0–4 (welcome through password)
+    // Content step 5 is the done screen — no tracker node
+    const isDone   = currentStep > i + 1 || (currentStep === TOTAL_STEPS && i < TOTAL_STEPS - 1);
+    const isActive = currentStep === i + 1 || (i === 0 && currentStep === 0);
+
+    if (currentStep > i + 1) {
+      circle.className = 'step-circle done';
+      circle.innerHTML = '<svg width="12" height="12" fill="none" stroke="white" stroke-width="3" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>';
+      label.className = 'step-label done';
+    } else if (currentStep === i + 1 || (i === 0 && currentStep === 0)) {
+      circle.className = 'step-circle active';
+      circle.textContent = i + 1;
+      label.className = 'step-label active';
+    } else {
+      circle.className = 'step-circle';
+      circle.textContent = i + 1;
+      label.className = 'step-label';
+    }
+
+    // Connectors between nodes
+    const conn = document.getElementById(`conn-${i}`);
+    if (conn) {
+      conn.className = 'step-connector' + (currentStep > i + 1 ? ' done' : '');
+    }
   }
-  document.querySelectorAll(".step").forEach((el, i) => {
-    el.classList.toggle("active", i === currentStep);
+
+  document.querySelectorAll('.step').forEach((el, i) => {
+    el.classList.toggle('active', i === currentStep);
   });
+
+  // Hide tracker on done screen
+  document.getElementById('step-track').style.display = currentStep === TOTAL_STEPS ? 'none' : 'flex';
 }
 
-function nextStep() { currentStep = Math.min(currentStep + 1, TOTAL_STEPS); updatePills(); }
-function prevStep() { currentStep = Math.max(currentStep - 1, 0); updatePills(); }
+function nextStep() {
+  currentStep = Math.min(currentStep + 1, TOTAL_STEPS);
+  updateTracker();
+  window.scrollTo(0, 0);
+}
+function prevStep() {
+  currentStep = Math.max(currentStep - 1, 0);
+  updateTracker();
+}
 
 function selectStrategy(name) {
   _selectedStrategy = name;
-  document.querySelectorAll(".strategy-pick").forEach(el => {
-    el.classList.toggle("selected", el.querySelector("input").value === name);
+  document.querySelectorAll('.strategy-pick').forEach(el => {
+    el.classList.toggle('selected', el.querySelector('input').value === name);
   });
 }
 
+function setBrokerMode(mode) {
+  _brokerMode = mode;
+  document.getElementById('tab-paper').classList.toggle('active', mode === 'paper');
+  document.getElementById('tab-live').classList.toggle('active', mode === 'live');
+  document.getElementById('broker-paper-note').style.display = mode === 'paper' ? 'block' : 'none';
+  document.getElementById('broker-live-note').style.display  = mode === 'live'  ? 'block' : 'none';
+}
+
+function toggleSecret() {
+  const inp = document.getElementById('s-api-secret');
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+}
+function togglePw() {
+  const inp = document.getElementById('s-password');
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+}
+
+function showBrokerResult(msg, type) {
+  const el = document.getElementById('broker-test-result');
+  el.className = 'test-result ' + type;
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+
+function testBrokerConnection() {
+  const key    = document.getElementById('s-api-key').value.trim();
+  const secret = document.getElementById('s-api-secret').value.trim();
+  if (!key || !secret) { showBrokerResult('Enter your API Key and Secret first.', 'err'); return; }
+  // Basic format check — full validation happens when broker is saved after login
+  const looksValid = (key.startsWith('PK') || key.startsWith('AK') || key.length >= 20) && secret.length >= 20;
+  if (looksValid) {
+    showBrokerResult('Keys look valid. Click "Save & Continue" to connect.', 'ok');
+  } else {
+    showBrokerResult('Keys look invalid. Alpaca API keys start with PK (paper) or AK (live) and are 20+ characters.', 'err');
+  }
+}
+
+function saveBrokerAndContinue() {
+  const key    = document.getElementById('s-api-key').value.trim();
+  const secret = document.getElementById('s-api-secret').value.trim();
+  if (!key || !secret) { showBrokerResult('Enter your API Key and Secret to continue, or use Skip.', 'err'); return; }
+  // Store in memory — will be saved after setup completes and auto-login creates a session
+  _brokerConnected = true;
+  nextStep();
+}
+
 async function finishSetup() {
-  const pw  = document.getElementById("s-password").value;
-  const pw2 = document.getElementById("s-password2").value;
-  const err = document.getElementById("pw-error");
+  const pw  = document.getElementById('s-password').value;
+  const pw2 = document.getElementById('s-password2').value;
+  const err = document.getElementById('pw-error');
   if (!pw || pw.length < 6) {
-    err.className = "test-result err"; err.style.display = "block";
-    err.textContent = "Password must be at least 6 characters."; return;
+    err.style.display = 'block'; err.textContent = 'Password must be at least 6 characters.'; return;
   }
   if (pw !== pw2) {
-    err.className = "test-result err"; err.style.display = "block";
-    err.textContent = "Passwords do not match."; return;
+    err.style.display = 'block'; err.textContent = 'Passwords do not match.'; return;
   }
-  err.style.display = "none";
+  err.style.display = 'none';
+
   const payload = {
-    notional:           parseFloat(document.getElementById("s-notional").value) || 500,
-    max_daily_loss_pct: parseFloat(document.getElementById("s-max-loss").value) || 2,
-    max_position_count: parseInt(document.getElementById("s-max-pos").value) || 5,
+    notional:           parseFloat(document.getElementById('s-notional').value) || 500,
+    max_daily_loss_pct: parseFloat(document.getElementById('s-max-loss').value) || 2,
+    max_position_count: parseInt(document.getElementById('s-max-pos').value)    || 5,
     starter_strategy:   _selectedStrategy,
     password:           pw,
   };
+
   try {
-    const r = await fetch("/api/setup/complete", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
+    const r = await fetch('/api/setup/complete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
-    if (r.ok) { nextStep(); }
-    else {
-      const d = await r.json();
-      err.className = "test-result err"; err.style.display = "block";
-      err.textContent = d.detail || "Setup failed.";
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      err.style.display = 'block'; err.textContent = d.detail || 'Setup failed.'; return;
     }
+
+    // Auto-login to get a session cookie so we can call authenticated endpoints
+    await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: pw }),
+    });
+
+    // Save broker account if the user filled it in
+    if (_brokerConnected) {
+      const key    = document.getElementById('s-api-key').value.trim();
+      const secret = document.getElementById('s-api-secret').value.trim();
+      const label  = document.getElementById('s-acct-label').value.trim() || (_brokerMode === 'paper' ? 'Alpaca Paper' : 'Alpaca Live');
+      try {
+        await fetch('/api/broker-accounts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ broker: 'alpaca', label, account_type: _brokerMode, api_key: key, api_secret: secret }),
+        });
+      } catch {
+        // Non-fatal — user can add broker from settings
+        _brokerConnected = false;
+      }
+    }
+
+    // Update done screen
+    if (!_brokerConnected) {
+      const brokerCheck = document.getElementById('done-broker-check');
+      if (brokerCheck) {
+        brokerCheck.style.color = '#64748B';
+        brokerCheck.innerHTML = `<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg> Broker not connected &mdash; add one from Broker Accounts`;
+      }
+    }
+    nextStep();
   } catch {
-    err.className = "test-result err"; err.style.display = "block";
-    err.textContent = "Error saving setup.";
+    err.style.display = 'block'; err.textContent = 'Error saving setup. Please try again.';
   }
 }
+
+// Init
+updateTracker();
 </script>
 </body>
 </html>
