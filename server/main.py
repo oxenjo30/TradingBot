@@ -349,6 +349,15 @@ def quote(symbol: str):
     except Exception as e:
         raise HTTPException(400, str(e))
 
+@app.get("/api/quotes/snapshot")
+def quotes_snapshot(symbols: str, request: Request):
+    _require_auth(request)
+    syms = [s.strip() for s in symbols.split(",") if s.strip()]
+    try:
+        return alpaca_client.get_snapshots(syms)
+    except Exception as e:
+        raise HTTPException(400, str(e))
+
 @app.get("/api/portfolio_history")
 def portfolio_history(request: Request, period: str = "1M", timeframe: str = "1D"):
     _require_auth(request)

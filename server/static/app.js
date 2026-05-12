@@ -321,72 +321,82 @@ const PAGE_INIT = {
   // login excluded — uses own inline script
 };
 
-// ── Watchlist helpers (used inside initDashboard) ──
-let _wlData = [];
-let _wlActive = null;
+// ── Watchlist — single flat list with live price rows ──
+let _wlSymbols = [];   // string[]
+let _wlId      = null; // id of the auto-managed single watchlist
+const WL_NAME  = '__default__';
 
 async function _wlLoad() {
-  try { _wlData = await api('/api/watchlists', { key: 'wl-list' }); }
-  catch { _wlData = []; }
-  if (!_wlActive && _wlData.length) _wlActive = _wlData[0].id;
-  if (_wlActive && !_wlData.find(w => w.id === _wlActive)) _wlActive = _wlData[0]?.id ?? null;
-  _wlRenderTabs();
-  _wlRenderChips();
+  try {
+    const lists = await api('/api/watchlists', { key: 'wl-list' });
+    let wl = lists[0];
+    if (!wl) {
+      wl = await api('/api/watchlists', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: WL_NAME }),
+      });
+    }
+    _wlId      = wl.id;
+    _wlSymbols = wl.symbols || [];
+  } catch { _wlId = null; _wlSymbols = []; }
+  _wlRenderRows();
+  if (_wlSymbols.length) _wlRefreshPrices();
 }
 
-function _wlRenderTabs() {
-  const tabs = document.getElementById('wl-tabs');
-  if (!tabs) return;
-  if (!_wlData.length) {
-    tabs.innerHTML = '<span style="font-size:12px;color:var(--muted);line-height:28px;">No watchlists yet — click <strong style="color:var(--text);">New list</strong> to create one.</span>';
-    return;
-  }
-  tabs.innerHTML = _wlData.map(w => {
-    const on = w.id === _wlActive;
-    return `<button onclick="window._wlSwitch(${w.id})" style="
-      display:inline-flex;align-items:center;height:28px;padding:0 14px;border-radius:7px;
-      font-size:12px;font-weight:${on ? '600' : '500'};cursor:pointer;
-      border:1px solid ${on ? 'rgba(99,102,241,.5)' : 'var(--border)'};
-      background:${on ? 'rgba(99,102,241,.15)' : 'transparent'};
-      color:${on ? '#A5B4FC' : 'var(--muted)'};transition:all .15s;">${escHtml(w.name)}</button>`;
-  }).join('');
+async function _wlRefreshPrices() {
+  if (!_wlSymbols.length) return;
+  try {
+    const snaps = await api(`/api/quotes/snapshot?symbols=${_wlSymbols.join(',')}`, { key: 'wl-snaps' });
+    snaps.forEach(s => {
+      const row = document.getElementById(`wl-row-${s.symbol}`);
+      if (!row) return;
+      const priceEl  = row.querySelector('.wl-price');
+      const changeEl = row.querySelector('.wl-change');
+      if (priceEl && s.price != null) priceEl.textContent = '$' + s.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      if (changeEl && s.change_pct != null) {
+        const up = s.change_pct >= 0;
+        changeEl.textContent = (up ? '+' : '') + s.change_pct.toFixed(2) + '%';
+        changeEl.style.color = up ? '#10B981' : '#EF4444';
+      }
+    });
+  } catch { /* prices non-critical */ }
 }
 
-function _wlRenderChips() {
-  const el = document.getElementById('wl-chips');
-  if (!el) return;
-  const wl = _wlData.find(w => w.id === _wlActive);
-  if (!wl || !wl.symbols.length) {
-    el.innerHTML = `<span style="font-size:12px;color:var(--muted);">${wl ? 'Empty — add a symbol above.' : ''}</span>`;
+function _wlRenderRows() {
+  const rowsEl  = document.getElementById('wl-rows');
+  const emptyEl = document.getElementById('wl-empty');
+  const countEl = document.getElementById('wl-count');
+  if (!rowsEl) return;
+  if (countEl) countEl.textContent = _wlSymbols.length ? `${_wlSymbols.length} symbol${_wlSymbols.length > 1 ? 's' : ''}` : '';
+  if (!_wlSymbols.length) {
+    rowsEl.innerHTML = '';
+    if (emptyEl) emptyEl.style.display = '';
     return;
   }
-  el.innerHTML = wl.symbols.map(sym => `
-    <span style="display:inline-flex;align-items:center;gap:6px;
-      background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.22);
-      border-radius:7px;padding:5px 10px 5px 12px;font-size:12px;font-weight:600;
-      color:#A5B4FC;letter-spacing:.03em;">
-      ${escHtml(sym)}
-      <button onclick="window._wlRemove(${_wlActive},'${escHtml(sym)}')"
-        style="background:none;border:none;cursor:pointer;color:rgba(165,180,252,.45);
-        padding:0;display:flex;align-items:center;transition:color .1s;"
-        onmouseover="this.style.color='#EF4444'" onmouseout="this.style.color='rgba(165,180,252,.45)'"
+  if (emptyEl) emptyEl.style.display = 'none';
+  rowsEl.innerHTML = _wlSymbols.map((sym, i) => `
+    <div id="wl-row-${sym}" style="display:flex;align-items:center;padding:.55rem 0;
+      ${i < _wlSymbols.length - 1 ? 'border-bottom:1px solid var(--border);' : ''}">
+      <span style="font-size:13px;font-weight:700;color:var(--text);min-width:72px;letter-spacing:.02em;">${escHtml(sym)}</span>
+      <span class="wl-change" style="font-size:12px;font-weight:600;min-width:64px;color:var(--muted);">—</span>
+      <span class="wl-price text-tabular" style="font-size:13px;font-weight:600;flex:1;text-align:right;color:var(--text);">—</span>
+      <button onclick="window._wlRemove('${escHtml(sym)}')"
+        style="background:none;border:none;cursor:pointer;color:var(--muted);padding:0 0 0 12px;
+        display:flex;align-items:center;transition:color .15s;"
+        onmouseover="this.style.color='#EF4444'" onmouseout="this.style.color=''"
         title="Remove ${escHtml(sym)}">
-        <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
-          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/>
         </svg>
       </button>
-    </span>`).join('');
+    </div>`).join('');
 }
 
-window._wlSwitch = function(id) {
-  _wlActive = id;
-  _wlRenderTabs();
-  _wlRenderChips();
-};
-
-window._wlRemove = async function(wlId, sym) {
+window._wlRemove = async function(sym) {
+  if (!_wlId) return;
   try {
-    await api(`/api/watchlists/${wlId}/symbols/${encodeURIComponent(sym)}`, { method: 'DELETE' });
+    await api(`/api/watchlists/${_wlId}/symbols/${encodeURIComponent(sym)}`, { method: 'DELETE' });
     await _wlLoad();
   } catch { alert('Failed to remove symbol.'); }
 };
@@ -899,46 +909,18 @@ async function initDashboard() {
 
   // ── Watchlist wiring ──
   (function initWatchlistPanel() {
-    const tabsEl  = document.getElementById('wl-tabs');
-    if (!tabsEl) return;
-    const newBtn  = document.getElementById('wl-new-btn');
-    const delBtn  = document.getElementById('wl-delete-btn');
-    const addInp  = document.getElementById('wl-add-input');
-    const addBtn  = document.getElementById('wl-add-btn');
-
-    newBtn && newBtn.addEventListener('click', async () => {
-      const name = prompt('Watchlist name:');
-      if (!name || !name.trim()) return;
-      try {
-        const w = await api('/api/watchlists', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: name.trim() }),
-        });
-        _wlActive = w.id;
-        await _wlLoad();
-      } catch { alert('Could not create watchlist.'); }
-    });
-
-    delBtn && delBtn.addEventListener('click', async () => {
-      if (!_wlActive) return;
-      const wl = _wlData.find(w => w.id === _wlActive);
-      if (!wl || !confirm(`Delete watchlist "${wl.name}"?`)) return;
-      try {
-        await api(`/api/watchlists/${_wlActive}`, { method: 'DELETE' });
-        _wlActive = null;
-        await _wlLoad();
-      } catch { alert('Could not delete watchlist.'); }
-    });
+    const addInp = document.getElementById('wl-add-input');
+    const addBtn = document.getElementById('wl-add-btn');
+    if (!addInp) return;
 
     const doAdd = async () => {
-      if (!addInp) return;
       const sym = addInp.value.trim().toUpperCase();
       if (!sym) return;
-      if (!_wlActive) { alert('Create a watchlist first using the "New list" button.'); return; }
+      if (!_wlId) return;
+      if (_wlSymbols.includes(sym)) { addInp.value = ''; return; }
       addBtn && (addBtn.disabled = true);
       try {
-        await api(`/api/watchlists/${_wlActive}/symbols`, {
+        await api(`/api/watchlists/${_wlId}/symbols`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ symbol: sym }),
@@ -950,10 +932,12 @@ async function initDashboard() {
       finally { addBtn && (addBtn.disabled = false); }
     };
 
-    addBtn && addBtn.addEventListener('click', doAdd);
-    addInp && addInp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); doAdd(); } });
+    addBtn.addEventListener('click', doAdd);
+    addInp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); doAdd(); } });
 
     _wlLoad();
+    // Refresh prices every 30s
+    setInterval(() => { if (_wlSymbols.length) _wlRefreshPrices(); }, 30_000);
   })();
 
   // ── Start pollers ──

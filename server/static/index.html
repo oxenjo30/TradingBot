@@ -285,49 +285,31 @@
     <!-- Row 4: Watchlist -->
     <div class="card" style="padding:1.1rem 1.25rem;">
 
-      <!-- Header row -->
+      <!-- Header -->
       <div class="flex items-center justify-between mb-3">
         <div class="flex items-center gap-2">
-          <div class="icon-circle" style="background:rgba(99,102,241,.15);">
+          <div class="icon-circle icon-indigo">
             <svg width="14" height="14" fill="none" stroke="#6366F1" stroke-width="2" viewBox="0 0 24 24">
               <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
             </svg>
           </div>
           <span style="font-size:13px;font-weight:600;">Watchlist</span>
+          <span id="wl-count" class="text-muted" style="font-size:11px;"></span>
         </div>
-        <!-- New list button -->
-        <button id="wl-new-btn" class="btn btn-ghost btn-sm flex items-center gap-1" title="New watchlist" style="font-size:12px;color:var(--muted);">
-          <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          New list
-        </button>
+        <!-- Add input inline -->
+        <div style="display:flex;gap:.4rem;align-items:center;">
+          <input id="wl-add-input" type="text" placeholder="Symbol e.g. AAPL"
+            style="width:160px;background:rgba(30,45,69,.6);border:1px solid var(--border);border-radius:8px;
+            color:var(--text);font-size:12px;padding:4px 10px;outline:none;text-transform:uppercase;transition:border-color .15s;"
+            onfocus="this.style.borderColor='rgba(99,102,241,.6)'" onblur="this.style.borderColor=''"
+            autocomplete="off" spellcheck="false">
+          <button id="wl-add-btn" class="btn btn-primary btn-sm" style="font-size:12px;padding:4px 12px;">Add</button>
+        </div>
       </div>
 
-      <!-- List tabs (injected by JS into #wl-select) -->
-      <div id="wl-tabs" style="display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:.9rem;min-height:28px;"></div>
-
-      <!-- Divider -->
-      <div style="height:1px;background:var(--border);margin-bottom:.9rem;"></div>
-
-      <!-- Symbol chips area -->
-      <div id="wl-chips" style="display:flex;flex-wrap:wrap;gap:.45rem;min-height:32px;margin-bottom:.85rem;align-items:center;"></div>
-
-      <!-- Add symbol row -->
-      <div style="display:flex;gap:.5rem;align-items:center;">
-        <input id="wl-add-input" type="text" placeholder="Add symbol e.g. AAPL"
-          style="flex:1;max-width:240px;background:rgba(30,45,69,.6);border:1px solid var(--border);border-radius:8px;
-          color:var(--text);font-size:12px;padding:5px 12px;outline:none;text-transform:uppercase;
-          transition:border-color .15s;"
-          onfocus="this.style.borderColor='rgba(99,102,241,.6)'" onblur="this.style.borderColor=''"
-          autocomplete="off" spellcheck="false">
-        <button id="wl-add-btn" class="btn btn-primary btn-sm" style="font-size:12px;padding:5px 16px;white-space:nowrap;">+ Add</button>
-        <button id="wl-delete-btn" class="btn btn-ghost btn-sm flex items-center gap-1" title="Delete watchlist" style="font-size:12px;color:#EF4444;margin-left:auto;">
-          <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
-          Delete list
-        </button>
-      </div>
-
-      <!-- hidden select kept for JS compatibility -->
-      <select id="wl-select" style="display:none;"></select>
+      <!-- Symbol rows -->
+      <div id="wl-rows" style="display:flex;flex-direction:column;gap:0;"></div>
+      <div id="wl-empty" class="state-empty" style="font-size:12px;padding:.5rem 0;display:none;">Add symbols above to start tracking.</div>
     </div>
 
     <!-- Row 5: System Bar -->

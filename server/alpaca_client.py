@@ -6,7 +6,7 @@ from alpaca.trading.client import TradingClient
 from alpaca.trading.requests import MarketOrderRequest, LimitOrderRequest, GetOrdersRequest
 from alpaca.trading.enums import OrderSide, TimeInForce, QueryOrderStatus
 from alpaca.data.historical import StockHistoricalDataClient
-from alpaca.data.requests import StockBarsRequest, StockLatestQuoteRequest
+from alpaca.data.requests import StockBarsRequest, StockLatestQuoteRequest, StockSnapshotRequest
 from alpaca.data.timeframe import TimeFrame
 
 from .config import ALPACA_API_KEY, ALPACA_API_SECRET, PAPER
@@ -168,6 +168,26 @@ def get_latest_quote(symbol: str) -> dict:
         "ask": float(q.ask_price),
         "ts": q.timestamp.isoformat(),
     }
+
+
+def get_snapshots(symbols: list[str]) -> list[dict]:
+    syms = [s.upper() for s in symbols if s]
+    if not syms:
+        return []
+    req = StockSnapshotRequest(symbol_or_symbols=syms)
+    res = data().get_stock_snapshot(req)
+    out = []
+    for sym in syms:
+        snap = res.get(sym)
+        if not snap:
+            out.append({"symbol": sym, "price": None, "change_pct": None, "volume": None})
+            continue
+        price = float(snap.latest_trade.price) if snap.latest_trade else None
+        prev  = float(snap.previous_daily_bar.close) if snap.previous_daily_bar else None
+        vol   = float(snap.daily_bar.volume) if snap.daily_bar else None
+        chg   = ((price - prev) / prev * 100) if price and prev else None
+        out.append({"symbol": sym, "price": price, "change_pct": chg, "volume": vol, "prev_close": prev})
+    return out
 
 
 def get_recent_bars(symbol: str, days: int = 60) -> list[dict]:
