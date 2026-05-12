@@ -1041,15 +1041,15 @@ async function initBots() {
 
     // ── Schedule sub-row (hidden by default) ──
     const schedRow = document.createElement('div');
-    schedRow.style.cssText = 'display:none;padding:.5rem 1.25rem .65rem 3.5rem;border-bottom:1px solid rgba(30,45,69,.5);background:rgba(0,0,0,.12);';
+    schedRow.style.cssText = 'display:none;padding:.5rem 1.25rem .65rem 3.5rem;border-bottom:1px solid var(--border);background:rgba(15,23,42,.5);';
     schedRow.innerHTML = `
       <div style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;">
         <span style="font-size:11px;color:#64748B;white-space:nowrap;">Active hours (ET):</span>
         <input type="time" class="input" id="sched-start-${s.name}" value="${s.active_start || ''}"
-          style="width:110px;padding:.25rem .5rem;font-size:12px;height:28px;">
+          style="width:120px;padding:.25rem .5rem;font-size:12px;height:28px;background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:6px;color-scheme:dark;">
         <span style="font-size:11px;color:#64748B;">to</span>
         <input type="time" class="input" id="sched-end-${s.name}" value="${s.active_end || ''}"
-          style="width:110px;padding:.25rem .5rem;font-size:12px;height:28px;">
+          style="width:120px;padding:.25rem .5rem;font-size:12px;height:28px;background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:6px;color-scheme:dark;">
         <button class="btn btn-primary" id="sched-save-${s.name}"
           style="font-size:11px;padding:.25rem .65rem;height:28px;">Save</button>
         <button class="btn btn-ghost" id="sched-clear-${s.name}"
