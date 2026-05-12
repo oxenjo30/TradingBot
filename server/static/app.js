@@ -932,8 +932,11 @@ async function initDashboard() {
     });
 
     const doAdd = async () => {
-      const sym = addInp ? addInp.value.trim().toUpperCase() : '';
-      if (!sym || !_wlActive) return;
+      if (!addInp) return;
+      const sym = addInp.value.trim().toUpperCase();
+      if (!sym) return;
+      if (!_wlActive) { alert('Create a watchlist first using the "New list" button.'); return; }
+      addBtn && (addBtn.disabled = true);
       try {
         await api(`/api/watchlists/${_wlActive}/symbols`, {
           method: 'POST',
@@ -941,12 +944,14 @@ async function initDashboard() {
           body: JSON.stringify({ symbol: sym }),
         });
         addInp.value = '';
+        addInp.focus();
         await _wlLoad();
       } catch { alert('Could not add symbol.'); }
+      finally { addBtn && (addBtn.disabled = false); }
     };
 
     addBtn && addBtn.addEventListener('click', doAdd);
-    addInp && addInp.addEventListener('keydown', e => { if (e.key === 'Enter') doAdd(); });
+    addInp && addInp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); doAdd(); } });
 
     _wlLoad();
   })();
