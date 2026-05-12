@@ -299,11 +299,16 @@
         </div>
         <!-- Add input inline -->
         <div style="display:flex;gap:.4rem;align-items:center;">
-          <input id="wl-add-input" type="text" placeholder="Symbol e.g. AAPL"
-            style="width:160px;background:rgba(30,45,69,.6);border:1px solid var(--border);border-radius:8px;
-            color:var(--text);font-size:12px;padding:4px 10px;outline:none;text-transform:uppercase;transition:border-color .15s;"
-            onfocus="this.style.borderColor='rgba(99,102,241,.6)'" onblur="this.style.borderColor=''"
-            autocomplete="off" spellcheck="false">
+          <div style="position:relative;">
+            <input id="wl-add-input" type="text" placeholder="Search symbol…"
+              style="width:180px;background:rgba(30,45,69,.6);border:1px solid var(--border);border-radius:8px;
+              color:var(--text);font-size:12px;padding:4px 10px;outline:none;text-transform:uppercase;transition:border-color .15s;"
+              onfocus="this.style.borderColor='rgba(99,102,241,.6)'" onblur="this.style.borderColor=''"
+              autocomplete="off" spellcheck="false">
+            <div id="wl-suggestions" style="display:none;position:absolute;top:calc(100% + 4px);right:0;left:0;
+              background:#0F1B2D;border:1px solid var(--border);border-radius:8px;
+              box-shadow:0 8px 24px rgba(0,0,0,.5);z-index:200;overflow:hidden;min-width:260px;"></div>
+          </div>
           <button id="wl-add-btn" class="btn btn-primary btn-sm" style="font-size:12px;padding:4px 12px;">Add</button>
         </div>
       </div>
