@@ -133,11 +133,13 @@
     <!-- Positions value table -->
     <div class="card">
       <div style="font-size:14px;font-weight:600;margin-bottom:.75rem;">Holdings</div>
-      <table class="dtable">
-        <colgroup><col style="width:80px"><col style="width:60px"><col><col><col><col style="width:100px"></colgroup>
-        <thead><tr><th>Symbol</th><th>Qty</th><th>Avg Entry</th><th>Current Price</th><th>Market Value</th><th>Unrealized P&amp;L</th></tr></thead>
-        <tbody id="holdings-body"><tr><td colspan="6" class="state-empty">Loading&hellip;</td></tr></tbody>
-      </table>
+      <div class="dtable-wrap">
+        <table class="dtable">
+          <colgroup><col style="width:80px"><col style="width:60px"><col><col><col><col style="width:100px"></colgroup>
+          <thead><tr><th>Symbol</th><th>Qty</th><th>Avg Entry</th><th>Current Price</th><th>Market Value</th><th>Unrealized P&amp;L</th></tr></thead>
+          <tbody id="holdings-body"><tr><td colspan="6" class="state-empty">Loading&hellip;</td></tr></tbody>
+        </table>
+      </div>
     </div>
 
   </main>

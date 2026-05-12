@@ -149,6 +149,37 @@ function setActiveNav() {
   });
 }
 
+// ── Mobile sidebar toggle ──
+function initMobileSidebar() {
+  const sidebar = document.querySelector('.sidebar');
+  if (!sidebar) return;
+
+  const header = document.querySelector('.page-header');
+  if (!header) return;
+
+  const burger = document.createElement('button');
+  burger.className = 'hamburger-btn';
+  burger.setAttribute('aria-label', 'Toggle menu');
+  burger.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+  </svg>`;
+  header.insertBefore(burger, header.firstChild);
+
+  const backdrop = document.createElement('div');
+  backdrop.className = 'sidebar-backdrop';
+  document.body.appendChild(backdrop);
+
+  function openSidebar()  { sidebar.classList.add('mobile-open'); backdrop.classList.add('visible'); document.body.style.overflow = 'hidden'; }
+  function closeSidebar() { sidebar.classList.remove('mobile-open'); backdrop.classList.remove('visible'); document.body.style.overflow = ''; }
+
+  burger.addEventListener('click', () => sidebar.classList.contains('mobile-open') ? closeSidebar() : openSidebar());
+  backdrop.addEventListener('click', closeSidebar);
+
+  sidebar.querySelectorAll('.nav-item').forEach(link => {
+    link.addEventListener('click', () => { if (window.innerWidth < 768) closeSidebar(); });
+  });
+}
+
 // ── Clock chip ──
 async function initClockChip(chipEl) {
   try {
@@ -453,6 +484,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initAccountModeBadge();
   initGlobalSearch();
   initBellIndicator();
+  initMobileSidebar();
   const page = document.body.dataset.page;
   if (PAGE_INIT[page]) PAGE_INIT[page]();
 });
