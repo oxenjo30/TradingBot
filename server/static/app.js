@@ -293,14 +293,15 @@ function donutConfig(labels, series) {
 }
 
 function radialConfig(pct, label) {
+  const isLight = _chartTheme() === 'light';
   return {
     series: [Math.min(Math.abs(pct), 100)],
     chart: { type: 'radialBar', height: 160, background: 'transparent' },
     plotOptions: { radialBar: {
       hollow: { size: '65%' },
       dataLabels: {
-        name:  { fontSize: '11px', color: '#64748B', offsetY: -6 },
-        value: { fontSize: '17px', color: '#E6EBF5', offsetY: 5,
+        name:  { fontSize: '11px', color: isLight ? '#64748B' : '#94A3B8', offsetY: -6 },
+        value: { fontSize: '17px', color: isLight ? '#0F172A' : '#E6EBF5', offsetY: 5,
                  formatter: () => (pct >= 0 ? '+' : '') + pct.toFixed(1) + '%' }
       }
     }},
@@ -801,9 +802,9 @@ async function initDashboard() {
                     min-height:${Math.max(54, 40 + sizePct)}px;display:flex;flex-direction:column;
                     align-items:center;justify-content:center;gap:2px;"
                     title="${p.symbol} — MV: $${Math.round(mv).toLocaleString()} | P&L: ${pnlSign}${plPct.toFixed(2)}%">
-            <div style="font-size:11px;font-weight:700;color:#E6EBF5;letter-spacing:.03em;">${p.symbol}</div>
-            <div style="font-size:10px;color:${isGain ? '#10B981' : '#EF4444'};font-weight:600;">${pnlSign}${plPct.toFixed(1)}%</div>
-            <div style="font-size:9px;color:#64748B;">$${Math.round(mv).toLocaleString()}</div>
+            <div style="font-size:11px;font-weight:700;color:var(--text);letter-spacing:.03em;">${p.symbol}</div>
+            <div style="font-size:10px;color:${isGain ? 'var(--green)' : 'var(--red)'};font-weight:600;">${pnlSign}${plPct.toFixed(1)}%</div>
+            <div style="font-size:9px;color:var(--muted);">$${Math.round(mv).toLocaleString()}</div>
           </div>`;
         }).join('');
     } catch (e) {
@@ -931,9 +932,9 @@ async function initDashboard() {
       _sugItems = results;
       if (!results.length) { _hideSug(); return; }
       sugEl.innerHTML = results.map((r, i) => `
-        <div data-i="${i}" style="display:flex;align-items:center;gap:8px;padding:7px 12px;cursor:pointer;
-          border-bottom:1px solid rgba(255,255,255,.05);transition:background .1s;"
-          onmouseover="this.style.background='rgba(99,102,241,.15)'"
+        <div data-i="${i}" class="wl-sug-item" style="display:flex;align-items:center;gap:8px;padding:7px 12px;cursor:pointer;
+          border-bottom:1px solid var(--border);transition:background .1s;"
+          onmouseover="this.style.background='rgba(99,102,241,.1)'"
           onmouseout="this.style.background=''"
           onmousedown="window._wlPickSug(${i})">
           <span style="font-size:12px;font-weight:700;color:var(--text);min-width:52px;">${escHtml(r.symbol)}</span>
