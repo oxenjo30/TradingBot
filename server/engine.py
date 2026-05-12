@@ -5,7 +5,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 
 from . import alpaca_client, crypto, db, notifications, risk, strategies
-from .alpaca_client import AccountClient
+from .broker_factory import get_account_client
 
 log = logging.getLogger("engine")
 log.setLevel(logging.INFO)
@@ -66,7 +66,8 @@ def run_tick():
 
             if acct_id not in client_cache:
                 try:
-                    acct_client = AccountClient(
+                    acct_client = get_account_client(
+                        broker=acct.get("broker", "alpaca"),
                         api_key=crypto.decrypt(acct["api_key"]),
                         api_secret=crypto.decrypt(acct["api_secret"]),
                         paper=(acct["account_type"] == "paper"),

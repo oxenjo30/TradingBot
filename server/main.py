@@ -417,11 +417,16 @@ def test_broker_credentials(body: BrokerCredentialsTest, request: Request):
     """Validate API credentials without saving them."""
     _require_auth(request)
     try:
-        from alpaca.trading.client import TradingClient
-        paper = (body.account_type == "paper")
-        client = TradingClient(body.api_key, body.api_secret, paper=paper)
-        acct = client.get_account()
-        return {"ok": True, "account_number": str(acct.account_number), "status": str(acct.status)}
+        from .broker_factory import get_account_client
+        client = get_account_client(
+            broker=body.broker,
+            api_key=body.api_key,
+            api_secret=body.api_secret,
+            paper=(body.account_type == "paper"),
+        )
+        summary = client.get_account_summary()
+        return {"ok": True, "status": summary.get("status", "active"),
+                "equity": summary.get("equity", 0)}
     except Exception as e:
         raise HTTPException(400, f"Connection failed: {e}")
 
@@ -470,9 +475,10 @@ def broker_account_status(account_id: int, request: Request):
     if not row:
         raise HTTPException(404, "account not found")
     try:
-        from .alpaca_client import AccountClient
-        creds = db.get_broker_account_credentials(account_id)
-        client = AccountClient(
+        from .broker_factory import get_account_client
+        creds  = db.get_broker_account_credentials(account_id)
+        client = get_account_client(
+            broker=row.get("broker", "alpaca"),
             api_key=crypto.decrypt(creds["api_key"]),
             api_secret=crypto.decrypt(creds["api_secret"]),
             paper=(row["account_type"] == "paper"),
