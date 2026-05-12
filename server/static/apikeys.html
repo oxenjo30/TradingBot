@@ -174,54 +174,77 @@
     </div>
 
     <!-- Step 2: Credentials -->
-    <div id="add-step-2" class="hidden">
-      <div class="modal-head">
-        <div id="add-broker-icon-wrap" style="width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0;letter-spacing:-.5px;"></div>
+    <div id="add-step-2" class="hidden" style="padding:0;">
+      <!-- Coloured header band -->
+      <div id="add-modal-band" class="acct-modal-band acct-band-paper">
+        <div id="add-broker-icon-wrap" class="acct-band-icon" style="font-size:13px;font-weight:700;letter-spacing:-.5px;"></div>
         <div>
-          <div class="modal-head-title" id="add-broker-title">Add Account</div>
-          <div class="modal-head-sub">Enter your API credentials below</div>
+          <div class="acct-band-title" id="add-broker-title">Add Account</div>
+          <div class="acct-band-sub">Enter your API credentials</div>
         </div>
+        <div id="add-type-badge" class="acct-type-badge acct-badge-paper" style="margin-left:auto;">Paper</div>
       </div>
-      <div class="modal-form">
+
+      <div class="modal-form" style="padding:1.25rem 1.5rem;">
         <input type="hidden" id="add-broker" value="alpaca">
+
         <div class="form-group">
           <label class="form-label">Account Label</label>
           <input id="add-label" type="text" class="input-field" placeholder="e.g. Alpaca Paper #1">
         </div>
-        <div class="form-row">
-          <div class="form-group">
+
+        <!-- Account type toggle -->
+        <div class="form-group">
+          <label class="form-label">Account Type</label>
+          <div class="acct-type-grid" id="add-type-selector">
+            <div class="acct-type-card acct-type-paper active" data-val="paper">
+              <div class="acct-type-icon">
+                <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+              </div>
+              <div>
+                <div class="acct-type-name">Paper</div>
+                <div class="acct-type-desc">Simulated &bull; No real money</div>
+              </div>
+              <div class="acct-type-check">
+                <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+              </div>
+            </div>
+            <div class="acct-type-card acct-type-live" data-val="live">
+              <div class="acct-type-icon">
+                <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+              </div>
+              <div>
+                <div class="acct-type-name">Live</div>
+                <div class="acct-type-desc">Real money &bull; Trades execute</div>
+              </div>
+              <div class="acct-type-check">
+                <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+              </div>
+            </div>
+          </div>
+          <input type="hidden" id="add-account-type" value="paper">
+        </div>
+
+        <!-- Credentials with banner -->
+        <div class="acct-creds-section" id="add-creds-section">
+          <div class="acct-creds-banner acct-creds-banner-paper" id="add-creds-banner">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+            <span id="add-creds-banner-text">Paper API keys start with <strong>PK</strong> &mdash; get them from alpaca.markets &rarr; Paper Trading</span>
+          </div>
+          <div class="form-group" style="margin-top:.75rem;">
             <label class="form-label">API Key</label>
-            <input id="add-api-key" type="text" class="input-field" placeholder="PK… (paper trading key)" autocomplete="off">
-            <div id="add-key-hint" style="font-size:11px;color:#94A3B8;margin-top:4px;">Paper keys start with PK &mdash; find them at alpaca.markets under Paper Trading API</div>
+            <input id="add-api-key" type="text" class="input-field" placeholder="PK… paper key" autocomplete="off">
           </div>
           <div class="form-group">
             <label class="form-label">API Secret</label>
             <input id="add-api-secret" type="password" class="input-field" placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;" autocomplete="new-password">
           </div>
         </div>
-        <div class="form-group">
-          <label class="form-label">Account Type</label>
-          <div class="type-selector" id="add-type-selector">
-            <div class="type-opt active" data-val="paper">
-              <div class="type-opt-dot type-paper-dot"></div>
-              <div>
-                <div class="type-opt-name">Paper</div>
-                <div class="type-opt-desc">Simulated</div>
-              </div>
-            </div>
-            <div class="type-opt" data-val="live">
-              <div class="type-opt-dot type-live-dot"></div>
-              <div>
-                <div class="type-opt-name">Live</div>
-                <div class="type-opt-desc">Real money</div>
-              </div>
-            </div>
-          </div>
-          <input type="hidden" id="add-account-type" value="paper">
-        </div>
+
         <div id="add-error" class="form-error hidden"></div>
       </div>
-      <div class="modal-actions">
+
+      <div class="modal-actions" style="padding:.75rem 1.5rem 1.25rem;">
         <button class="btn btn-ghost" id="add-step-back" style="margin-right:auto;">
           <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
           Back
@@ -236,51 +259,80 @@
 
 <!-- Edit Account -->
 <div id="modal-edit-account" class="modal-overlay hidden" role="dialog" aria-modal="true">
-  <div class="modal-box" style="max-width:460px;">
-    <div class="modal-head">
-      <div class="modal-head-icon icon-purple">
-        <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+  <div class="modal-box" style="max-width:480px;padding:0;overflow:hidden;">
+
+    <!-- Coloured header band -->
+    <div id="edit-modal-band" class="acct-modal-band acct-band-paper">
+      <div class="acct-band-icon" id="edit-band-icon">
+        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
       </div>
       <div>
-        <div class="modal-head-title">Edit Account</div>
-        <div class="modal-head-sub" id="edit-modal-broker-name">Update account details and credentials</div>
+        <div class="acct-band-title">Edit Account</div>
+        <div class="acct-band-sub" id="edit-modal-broker-name">Alpaca &middot; Paper</div>
       </div>
+      <div id="edit-type-badge" class="acct-type-badge acct-badge-paper" style="margin-left:auto;">Paper</div>
     </div>
-    <div class="modal-form">
+
+    <div class="modal-form" style="padding:1.25rem 1.5rem;">
       <input id="edit-account-id" type="hidden">
+
       <div class="form-group">
         <label class="form-label">Account Label</label>
         <input id="edit-label" type="text" class="input-field" placeholder="e.g. Alpaca Paper #1">
       </div>
+
+      <!-- Account type toggle — big cards -->
       <div class="form-group">
         <label class="form-label">Account Type</label>
-        <div class="type-selector" id="edit-type-selector">
-          <div class="type-opt active" data-val="paper">
-            <div class="type-opt-dot type-paper-dot"></div>
-            <div><div class="type-opt-name">Paper</div><div class="type-opt-desc">Simulated</div></div>
+        <div class="acct-type-grid" id="edit-type-selector">
+          <div class="acct-type-card acct-type-paper active" data-val="paper">
+            <div class="acct-type-icon">
+              <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+            </div>
+            <div>
+              <div class="acct-type-name">Paper</div>
+              <div class="acct-type-desc">Simulated &bull; No real money</div>
+            </div>
+            <div class="acct-type-check">
+              <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+            </div>
           </div>
-          <div class="type-opt" data-val="live">
-            <div class="type-opt-dot type-live-dot"></div>
-            <div><div class="type-opt-name">Live</div><div class="type-opt-desc">Real money</div></div>
+          <div class="acct-type-card acct-type-live" data-val="live">
+            <div class="acct-type-icon">
+              <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+            </div>
+            <div>
+              <div class="acct-type-name">Live</div>
+              <div class="acct-type-desc">Real money &bull; Trades execute</div>
+            </div>
+            <div class="acct-type-check">
+              <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+            </div>
           </div>
         </div>
         <input type="hidden" id="edit-account-type" value="paper">
       </div>
-      <div style="border-top:1px solid #1E2D45;margin:.75rem 0;padding-top:.75rem;">
-        <div style="font-size:12px;font-weight:600;color:#94A3B8;margin-bottom:.75rem;text-transform:uppercase;letter-spacing:.04em;">API Credentials</div>
-        <div class="form-group">
-          <label class="form-label">API Key <span class="text-muted" style="font-weight:400;">(leave blank to keep existing)</span></label>
-          <input id="edit-api-key" type="text" class="input-field" placeholder="PK… (paper trading key)" autocomplete="off">
-          <div id="edit-key-hint" style="font-size:11px;color:#94A3B8;margin-top:4px;">Paper keys start with PK &mdash; find them at alpaca.markets under Paper Trading API</div>
+
+      <!-- Credentials section -->
+      <div class="acct-creds-section" id="edit-creds-section">
+        <div class="acct-creds-banner acct-creds-banner-paper" id="edit-creds-banner">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+          <span id="edit-creds-banner-text">Paper API keys start with <strong>PK</strong> &mdash; get them from alpaca.markets &rarr; Paper Trading</span>
+        </div>
+        <div class="form-group" style="margin-top:.75rem;">
+          <label class="form-label">API Key <span style="font-weight:400;color:#64748B;">(leave blank to keep existing)</span></label>
+          <input id="edit-api-key" type="text" class="input-field" placeholder="PK… paper key" autocomplete="off">
         </div>
         <div class="form-group">
-          <label class="form-label">API Secret <span class="text-muted" style="font-weight:400;">(leave blank to keep existing)</span></label>
+          <label class="form-label">API Secret <span style="font-weight:400;color:#64748B;">(leave blank to keep existing)</span></label>
           <input id="edit-api-secret" type="password" class="input-field" placeholder="Leave blank to keep current" autocomplete="new-password">
         </div>
       </div>
+
       <div id="edit-error" class="form-error hidden"></div>
     </div>
-    <div class="modal-actions">
+
+    <div class="modal-actions" style="padding:.75rem 1.5rem 1.25rem;">
       <button class="btn btn-ghost" data-action="cancel">Cancel</button>
       <button class="btn btn-primary" data-action="confirm">Save Changes</button>
     </div>

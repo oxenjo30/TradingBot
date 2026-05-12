@@ -352,7 +352,7 @@ button { cursor: pointer; font-family: inherit; }
 /* ── Table ── */
 .dtable {
   width: 100%;
-  table-layout: fixed;
+  table-layout: auto;
   border-collapse: collapse;
 }
 .dtable th {
@@ -361,13 +361,13 @@ button { cursor: pointer; font-family: inherit; }
   padding: .5rem .75rem;
   text-align: left;
   border-bottom: 1px solid var(--border);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .dtable td {
   padding: .6rem .75rem;
   font-size: 13px;
   border-bottom: 1px solid rgba(30,45,69,.5);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .dtable tr:last-child td { border-bottom: none; }
 .dtable tr:hover td { background: rgba(59,130,246,.04); }
@@ -853,6 +853,122 @@ button { cursor: pointer; font-family: inherit; }
   color: #E6EBF5;
   margin-top: 2px;
 }
+
+/* ── Account modal band (coloured header) ── */
+.acct-modal-band {
+  display: flex;
+  align-items: center;
+  gap: .875rem;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid #1E2D45;
+  transition: background .25s, border-color .25s;
+}
+.acct-band-paper {
+  background: linear-gradient(135deg, rgba(59,130,246,.18) 0%, rgba(30,45,69,.55) 100%);
+  border-bottom-color: rgba(59,130,246,.25);
+}
+.acct-band-live {
+  background: linear-gradient(135deg, rgba(239,68,68,.18) 0%, rgba(30,45,69,.55) 100%);
+  border-bottom-color: rgba(239,68,68,.25);
+}
+.acct-band-icon {
+  width: 40px; height: 40px;
+  border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  background: rgba(255,255,255,.07);
+  color: #E6EBF5;
+}
+.acct-band-title { font-size: 15px; font-weight: 700; color: #E6EBF5; }
+.acct-band-sub   { font-size: 12px; color: #94A3B8; margin-top: 2px; }
+
+/* Type badge in band */
+.acct-type-badge {
+  font-size: 11px; font-weight: 700;
+  padding: .2rem .65rem;
+  border-radius: 20px;
+  letter-spacing: .03em;
+  text-transform: uppercase;
+}
+.acct-badge-paper { background: rgba(59,130,246,.2);  color: #60A5FA; border: 1px solid rgba(59,130,246,.35); }
+.acct-badge-live  { background: rgba(239,68,68,.18);  color: #F87171; border: 1px solid rgba(239,68,68,.35); }
+
+/* ── Account type card grid ── */
+.acct-type-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: .6rem;
+}
+.acct-type-card {
+  display: flex;
+  align-items: center;
+  gap: .65rem;
+  padding: .75rem .875rem;
+  border-radius: 10px;
+  border: 1.5px solid #1E2D45;
+  background: rgba(17,24,39,.5);
+  cursor: pointer;
+  transition: border-color .18s, background .18s, box-shadow .18s;
+  user-select: none;
+}
+.acct-type-card:hover { border-color: rgba(100,116,139,.4); background: rgba(30,41,59,.7); }
+.acct-type-icon {
+  width: 34px; height: 34px;
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  background: rgba(255,255,255,.05);
+  color: #94A3B8;
+  transition: background .18s, color .18s;
+}
+.acct-type-name { font-size: 13px; font-weight: 600; color: #CBD5E1; transition: color .18s; }
+.acct-type-desc { font-size: 11px; color: #64748B; margin-top: 2px; }
+.acct-type-check {
+  margin-left: auto;
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  border: 1.5px solid #1E2D45;
+  display: flex; align-items: center; justify-content: center;
+  color: transparent;
+  flex-shrink: 0;
+  transition: background .18s, border-color .18s, color .18s;
+}
+.acct-type-paper.active {
+  border-color: rgba(59,130,246,.55);
+  background: rgba(59,130,246,.08);
+  box-shadow: 0 0 0 1px rgba(59,130,246,.18);
+}
+.acct-type-paper.active .acct-type-icon { background: rgba(59,130,246,.15); color: #60A5FA; }
+.acct-type-paper.active .acct-type-name { color: #93C5FD; }
+.acct-type-paper.active .acct-type-check { background: #3B82F6; border-color: #3B82F6; color: #fff; }
+.acct-type-live.active {
+  border-color: rgba(239,68,68,.5);
+  background: rgba(239,68,68,.07);
+  box-shadow: 0 0 0 1px rgba(239,68,68,.18);
+}
+.acct-type-live.active .acct-type-icon { background: rgba(239,68,68,.13); color: #F87171; }
+.acct-type-live.active .acct-type-name { color: #FCA5A5; }
+.acct-type-live.active .acct-type-check { background: #EF4444; border-color: #EF4444; color: #fff; }
+
+/* ── Credentials banner ── */
+.acct-creds-section {
+  border-top: 1px solid #1E2D45;
+  margin-top: .875rem;
+  padding-top: .875rem;
+}
+.acct-creds-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: .5rem;
+  padding: .6rem .75rem;
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.5;
+  transition: background .25s, border-color .25s, color .25s;
+}
+.acct-creds-banner svg { flex-shrink: 0; margin-top: 1px; }
+.acct-creds-banner-paper { background: rgba(59,130,246,.1);  border: 1px solid rgba(59,130,246,.25); color: #93C5FD; }
+.acct-creds-banner-live  { background: rgba(239,68,68,.09);  border: 1px solid rgba(239,68,68,.25);  color: #FCA5A5; }
 
 /* ── Broker Picker Tabs ── */
 .bp-tabs {

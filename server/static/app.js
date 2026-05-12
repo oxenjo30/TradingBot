@@ -1876,13 +1876,32 @@ async function initApiKeys() {
   // ── Type selector helpers ─────────────────────────────────────────
   function updateKeyPlaceholders(type, prefix) {
     const isPaper = type === 'paper';
-    const keyEl  = document.getElementById(`${prefix}-api-key`);
-    const hintEl = document.getElementById(`${prefix}-key-hint`);
-    if (keyEl) keyEl.placeholder = isPaper ? 'PK… (paper trading key)' : 'AK… (live trading key)';
-    if (hintEl) {
-      hintEl.textContent = isPaper
-        ? 'Paper keys start with PK — find them at alpaca.markets under Paper Trading API'
-        : 'Live keys start with AK — find them at alpaca.markets under Live Trading API';
+
+    // API key placeholder
+    const keyEl = document.getElementById(`${prefix}-api-key`);
+    if (keyEl) keyEl.placeholder = isPaper ? 'PK… paper key' : 'AK… live key';
+
+    // Coloured banner
+    const banner = document.getElementById(`${prefix}-creds-banner`);
+    const bannerText = document.getElementById(`${prefix}-creds-banner-text`);
+    if (banner) {
+      banner.className = 'acct-creds-banner ' + (isPaper ? 'acct-creds-banner-paper' : 'acct-creds-banner-live');
+    }
+    if (bannerText) {
+      bannerText.innerHTML = isPaper
+        ? 'Paper API keys start with <strong>PK</strong> &mdash; get them from alpaca.markets &rarr; Paper Trading'
+        : 'Live API keys start with <strong>AK</strong> &mdash; get them from alpaca.markets &rarr; Live Trading';
+    }
+
+    // Header band colour
+    const band = document.getElementById(`${prefix}-modal-band`);
+    if (band) band.className = 'acct-modal-band ' + (isPaper ? 'acct-band-paper' : 'acct-band-live');
+
+    // Badge in band
+    const badge = document.getElementById(`${prefix}-type-badge`);
+    if (badge) {
+      badge.className = 'acct-type-badge ' + (isPaper ? 'acct-badge-paper' : 'acct-badge-live');
+      badge.textContent = isPaper ? 'Paper' : 'Live';
     }
   }
 
@@ -1890,9 +1909,9 @@ async function initApiKeys() {
     const sel = document.getElementById(selectorId);
     if (!sel) return;
     const hidden = document.getElementById(hiddenId);
-    sel.querySelectorAll('.type-opt').forEach(opt => {
+    sel.querySelectorAll('[data-val]').forEach(opt => {
       opt.addEventListener('click', () => {
-        sel.querySelectorAll('.type-opt').forEach(o => o.classList.remove('active'));
+        sel.querySelectorAll('[data-val]').forEach(o => o.classList.remove('active'));
         opt.classList.add('active');
         hidden.value = opt.dataset.val;
         if (keyPrefix) updateKeyPlaceholders(opt.dataset.val, keyPrefix);
@@ -1905,7 +1924,7 @@ async function initApiKeys() {
     if (!sel) return;
     const hidden = document.getElementById(hiddenId);
     if (hidden) hidden.value = val;
-    sel.querySelectorAll('.type-opt').forEach(o => {
+    sel.querySelectorAll('[data-val]').forEach(o => {
       o.classList.toggle('active', o.dataset.val === val);
     });
     if (keyPrefix) updateKeyPlaceholders(val, keyPrefix);
