@@ -23,11 +23,6 @@ REGISTRY: dict[str, type[Strategy]] = {
 
 
 def build(name: str, params: dict) -> Strategy:
-    cls = REGISTRY[name]
-    return cls(params)
-
-
-def build(name: str, params: dict) -> Strategy:
     if name not in REGISTRY:
         raise ValueError(f"Unknown strategy: {name}")
     return REGISTRY[name](params)

@@ -19,6 +19,7 @@ class BacktestEngine:
         position_size_pct: float,
         commission_pct: float,
         slippage_pct: float,
+        strategy_params: dict | None = None,
     ) -> dict:
         if strategy_name not in strat_mod.REGISTRY:
             raise ValueError(f"Unknown strategy: {strategy_name}")
@@ -48,10 +49,9 @@ class BacktestEngine:
         trading_calendar = sorted(all_dates)
 
         # 3. Instantiate strategy restricted to user-specified symbols
-        strategy = strat_mod.build(
-            strategy_name,
-            {"symbols": symbols_up, "use_scanner": False},
-        )
+        build_params = dict(strategy_params or {})
+        build_params.update({"symbols": symbols_up, "use_scanner": False})
+        strategy = strat_mod.build(strategy_name, build_params)
 
         # 4. Simulation state
         cash = float(initial_capital)
@@ -177,6 +177,22 @@ class BacktestEngine:
         else:
             sharpe_ratio = 0.0
 
+        # Per-symbol breakdown
+        symbol_breakdown: list[dict] = []
+        sym_trades: dict[str, list] = {}
+        for t in closed_trades:
+            sym_trades.setdefault(t["symbol"], []).append(t)
+        for sym, trades_list in sorted(sym_trades.items()):
+            sym_wins = sum(1 for t in trades_list if t["pnl"] > 0)
+            sym_pnl  = sum(t["pnl"] for t in trades_list)
+            symbol_breakdown.append({
+                "symbol":      sym,
+                "trades":      len(trades_list),
+                "wins":        sym_wins,
+                "win_rate_pct": round(sym_wins / len(trades_list) * 100, 1),
+                "total_pnl":   round(sym_pnl, 2),
+            })
+
         result: dict = {
             "total_return_pct": round(total_return_pct, 4),
             "max_drawdown_pct": round(max_drawdown_pct, 4),
@@ -185,6 +201,7 @@ class BacktestEngine:
             "total_trades": total_trades,
             "equity_curve": equity_curve,
             "trades": closed_trades,
+            "symbol_breakdown": symbol_breakdown,
         }
 
         # 6. Persist and attach id
