@@ -438,7 +438,7 @@ async function doLogin(e) {
       body: JSON.stringify({ password: pw }),
     });
     if (r.ok) {
-      btn.innerHTML = 'œ&ldquo; Success';
+      btn.innerHTML = '&#10003; Success';
       btn.style.background = 'linear-gradient(135deg,#16c784,#0fa066)';
       setTimeout(() => { window.location.href = '/static/index.html'; }, 400);
     } else {
