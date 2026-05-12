@@ -438,13 +438,13 @@ def daily_signal_counts(days: int = 30) -> list[dict]:
     with get_conn() as c:
         rows = c.execute("""
             SELECT
-                DATE(ts)                                          AS date,
-                COUNT(*)                                          AS total,
-                SUM(CASE WHEN side='buy'  THEN 1 ELSE 0 END)     AS buys,
-                SUM(CASE WHEN side='sell' THEN 1 ELSE 0 END)     AS sells
+                DATE(ts)                                                                           AS date,
+                COUNT(*)                                                                           AS total,
+                SUM(CASE WHEN side='buy'  AND status NOT IN ('blocked','error') THEN 1 ELSE 0 END) AS buys,
+                SUM(CASE WHEN side='sell' AND status NOT IN ('blocked','error') THEN 1 ELSE 0 END) AS sells,
+                SUM(CASE WHEN status='blocked' THEN 1 ELSE 0 END)                                 AS blocked
             FROM signals
             WHERE ts >= DATE('now', '-' || ? || ' days')
-              AND status NOT IN ('blocked', 'error')
               AND symbol NOT IN ('-', '')
             GROUP BY DATE(ts)
             ORDER BY date ASC

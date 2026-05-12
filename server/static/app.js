@@ -1410,20 +1410,22 @@ async function initPerformance() {
 
       // Daily chart
       const daily = p.daily_counts || [];
-      if (daily.length >= 2) {
-        const chartEl = document.getElementById('daily-chart');
+      const chartEl = document.getElementById('daily-chart');
+      if (!daily.length) {
+        chartEl.innerHTML = '<div class="state-empty" style="height:200px;display:flex;align-items:center;justify-content:center;">No signal activity yet.</div>';
+      } else {
         chartEl.innerHTML = '';
         if (dailyChart) dailyChart.destroy();
         dailyChart = safeMakeChart(chartEl, {
           series: [
-            { name: 'Total', data: daily.map(d => ({ x: d.date, y: d.total })) },
             { name: 'Buys',  data: daily.map(d => ({ x: d.date, y: d.buys  })) },
             { name: 'Sells', data: daily.map(d => ({ x: d.date, y: d.sells })) },
+            { name: 'Blocked', data: daily.map(d => ({ x: d.date, y: d.blocked || 0 })) },
           ],
-          chart: { type: 'bar', height: 200, toolbar: { show: false }, background: 'transparent', stacked: false },
-          colors: ['#3B82F6', '#10B981', '#EF4444'],
+          chart: { type: 'bar', height: 200, toolbar: { show: false }, background: 'transparent', stacked: true },
+          colors: ['#10B981', '#EF4444', '#F59E0B'],
           xaxis: { type: 'category', labels: { style: { colors: '#64748B', fontSize: '11px' } }, axisBorder: { show: false } },
-          yaxis: { labels: { style: { colors: '#64748B', fontSize: '11px' } } },
+          yaxis: { labels: { style: { colors: '#64748B', fontSize: '11px' } }, min: 0, forceNiceScale: true },
           grid: { borderColor: '#1E2D45', strokeDashArray: 3 },
           legend: { labels: { colors: '#E6EBF5' } },
           theme: { mode: 'dark' },
