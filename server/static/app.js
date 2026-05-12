@@ -50,6 +50,7 @@ function _abort(key) {
 async function api(path, opts = {}) {
   const signal = _abort(opts.key || path);
   const res = await fetch(path, { ...opts, signal });
+  if (res.status === 402) { location.href = '/static/license.html'; throw new Error('license required'); }
   if (res.status === 401) { location.href = '/static/login.html'; throw new Error('unauthorized'); }
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
