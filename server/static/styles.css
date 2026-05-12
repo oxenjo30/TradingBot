@@ -222,7 +222,85 @@ button { cursor: pointer; font-family: inherit; }
   border-radius: 8px;
   padding: 6px 12px;
   width: 240px; flex-shrink: 0;
-  pointer-events: none; opacity: .6;
+  transition: border-color .15s, background .15s;
+}
+.search-bar:hover {
+  border-color: rgba(59,130,246,.5);
+  background: rgba(30,45,69,.7);
+}
+
+/* ── Global search overlay ── */
+#search-overlay {
+  position: fixed; inset: 0; z-index: 60;
+  background: rgba(0,0,0,.75); backdrop-filter: blur(8px);
+  display: flex; align-items: flex-start; justify-content: center;
+  padding-top: 80px;
+}
+#search-overlay.hidden { display: none; }
+#search-overlay-box {
+  width: 560px; max-width: calc(100vw - 2rem);
+  background: linear-gradient(160deg, #131c2e 0%, #0d1117 100%);
+  border: 1px solid rgba(59,130,246,.3);
+  border-radius: 16px;
+  box-shadow: 0 24px 80px rgba(0,0,0,.7);
+  overflow: hidden;
+}
+#search-overlay-box::before {
+  content: ''; display: block; height: 2px;
+  background: linear-gradient(90deg, #3B82F6, #8B5CF6);
+}
+#search-input-wrap {
+  display: flex; align-items: center; gap: .75rem;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid rgba(30,45,69,.8);
+}
+#search-input-wrap svg { flex-shrink: 0; }
+#search-input {
+  flex: 1; background: none; border: none; outline: none;
+  font-size: 16px; font-weight: 500; color: var(--text);
+  font-family: inherit;
+}
+#search-input::placeholder { color: var(--muted); }
+#search-close-btn {
+  display: flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; border-radius: 6px;
+  background: rgba(30,45,69,.6); border: 1px solid var(--border);
+  color: var(--muted); font-size: 11px; font-weight: 700;
+  cursor: pointer; flex-shrink: 0;
+}
+#search-results {
+  padding: .75rem;
+  display: flex; flex-direction: column; gap: 2px;
+  max-height: 380px; overflow-y: auto;
+}
+.search-result-item {
+  display: flex; align-items: center; gap: .75rem;
+  padding: .6rem .75rem; border-radius: 10px;
+  cursor: pointer; transition: background .1s;
+  text-decoration: none; color: var(--text);
+}
+.search-result-item:hover, .search-result-item.focused {
+  background: rgba(59,130,246,.1);
+}
+.search-result-icon {
+  width: 32px; height: 32px; border-radius: 8px;
+  background: rgba(30,45,69,.8); border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.search-result-label { font-size: 13px; font-weight: 600; }
+.search-result-desc  { font-size: 11px; color: var(--muted); margin-top: 1px; }
+#search-hint {
+  padding: .6rem 1.25rem .9rem;
+  font-size: 11px; color: var(--muted);
+  border-top: 1px solid rgba(30,45,69,.5);
+  display: flex; gap: 1rem; align-items: center;
+}
+.search-kbd {
+  display: inline-flex; align-items: center; gap: 3px;
+  background: rgba(30,45,69,.6); border: 1px solid var(--border);
+  border-radius: 4px; padding: 1px 5px;
+  font-size: 10px; font-weight: 700; color: var(--muted);
 }
 .search-text { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13px; color: var(--muted); }
 .market-chip {
@@ -924,6 +1002,49 @@ button { cursor: pointer; font-family: inherit; }
 .mo-result { font-size:12px; text-align:center; min-height:16px; transition:color .15s; }
 .mo-result.ok  { color: var(--green); }
 .mo-result.err { color: var(--red); }
+
+/* ── Manual order ticket tabs ── */
+.mo-tab {
+  display: flex; align-items: center; justify-content: center; gap: .4rem;
+  padding: .85rem .5rem;
+  font-size: 13px; font-weight: 700; letter-spacing: .02em;
+  background: transparent; border: none; cursor: pointer;
+  font-family: inherit; transition: background .15s, color .15s;
+  border-bottom: 3px solid transparent;
+}
+.mo-tab-buy        { color: #64748B; }
+.mo-tab-sell       { color: #64748B; border-left: 1px solid var(--border); }
+.mo-tab-buy.mo-tab-active  { color: #10B981; background: rgba(16,185,129,.07); border-bottom-color: #10B981; }
+.mo-tab-sell.mo-tab-active { color: #EF4444; background: rgba(239,68,68,.07);  border-bottom-color: #EF4444; }
+.mo-tab:hover { background: rgba(255,255,255,.03); }
+
+/* ── Manual order mode segmented control ── */
+.mo-mode-btn {
+  padding: .4rem .5rem; font-size: 12px; font-weight: 600;
+  background: transparent; color: #64748B;
+  border: 1px solid var(--border); cursor: pointer;
+  font-family: inherit; transition: background .12s, color .12s;
+}
+.mo-mode-btn:first-child { border-radius: 7px 0 0 7px; }
+.mo-mode-btn:last-child  { border-radius: 0 7px 7px 0; border-left: none; }
+.mo-mode-btn.mo-mode-active { background: rgba(59,130,246,.12); color: var(--blue); border-color: rgba(59,130,246,.3); }
+
+/* ── Manual order field labels ── */
+.mo-field-label {
+  font-size: 10.5px; font-weight: 700; color: var(--muted);
+  text-transform: uppercase; letter-spacing: .07em; margin-bottom: .3rem;
+}
+
+/* ── Manual order submit button ── */
+.mo-submit-btn {
+  width: 100%; display: flex; align-items: center; justify-content: center;
+  gap: .5rem; padding: .7rem; font-size: 13px; font-weight: 700;
+  letter-spacing: .02em; border-radius: 9px; color: #fff;
+  transition: opacity .15s;
+}
+.mo-submit-btn:hover { opacity: .88; }
+.mo-submit-buy  { background: #10B981; border-color: #10B981; }
+.mo-submit-sell { background: #EF4444; border-color: #EF4444; }
 
 /* ── Mode card — live trading state ── */
 .live-card {
