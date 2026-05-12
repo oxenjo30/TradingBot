@@ -1252,21 +1252,23 @@ async function initPositions() {
   let quoteTimer = null;
 
   async function fetchQuote(sym) {
-    if (!sym || sym.length < 1) { quoteDisplay.style.display = 'none'; return; }
+    if (!quoteDisplay || !sym) return;
     quoteDisplay.style.display = '';
     quoteDisplay.textContent = 'Fetching price…';
     quoteDisplay.style.color = '#64748B';
     try {
-      const q = await api(`/api/quote/${sym}`, { key: `quote-${sym}` });
-      const bid = parseFloat(q.bid_price) || 0;
-      const ask = parseFloat(q.ask_price) || 0;
+      const res = await fetch(`/api/quote/${encodeURIComponent(sym)}`);
+      if (!res.ok) throw new Error('not found');
+      const q = await res.json();
+      const bid = parseFloat(q.bid) || 0;
+      const ask = parseFloat(q.ask) || 0;
       const mid = bid && ask ? (bid + ask) / 2 : bid || ask;
       if (!mid) { quoteDisplay.textContent = 'No quote available'; return; }
       const midStr = `$${mid.toFixed(2)}`;
       const bidStr = bid ? `bid $${bid.toFixed(2)}` : '';
       const askStr = ask ? `ask $${ask.toFixed(2)}` : '';
-      const detail = [bidStr, askStr].filter(Boolean).join(' &nbsp;');
-      quoteDisplay.innerHTML = `<span style="color:#E6EBF5;font-weight:700;">${midStr}</span>${detail ? ' &nbsp;' + detail : ''}`;
+      const detail = [bidStr, askStr].filter(Boolean).join('  ');
+      quoteDisplay.innerHTML = `<span style="color:#E6EBF5;font-weight:700;">${midStr}</span>${detail ? '  ' + detail : ''}`;
       quoteDisplay.style.color = '#64748B';
       if (priceInput && !priceInput.value) priceInput.value = mid.toFixed(2);
     } catch {
@@ -1872,7 +1874,19 @@ async function initApiKeys() {
   initClockChip(document.getElementById('market-chip'));
 
   // ── Type selector helpers ─────────────────────────────────────────
-  function wireTypeSelector(selectorId, hiddenId) {
+  function updateKeyPlaceholders(type, prefix) {
+    const isPaper = type === 'paper';
+    const keyEl  = document.getElementById(`${prefix}-api-key`);
+    const hintEl = document.getElementById(`${prefix}-key-hint`);
+    if (keyEl) keyEl.placeholder = isPaper ? 'PK… (paper trading key)' : 'AK… (live trading key)';
+    if (hintEl) {
+      hintEl.textContent = isPaper
+        ? 'Paper keys start with PK — find them at alpaca.markets under Paper Trading API'
+        : 'Live keys start with AK — find them at alpaca.markets under Live Trading API';
+    }
+  }
+
+  function wireTypeSelector(selectorId, hiddenId, keyPrefix) {
     const sel = document.getElementById(selectorId);
     if (!sel) return;
     const hidden = document.getElementById(hiddenId);
@@ -1881,11 +1895,12 @@ async function initApiKeys() {
         sel.querySelectorAll('.type-opt').forEach(o => o.classList.remove('active'));
         opt.classList.add('active');
         hidden.value = opt.dataset.val;
+        if (keyPrefix) updateKeyPlaceholders(opt.dataset.val, keyPrefix);
       });
     });
   }
 
-  function setTypeSelector(selectorId, hiddenId, val) {
+  function setTypeSelector(selectorId, hiddenId, val, keyPrefix) {
     const sel = document.getElementById(selectorId);
     if (!sel) return;
     const hidden = document.getElementById(hiddenId);
@@ -1893,10 +1908,11 @@ async function initApiKeys() {
     sel.querySelectorAll('.type-opt').forEach(o => {
       o.classList.toggle('active', o.dataset.val === val);
     });
+    if (keyPrefix) updateKeyPlaceholders(val, keyPrefix);
   }
 
-  wireTypeSelector('add-type-selector', 'add-account-type');
-  wireTypeSelector('edit-type-selector', 'edit-account-type');
+  wireTypeSelector('add-type-selector', 'add-account-type', 'add');
+  wireTypeSelector('edit-type-selector', 'edit-account-type', 'edit');
 
   // ── Account cards ─────────────────────────────────────────────────
   async function loadAccounts() {
@@ -2037,7 +2053,7 @@ async function initApiKeys() {
     const secEl = document.getElementById('edit-api-secret');
     if (keyEl) keyEl.value = '';
     if (secEl) secEl.value = '';
-    setTypeSelector('edit-type-selector', 'edit-account-type', acct.account_type);
+    setTypeSelector('edit-type-selector', 'edit-account-type', acct.account_type, 'edit');
     document.getElementById('edit-error').classList.add('hidden');
 
     openModal(document.getElementById('modal-edit-account'), async () => {
@@ -2168,7 +2184,7 @@ async function initApiKeys() {
     ['add-label','add-api-key','add-api-secret'].forEach(id => {
       const el = document.getElementById(id); if (el) el.value = '';
     });
-    setTypeSelector('add-type-selector', 'add-account-type', 'paper');
+    setTypeSelector('add-type-selector', 'add-account-type', 'paper', 'add');
     document.getElementById('add-error').classList.add('hidden');
     buildBrokerPicker();
     openModal(document.getElementById('modal-add-account'), async () => {
