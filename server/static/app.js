@@ -1704,9 +1704,11 @@ async function initPositions() {
     if (submitBtn) {
       submitBtn.classList.toggle('mot-submit-buy',  isBuy);
       submitBtn.classList.toggle('mot-submit-sell', !isBuy);
+      const _sym = symInput?.value.trim().toUpperCase() || '';
+      const _sl  = _sym ? ' ' + _sym : '';
       submitBtn.innerHTML = isBuy
-        ? '<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg> Place Buy Order'
-        : '<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></svg> Place Sell Order';
+        ? '<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg> Buy' + _sl
+        : '<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></svg> Sell' + _sl;
     }
   }
 
@@ -1748,14 +1750,15 @@ async function initPositions() {
       const mid = bid && ask ? (bid + ask) / 2 : bid || ask;
       if (!mid) { quoteDisplay.textContent = 'No quote available'; return; }
       moMidPrice = mid;
-      const chg = q.change_pct != null ? parseFloat(q.change_pct) : null;
-      const chgColor = chg != null && chg >= 0 ? '#10B981' : '#EF4444';
-      const chgStr = chg != null ? '<span style="color:' + chgColor + ';font-weight:700;margin-left:6px;">' + (chg >= 0 ? '+' : '') + chg.toFixed(2) + '%</span>' : '';
-      quoteDisplay.innerHTML = '<span style="color:#E6EBF5;font-size:14px;font-weight:800;">$' + mid.toFixed(2) + '</span>' + chgStr + '<span style="color:#475569;margin-left:6px;font-size:11px;">mid &middot; bid $' + bid.toFixed(2) + ' &middot; ask $' + ask.toFixed(2) + '</span>';
+      quoteDisplay.textContent = 'Bid $' + bid.toFixed(2) + ' · Ask $' + ask.toFixed(2) + ' · Mid $' + mid.toFixed(2);
       if (priceInput && !priceInput.value) priceInput.value = mid.toFixed(2);
       updateEstTotal();
+      setMoSide(moSide); // refresh button label with symbol
     } catch {
-      quoteDisplay.innerHTML = '<span style="color:#EF4444;">Symbol not found</span>';
+      quoteDisplay.textContent = 'Symbol not found';
+      quoteDisplay.style.background = 'rgba(239,68,68,.1)';
+      quoteDisplay.style.borderColor = 'rgba(239,68,68,.3)';
+      quoteDisplay.style.color = '#DC2626';
       moMidPrice = 0;
     }
   }
@@ -1767,9 +1770,15 @@ async function initPositions() {
     symInput.value = symInput.value.toUpperCase();
     clearTimeout(quoteTimer);
     if (priceInput) priceInput.value = '';
-    if (quoteDisplay) quoteDisplay.textContent = '';
+    if (quoteDisplay) {
+      quoteDisplay.textContent = '';
+      quoteDisplay.style.background = '';
+      quoteDisplay.style.borderColor = '';
+      quoteDisplay.style.color = '';
+    }
     moMidPrice = 0;
     updateEstTotal();
+    setMoSide(moSide); // refresh button label as symbol changes
     const sym = symInput.value.trim();
     if (sym.length >= 1) quoteTimer = setTimeout(() => fetchQuote(sym), 600);
   });
@@ -1964,6 +1973,163 @@ async function initPerformance() {
   createPoller(fetchPerformance, 60_000).start();
   createPoller(fetchSignals,     30_000).start();
   createPoller(fetchAttribution, 60_000).start();
+  initStrategyHealth();
+}
+
+// ── Strategy Health card (performance.html) ───────────────────────────────
+async function initStrategyHealth() {
+  const tbody  = document.getElementById('sh-tbody');
+  const badges = document.getElementById('sh-summary-badges');
+  if (!tbody) return;
+
+  let data;
+  try {
+    data = await api('/api/strategy-health');
+  } catch (e) {
+    tbody.innerHTML = '<tr><td colspan="6" class="state-empty">Failed to load health data.</td></tr>';
+    return;
+  }
+
+  if (!data || !data.length) {
+    tbody.innerHTML = '<tr><td colspan="6" class="state-empty">No strategies registered.</td></tr>';
+    return;
+  }
+
+  const onTrackCount  = data.filter(d => d.drift_status === 'green' || d.drift_status === 'yellow').length;
+  const driftingCount = data.filter(d => d.drift_status === 'red').length;
+  if (badges) {
+    badges.innerHTML = `
+      <span style="font-size:11px;color:var(--muted);">${onTrackCount} on track</span>
+      ${driftingCount > 0
+        ? `<span class="sh-badge-count">${driftingCount} drifting</span>`
+        : `<span class="sh-badge-count sh-badge-ok">All clear</span>`}
+    `;
+  }
+
+  const pct = v => v != null ? (v * 100).toFixed(1) + '%' : '—';
+  const ret = v => v != null ? (v >= 0 ? '+' : '') + v.toFixed(2) + '%' : '—';
+  const ago = d => {
+    if (!d) return 'Never';
+    const diff = Math.floor((Date.now() - new Date(d)) / 3600000);
+    if (diff < 1)  return '< 1h ago';
+    if (diff < 24) return diff + 'h ago';
+    return Math.floor(diff / 24) + 'd ago';
+  };
+  const statusColor = s => ({ green: 'var(--green)', yellow: 'var(--orange)', red: 'var(--red)' }[s] || 'var(--muted)');
+
+  const pillMap = {
+    green:        `<span class="health-pill health-green"><span class="health-dot health-dot-green"></span>On Track</span>`,
+    yellow:       `<span class="health-pill health-yellow"><span class="health-dot health-dot-yellow"></span>Watching</span>`,
+    red:          `<span class="health-pill health-red"><span class="health-dot health-dot-red"></span>Drifting</span>`,
+    no_data:      `<span class="health-pill health-none"><span class="health-dot health-dot-none"></span>Need More Data</span>`,
+    no_benchmark: `<span class="health-pill health-none"><span class="health-dot health-dot-none"></span>No Benchmark</span>`,
+  };
+
+  let rowParts   = [];
+  let detailParts = [];
+
+  data.forEach((d, rowIndex) => {
+    const rowId    = `sh-detail-${rowIndex}`;
+    const btnId    = `sh-exp-${rowIndex}`;
+    const hasBench = d.drift_status !== 'no_benchmark';
+    const hasData  = d.drift_status !== 'no_data' && d.drift_status !== 'no_benchmark';
+    const color    = statusColor(d.drift_status);
+
+    let wrDelta = '';
+    if (hasData && d.benchmark_win_rate != null) {
+      const pp  = ((d.live_win_rate - d.benchmark_win_rate) * 100).toFixed(1);
+      const cls = pp >= 0 ? 'delta-up' : 'delta-down';
+      wrDelta = `<span class="delta-chip ${cls}">${pp >= 0 ? '+' : ''}${pp}pp</span>`;
+    }
+    let arDelta = '';
+    if (hasData && d.benchmark_avg_return_pct != null) {
+      const diff = d.live_avg_return_pct - d.benchmark_avg_return_pct;
+      const cls  = diff >= 0 ? 'delta-up' : 'delta-down';
+      arDelta = `<span class="delta-chip ${cls}">${diff >= 0 ? '+' : ''}${diff.toFixed(2)}%</span>`;
+    }
+
+    const benchSub  = hasBench ? `Benchmark: ${d.benchmark_run_name || 'Set'}` : 'No benchmark set';
+    const clickable = hasBench ? `style="cursor:pointer;" onclick="shToggle('${rowId}','${btnId}')"` : '';
+    const expandBtn = hasBench
+      ? `<button class="sh-expand-btn" id="${btnId}" tabindex="-1">
+           <svg width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+         </button>` : '';
+
+    rowParts.push(`
+      <tr ${clickable}>
+        <td>${expandBtn}</td>
+        <td>
+          <div style="font-weight:600;font-size:13px;${!hasBench ? 'color:var(--muted);' : ''}">${d.strategy}</div>
+          <div style="font-size:11px;color:#475569;margin-top:1px;">${benchSub}</div>
+        </td>
+        <td>
+          ${hasData ? `<div class="metric-pair">
+            <span class="metric-live" style="color:${color};">${pct(d.live_win_rate)}</span>
+            <span class="metric-bench">
+              <span class="metric-bench-label">BT</span>${pct(d.benchmark_win_rate)}${wrDelta}
+            </span>
+          </div>` : `<span style="font-size:13px;color:#475569;">—</span>`}
+        </td>
+        <td>
+          ${hasData ? `<div class="metric-pair">
+            <span class="metric-live" style="color:${color};">${ret(d.live_avg_return_pct)}</span>
+            <span class="metric-bench">
+              <span class="metric-bench-label">BT</span>${ret(d.benchmark_avg_return_pct)}${arDelta}
+            </span>
+          </div>` : `<span style="font-size:13px;color:#475569;">—</span>`}
+        </td>
+        <td>
+          <div style="font-size:13px;font-weight:500;">${d.live_trades} trades</div>
+          <div style="font-size:11px;color:#475569;">Last: ${ago(d.last_trade_at)}</div>
+        </td>
+        <td>${pillMap[d.drift_status] || ''}</td>
+      </tr>`);
+
+    if (hasBench) {
+      const period = (d.benchmark_start_date && d.benchmark_end_date)
+        ? `${d.benchmark_start_date} – ${d.benchmark_end_date}` : '—';
+      detailParts.push(`
+        <tr class="sh-detail-row" id="${rowId}">
+          <td colspan="6" class="sh-detail-cell">
+            <div class="sh-detail-inner">
+              <div class="sh-detail-item"><span class="sh-detail-label">Benchmark Run</span><span class="sh-detail-val">${d.benchmark_run_name || '—'}</span></div>
+              <div class="sh-detail-item"><span class="sh-detail-label">Backtest Period</span><span class="sh-detail-val">${period}</span></div>
+              <div class="sh-detail-item"><span class="sh-detail-label">Backtest Win Rate</span><span class="sh-detail-val">${pct(d.benchmark_win_rate)}</span></div>
+              <div class="sh-detail-item"><span class="sh-detail-label">Backtest Avg Return</span><span class="sh-detail-val">${ret(d.benchmark_avg_return_pct)} / trade</span></div>
+              <div class="sh-detail-item"><span class="sh-detail-label">Backtest Total Trades</span><span class="sh-detail-val">${d.benchmark_total_trades ?? '—'} trades</span></div>
+              ${d.drift_status === 'no_data' ? `<div class="sh-detail-item"><span class="sh-detail-label">Live Trades</span><span class="sh-detail-val" style="color:var(--muted);">${d.live_trades} of 10 needed</span></div>` : ''}
+              <div class="sh-detail-item" style="margin-left:auto;align-self:center;">
+                <a href="/static/backtesting.html?run=${d.benchmark_run_id}" class="btn btn-ghost btn-sm" style="font-size:11px;">
+                  <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                  View Backtest
+                </a>
+              </div>
+            </div>
+          </td>
+        </tr>`);
+    } else {
+      detailParts.push(null);
+    }
+  });
+
+  // Interleave: each data row followed by its detail row (if any)
+  let combined = '';
+  data.forEach((d, i) => {
+    combined += rowParts[i];
+    if (detailParts[i]) combined += detailParts[i];
+  });
+  tbody.innerHTML = combined;
+}
+
+function shToggle(detailId, btnId) {
+  const row = document.getElementById(detailId);
+  const btn = document.getElementById(btnId);
+  if (!row || !btn) return;
+  const isOpen = row.classList.contains('open');
+  row.classList.toggle('open', !isOpen);
+  btn.classList.toggle('expanded', !isOpen);
+  const poly = btn.querySelector('polyline');
+  if (poly) poly.setAttribute('points', isOpen ? '6 9 12 15 18 9' : '18 15 12 9 6 15');
 }
 
 // ─────────────────────────────────────────
@@ -2347,7 +2513,7 @@ async function initBalances() {
       }
     } catch (e) {
       if (e.name === 'AbortError') return;
-      ['bal-equity','bal-cash','bal-bp','bal-pv'].forEach(id => {
+      ['bal-equity','bal-cash','bal-bp','bal-pv','bal-upnl'].forEach(id => {
         document.getElementById(id).textContent = '—';
       });
       throw e;
@@ -2361,11 +2527,17 @@ async function initBalances() {
       tbody.innerHTML = '';
       if (!positions.length) {
         tbody.innerHTML = '<tr><td colspan="6" class="state-empty">No open holdings.</td></tr>';
+        const upnlEl = document.getElementById('bal-upnl');
+        if (upnlEl) { upnlEl.textContent = '—'; upnlEl.className = 'text-tabular'; }
+        const upnlSub = document.getElementById('bal-upnl-sub');
+        if (upnlSub) upnlSub.textContent = '';
         return;
       }
+      let totalPnl = 0;
       positions.forEach(p => {
         const tr = document.createElement('tr');
         const pnl = p.unrealized_pl || 0;
+        totalPnl += pnl;
         const fields = [p.symbol, (p.qty||0).toFixed(2), fmt.usd(p.avg_entry_price), fmt.usd(p.current_price), fmt.usd(p.market_value), ''];
         fields.forEach((v, i) => {
           const td = document.createElement('td');
@@ -2377,6 +2549,18 @@ async function initBalances() {
         });
         tbody.appendChild(tr);
       });
+      const upnlEl  = document.getElementById('bal-upnl');
+      const upnlSub = document.getElementById('bal-upnl-sub');
+      if (upnlEl) {
+        upnlEl.textContent = fmt.usdSigned(totalPnl, '—');
+        upnlEl.className = 'text-tabular ' + (totalPnl >= 0 ? 'text-green glow-green' : 'text-red glow-red');
+        upnlEl.style.fontSize = '22px';
+        upnlEl.style.fontWeight = '700';
+      }
+      if (upnlSub) {
+        upnlSub.textContent = positions.length ? (totalPnl >= 0 ? 'Open gain' : 'Open loss') : '';
+        upnlSub.style.color = totalPnl >= 0 ? 'var(--green)' : 'var(--red)';
+      }
     } catch (e) {
       if (e.name === 'AbortError') return;
       tbody.innerHTML = '<tr><td colspan="6" class="state-error">Failed to load — retrying in 30s</td></tr>';
@@ -3169,6 +3353,12 @@ async function initBacktesting() {
   } catch (e) {
     console.error('initBacktesting: failed to load history', e);
   }
+
+  // Auto-load a run if ?run=<id> is present (used by "View Backtest" links from Strategy Health)
+  const urlRun = new URLSearchParams(window.location.search).get('run');
+  if (urlRun) {
+    try { await loadRun(parseInt(urlRun, 10)); } catch (_) {}
+  }
 }
 
 function renderAdvancedParams(stratName) {
@@ -3374,10 +3564,22 @@ function renderHistory(runs) {
     return;
   }
   el.innerHTML = runs.map(r => {
-    const syms     = Array.isArray(r.symbols) ? r.symbols.join(', ') : r.symbols;
-    const label    = r.name || fmt.time(r.created_at);
-    const retColor = r.total_return_pct >= 0 ? 'var(--green)' : 'var(--red)';
-    const dateRange = (r.start_date && r.end_date) ? ` &middot; ${r.start_date} &rarr; ${r.end_date}` : '';
+    const syms      = Array.isArray(r.symbols) ? r.symbols.join(', ') : r.symbols;
+    const label     = r.name || fmt.time(r.created_at);
+    const retColor  = r.total_return_pct >= 0 ? 'var(--green)' : 'var(--red)';
+    const dateRange = (r.start_date && r.end_date)
+      ? ` &middot; ${r.start_date} &rarr; ${r.end_date}` : '';
+    const isBench   = !!r.is_benchmark;
+    const benchBtn  = `
+      <button class="bench-star-btn${isBench ? ' is-bench' : ''}"
+              onclick="setBenchmark(${r.id}, this)"
+              title="${isBench ? 'Current benchmark for this strategy' : 'Set as benchmark'}">
+        <svg width="11" height="11" fill="${isBench ? 'currentColor' : 'none'}"
+             stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+        </svg>
+        ${isBench ? 'Benchmark' : 'Set Benchmark'}
+      </button>`;
     return `<div style="display:flex;align-items:center;gap:10px;padding:.55rem 0;border-bottom:1px solid rgba(30,45,69,.7);">
       <div style="flex:1;min-width:0;">
         <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${label}</div>
@@ -3386,10 +3588,20 @@ function renderHistory(runs) {
       <div style="font-size:13px;color:${retColor};min-width:52px;text-align:right;">${fmt.pct(r.total_return_pct)}</div>
       <div style="font-size:12px;color:#EF4444;min-width:52px;text-align:right;">${fmt.pct(r.max_drawdown_pct)}</div>
       <div style="font-size:12px;color:var(--muted);min-width:42px;text-align:right;">${fmt.pct(r.win_rate_pct)}</div>
+      ${benchBtn}
       <button class="btn btn-sm btn-ghost" onclick="loadRun(${r.id})">Load</button>
       <button class="btn btn-sm btn-ghost" style="color:#EF4444;" onclick="deleteRun(${r.id})">Delete</button>
     </div>`;
   }).join('');
+}
+
+async function setBenchmark(runId, btn) {
+  try {
+    await api(`/api/backtest/runs/${runId}/set-benchmark`, { method: 'POST' });
+    renderHistory(await api('/api/backtest/runs'));
+  } catch (e) {
+    console.error('setBenchmark error', e);
+  }
 }
 
 async function loadRun(id) {
