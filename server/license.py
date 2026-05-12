@@ -74,5 +74,5 @@ def check_stored_license() -> dict:
     try:
         result = verify_key(key, _get_seller_secret())
         return {**result, "reason": ""}
-    except LicenseError as e:
+    except (LicenseError, RuntimeError) as e:
         return {"valid": False, "reason": str(e), "days_remaining": 0}
