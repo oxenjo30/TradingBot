@@ -2023,7 +2023,7 @@ async function initSettings() {
       deactBtn.style.display = 'block';
       deactBtn.onclick = async () => {
         if (!confirm('Deactivate license? The dashboard will become inaccessible.')) return;
-        await fetch('/api/license', { method: 'DELETE', headers: {'X-Token': document.cookie.match(/token=([^;]+)/)?.[1] || ''} });
+        await fetch('/api/license', { method: 'DELETE' });
         location.href = '/static/license.html';
       };
     }

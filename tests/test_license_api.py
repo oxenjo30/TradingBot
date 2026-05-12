@@ -39,3 +39,38 @@ def test_license_status_after_valid_key(client):
     r = client.post("/api/license/activate", json={"key": key})
     assert r.status_code == 200
     assert r.json()["valid"] is True
+
+
+def test_protected_route_returns_402_without_license(tmp_path, monkeypatch):
+    """A protected endpoint returns 402 when no license key is stored."""
+    import server.db as db_mod
+    monkeypatch.setenv("TRADEBOT_DB", str(tmp_path / "no_lic.db"))
+    db_mod.init_db()
+    # No license key stored, password not set so auth passes
+    import server.auth as auth_mod
+    monkeypatch.setattr(auth_mod, "password_is_set", lambda: False)
+    # Need a fresh client for this isolated DB
+    from fastapi.testclient import TestClient
+    from server.main import app as _app
+    c = TestClient(_app)
+    r = c.get("/api/positions")
+    assert r.status_code == 402
+
+
+def test_delete_license_deactivates(tmp_path, monkeypatch):
+    """DELETE /api/license clears the stored key."""
+    import server.db as db_mod
+    monkeypatch.setenv("TRADEBOT_DB", str(tmp_path / "deact.db"))
+    db_mod.init_db()
+    import server.auth as auth_mod
+    monkeypatch.setattr(auth_mod, "password_is_set", lambda: False)
+    import server.license as lic_mod
+    key = lic_mod.mint_key("test-secret-32-chars-seller-key!!", "ANY", 30)
+    db_mod.set_license_key(key)
+    from fastapi.testclient import TestClient
+    from server.main import app as _app
+    c = TestClient(_app)
+    r = c.delete("/api/license")
+    assert r.status_code == 200
+    assert r.json() == {"ok": True}
+    assert db_mod.get_license_key() == ""

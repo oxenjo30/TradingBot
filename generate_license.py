@@ -23,6 +23,9 @@ def main():
     print("License duration in days (e.g. 365): ", end="")
     try:
         days = int(input().strip())
+        if days <= 0:
+            print("Days must be a positive number.")
+            sys.exit(1)
     except ValueError:
         print("Invalid number.")
         sys.exit(1)
