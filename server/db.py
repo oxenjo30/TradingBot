@@ -214,6 +214,14 @@ def set_app_config(key: str, value: str):
         )
 
 
+def get_license_key() -> str:
+    return get_app_config("license_key", "")
+
+
+def set_license_key(key: str) -> None:
+    set_app_config("license_key", key)
+
+
 def get_notification_settings() -> dict:
     keys = ["email_enabled", "email_to", "email_smtp", "email_port",
             "email_user", "email_pass", "telegram_enabled",
