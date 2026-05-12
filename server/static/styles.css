@@ -1516,6 +1516,11 @@ button { cursor: pointer; font-family: inherit; }
   border-bottom-color: #FCD34D;
   color: #92400E;
 }
+[data-theme="light"] .sys-bar {
+  background: #F8FAFC;
+  border-top-color: var(--border);
+  color: var(--muted);
+}
 [data-theme="light"] .skeleton {
   background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%);
   background-size: 200% 100%;
