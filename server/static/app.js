@@ -2366,7 +2366,7 @@ async function initRisk() {
     btn.addEventListener('click', async () => {
       const key = btn.dataset.key;
       const val = document.getElementById(btn.dataset.source).value;
-      if (!val) return;
+      if (val === '' || val === null) return;
       btn.disabled = true;
       try {
         await api(`/api/risk/${key}`, {
