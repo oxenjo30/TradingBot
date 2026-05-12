@@ -90,6 +90,20 @@ class OrderIn(BaseModel):
     limit_price: float | None = Field(default=None, gt=0)
     side: Literal["buy", "sell"]
 
+class WebhookSignal(BaseModel):
+    symbol:     str
+    side:       Literal["buy", "sell"]
+    qty:        float | None = None
+    notional:   float | None = None
+    strategy:   str = "webhook"
+    account_id: int | None = None
+
+class AlertCreate(BaseModel):
+    symbol:       str
+    direction:    Literal["above", "below"]
+    target_price: float
+    note:         str = ""
+
 class StrategyUpdate(BaseModel):
     enabled: bool | None = None
     params: dict | None = None
@@ -483,6 +497,22 @@ def delete_broker_account(account_id: int, request: Request):
     return {"ok": True}
 
 
+@app.get("/api/broker-accounts/{account_id}/kill-switch")
+def get_account_kill_switch_route(account_id: int, request: Request):
+    _require_auth(request)
+    if not db.get_broker_account(account_id):
+        raise HTTPException(404, "account not found")
+    return {"account_id": account_id, "kill_switch": db.get_account_kill_switch(account_id)}
+
+@app.post("/api/broker-accounts/{account_id}/kill-switch")
+def set_account_kill_switch_route(account_id: int, request: Request, on: bool = True):
+    _require_auth(request)
+    if not db.get_broker_account(account_id):
+        raise HTTPException(404, "account not found")
+    db.set_account_kill_switch(account_id, on)
+    return {"account_id": account_id, "kill_switch": on}
+
+
 # ── Strategy Account Assignments ───────────────────────────────────────────────
 
 @app.get("/api/strategies/{name}/accounts")
@@ -548,6 +578,12 @@ def performance_data(request: Request):
         "total_unrealized_pl": total_upl,
         "unique_symbols":     all_symbols,
     }
+
+
+@app.get("/api/performance/by-account")
+def performance_by_account(request: Request):
+    _require_auth(request)
+    return db.performance_by_strategy_account()
 
 
 # ── Signals & Engine ───────────────────────────────────────────────────────────
@@ -620,6 +656,86 @@ def export_positions(request: Request, account_id: int | None = None):
         media_type="text/csv",
         headers={"Content-Disposition": "attachment; filename=tradebot_positions.csv"},
     )
+
+
+# ── Webhook ───────────────────────────────────────────────────────────────────
+
+@app.get("/api/webhook/token")
+def get_webhook_token_route(request: Request):
+    _require_auth(request)
+    token = db.get_webhook_token()
+    host  = str(request.base_url)
+    return {
+        "token":       token if token else None,
+        "configured":  bool(token),
+        "webhook_url": f"{host}api/webhook/signal",
+    }
+
+@app.post("/api/webhook/token/rotate")
+def rotate_webhook_token_route(request: Request):
+    _require_auth(request)
+    token = db.rotate_webhook_token()
+    return {"token": token}
+
+@app.post("/api/webhook/signal")
+def webhook_signal(body: WebhookSignal, request: Request):
+    """Accept external webhook signals. Auth via X-Webhook-Token header only."""
+    import hmac as _hmac
+    stored_token = db.get_webhook_token()
+    if not stored_token:
+        raise HTTPException(403, "Webhooks not configured. Generate a token in Settings first.")
+    incoming = request.headers.get("X-Webhook-Token", "")
+    if not _hmac.compare_digest(stored_token, incoming):
+        raise HTTPException(401, "Invalid webhook token.")
+
+    # Risk check + order submission
+    try:
+        acct_client = _get_account_client(body.account_id)
+        if acct_client:
+            acct_summary = acct_client.get_account_summary()
+        else:
+            acct_summary = alpaca_client.get_account_summary()
+        risk.check_all(body.symbol, body.side, acct_summary, 0, account_id=body.account_id)
+    except risk.RiskViolation as rv:
+        db.log_signal(body.strategy, body.symbol, body.side, body.qty or 0,
+                      f"webhook blocked: {rv}", blocked=True, account_id=body.account_id)
+        return {"status": "blocked", "reason": str(rv)}
+    except Exception as e:
+        raise HTTPException(502, f"Broker error: {e}")
+
+    try:
+        if acct_client:
+            result = acct_client.submit_market_order(body.symbol, body.side,
+                                                     qty=body.qty, notional=body.notional)
+        else:
+            result = alpaca_client.submit_market_order(body.symbol, body.side,
+                                                       qty=body.qty, notional=body.notional)
+        db.log_signal(body.strategy, body.symbol, body.side, body.qty or 0,
+                      "webhook signal executed", blocked=False, account_id=body.account_id)
+        return {"status": "executed", "order_id": result.get("id")}
+    except Exception as e:
+        raise HTTPException(502, f"Order submission failed: {e}")
+
+
+# ── Price Alerts ──────────────────────────────────────────────────────────────
+
+@app.get("/api/alerts")
+def list_alerts(request: Request, include_triggered: bool = False):
+    _require_auth(request)
+    return db.list_price_alerts(include_triggered=include_triggered)
+
+@app.post("/api/alerts", status_code=201)
+def create_alert(body: AlertCreate, request: Request):
+    _require_auth(request)
+    alert_id = db.create_price_alert(body.symbol, body.direction, body.target_price, body.note)
+    return {"id": alert_id, "symbol": body.symbol.upper(),
+            "direction": body.direction, "target_price": body.target_price,
+            "note": body.note, "triggered": 0}
+
+@app.delete("/api/alerts/{alert_id}", status_code=204)
+def delete_alert(alert_id: int, request: Request):
+    _require_auth(request)
+    db.delete_price_alert(alert_id)
 
 
 # ── Scanner ────────────────────────────────────────────────────────────────────

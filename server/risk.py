@@ -80,7 +80,8 @@ def _get_weekly_pl_pct(account: dict) -> float:
 # ── Pre-order checks ──────────────────────────────────────────────────────────
 
 def check_all(symbol: str, side: str, account: dict, day_trade_count: int,
-              open_positions_count: int = 0, current_symbol_value: float = 0.0):
+              open_positions_count: int = 0, current_symbol_value: float = 0.0,
+              notional: float = 0.0, qty: float = None, account_id: int | None = None):
     """
     Raises RiskViolation if any guard fails.
     Call before every auto-order submission.
@@ -89,12 +90,18 @@ def check_all(symbol: str, side: str, account: dict, day_trade_count: int,
     day_trade_count       — int from Alpaca account.daytrade_count
     open_positions_count  — number of currently open positions
     current_symbol_value  — current market value (USD) held in this symbol
+    account_id            — broker account id for per-account kill switch check
     """
     settings = get_settings()
 
     # 1. Kill switch
     if settings["kill_switch"]:
         raise RiskViolation("kill switch is active — all auto-trading halted")
+
+    # Per-account kill switch
+    if account_id is not None:
+        if db.get_account_kill_switch(account_id):
+            raise RiskViolation(f"account kill switch is ON for account {account_id}")
 
     # 2. Symbol blacklist
     blacklist = db.get_symbol_blacklist()
