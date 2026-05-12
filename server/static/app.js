@@ -315,9 +315,57 @@ async function initAccountModeBadge() {
   } catch { /* silently keep default paper state */ }
 }
 
+// ── Global search — navigates to relevant page ──────────────────────
+function initGlobalSearch() {
+  const bar = document.getElementById('global-search-bar');
+  if (!bar) return;
+  bar.addEventListener('click', () => {
+    const q = prompt('Search TradeBot (e.g. a symbol, page name):');
+    if (!q) return;
+    const t = q.trim().toUpperCase();
+    const pages = [
+      [/^(DASH|HOME|INDEX)/, '/static/index.html'],
+      [/^(POS|ORDER|HOLD)/, '/static/positions.html'],
+      [/^(BAL|CASH|FUND)/, '/static/balances.html'],
+      [/^(PERF|P&L|PNL)/, '/static/performance.html'],
+      [/^(BOT|STRAT)/, '/static/bots.html'],
+      [/^(RISK|GUARD)/, '/static/risk.html'],
+      [/^(LOG|SIG)/, '/static/logs.html'],
+      [/^(BACK|TEST)/, '/static/backtesting.html'],
+      [/^(KEY|API|BROKER|ACC)/, '/static/apikeys.html'],
+      [/^(SET|CONF)/, '/static/settings.html'],
+    ];
+    for (const [re, url] of pages) {
+      if (re.test(t)) { location.href = url; return; }
+    }
+    // Default: go to positions search if it looks like a ticker
+    if (/^[A-Z]{1,5}$/.test(t)) { location.href = `/static/positions.html`; return; }
+    alert('No matching page found. Try: dashboard, positions, logs, bots, risk, settings, backtesting, balances, performance, broker accounts.');
+  });
+}
+
+// ── Bell / notification indicator ───────────────────────────────────
+function initBellIndicator() {
+  const bell = document.getElementById('bell-btn');
+  const badge = document.getElementById('bell-badge');
+  if (!bell) return;
+  bell.addEventListener('click', () => { location.href = '/static/logs.html'; });
+  // Poll for unread signals
+  async function checkUnread() {
+    try {
+      const signals = await api('/api/signals?limit=5', { key: 'bell-check' });
+      if (badge && signals && signals.length > 0) badge.classList.remove('hidden');
+    } catch {}
+  }
+  checkUnread();
+  setInterval(checkUnread, 60_000);
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   setActiveNav();
   initAccountModeBadge();
+  initGlobalSearch();
+  initBellIndicator();
   const page = document.body.dataset.page;
   if (PAGE_INIT[page]) PAGE_INIT[page]();
 });
