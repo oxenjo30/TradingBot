@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>TradeBot &rdquo;&rdquo; Sign In</title>
+<title>TradeBot &mdash; Sign In</title>
 <link rel="icon" href="data:,">
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -377,7 +377,7 @@
   </div>
 
   <div class="error-box" id="error-msg">
-    š  <span id="error-text">Incorrect password &rdquo;&rdquo; please try again</span>
+    <span id="error-text">Incorrect password &mdash; please try again</span>
   </div>
 
   <form id="login-form" onsubmit="doLogin(event)" autocomplete="on">
@@ -389,7 +389,7 @@
     <button class="sign-btn" type="submit" id="login-btn">Sign In</button>
   </form>
 
-  <a class="footer-link" href="/setup">Forgot password? Re-run setup wizard †&rsquo;</a>
+  <a class="footer-link" href="/setup">Forgot password? Re-run setup wizard &rarr;</a>
 </div>
 
 <!-- Ticker tape -->
@@ -442,7 +442,7 @@ async function doLogin(e) {
       btn.style.background = 'linear-gradient(135deg,#16c784,#0fa066)';
       setTimeout(() => { window.location.href = '/static/index.html'; }, 400);
     } else {
-      document.getElementById('error-text').textContent = 'Incorrect password &rdquo;&rdquo; please try again';
+      document.getElementById('error-text').textContent = 'Incorrect password &mdash; please try again';
       errBox.style.display = 'block';
       btn.disabled = false;
       btn.innerHTML = 'Sign In';
@@ -450,7 +450,7 @@ async function doLogin(e) {
       document.getElementById('password').focus();
     }
   } catch {
-    document.getElementById('error-text').textContent = 'Cannot reach server &rdquo;&rdquo; is TradeBot running?';
+    document.getElementById('error-text').textContent = 'Cannot reach server &mdash; is TradeBot running?';
     errBox.style.display = 'block';
     btn.disabled = false;
     btn.innerHTML = 'Sign In';
