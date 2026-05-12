@@ -46,6 +46,12 @@ def run_tick():
     # Structure: {"client": AccountClient, "account": dict, "dtc": int, "positions": dict[str, float]}
     client_cache: dict[int, dict] = {}
 
+    from datetime import datetime, timezone
+    now_et = datetime.now(timezone.utc).astimezone(
+        __import__("zoneinfo", fromlist=["ZoneInfo"]).ZoneInfo("America/New_York")
+    )
+    now_time = now_et.strftime("%H:%M")
+
     for s in db.get_strategies():
         if not s["enabled"]:
             continue
@@ -54,6 +60,12 @@ def run_tick():
         cls = strategies.REGISTRY[s["name"]]
         if not cls.auto_trade:
             continue
+        # Per-strategy time window check (ET)
+        if s.get("active_start") and s.get("active_end"):
+            if not (s["active_start"] <= now_time <= s["active_end"]):
+                log.debug("strategy %s skipped — outside window %s–%s (now %s ET)",
+                          s["name"], s["active_start"], s["active_end"], now_time)
+                continue
 
         accounts = db.get_strategy_accounts(s["name"])
         if not accounts:

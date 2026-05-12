@@ -107,6 +107,8 @@ class AlertCreate(BaseModel):
 class StrategyUpdate(BaseModel):
     enabled: bool | None = None
     params: dict | None = None
+    active_start: str | None = None  # "HH:MM" or "" to clear
+    active_end:   str | None = None  # "HH:MM" or "" to clear
 
 class RiskSettingUpdate(BaseModel):
     value: str
@@ -368,8 +370,10 @@ def list_strategies():
         s = saved.get(cls.name)
         out.append({
             **cls.describe(),
-            "enabled": s["enabled"] if s else False,
-            "params": s["params"] if s else cls.default_params,
+            "enabled":      s["enabled"]      if s else False,
+            "params":       s["params"]       if s else cls.default_params,
+            "active_start": s["active_start"] if s else None,
+            "active_end":   s["active_end"]   if s else None,
         })
     return out
 
@@ -380,12 +384,19 @@ def update_strategy(name: str, body: StrategyUpdate, request: Request):
         raise HTTPException(404, "unknown strategy")
     current = db.get_strategy(name) or {
         "enabled": False, "params": strategies.REGISTRY[name].default_params,
+        "active_start": None, "active_end": None,
     }
     enabled = body.enabled if body.enabled is not None else current["enabled"]
-    params = current["params"]
+    params  = current["params"]
     if body.params is not None:
         params = {**params, **body.params}
-    db.upsert_strategy(name, enabled=enabled, params=params)
+    # "" means clear; None means keep existing
+    active_start = (body.active_start if body.active_start != ""
+                    else None) if body.active_start is not None else current.get("active_start")
+    active_end   = (body.active_end   if body.active_end   != ""
+                    else None) if body.active_end   is not None else current.get("active_end")
+    db.upsert_strategy(name, enabled=enabled, params=params,
+                       active_start=active_start, active_end=active_end)
     return db.get_strategy(name)
 
 

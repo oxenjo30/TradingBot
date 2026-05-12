@@ -196,6 +196,13 @@ def init_db():
         cols = [r[1] for r in c.execute("PRAGMA table_info(strategy_perf)")]
         if "account_id" not in cols:
             c.execute("ALTER TABLE strategy_perf ADD COLUMN account_id INTEGER DEFAULT NULL")
+    # Migration: add active_start / active_end to strategies if missing
+    with get_conn() as c:
+        cols = [r[1] for r in c.execute("PRAGMA table_info(strategies)")]
+        if "active_start" not in cols:
+            c.execute("ALTER TABLE strategies ADD COLUMN active_start TEXT DEFAULT NULL")
+        if "active_end" not in cols:
+            c.execute("ALTER TABLE strategies ADD COLUMN active_end TEXT DEFAULT NULL")
 
 
 def get_risk_settings() -> dict:
@@ -311,16 +318,20 @@ def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def upsert_strategy(name: str, enabled: bool, params: dict):
+def upsert_strategy(name: str, enabled: bool, params: dict,
+                    active_start: str | None = None, active_end: str | None = None):
     with get_conn() as c:
         c.execute(
-            """INSERT INTO strategies(name, enabled, params_json, updated_at)
-               VALUES(?,?,?,?)
+            """INSERT INTO strategies(name, enabled, params_json, active_start, active_end, updated_at)
+               VALUES(?,?,?,?,?,?)
                ON CONFLICT(name) DO UPDATE SET
                  enabled=excluded.enabled,
                  params_json=excluded.params_json,
+                 active_start=excluded.active_start,
+                 active_end=excluded.active_end,
                  updated_at=excluded.updated_at""",
-            (name, 1 if enabled else 0, json.dumps(params), now_iso()),
+            (name, 1 if enabled else 0, json.dumps(params),
+             active_start or None, active_end or None, now_iso()),
         )
 
 
@@ -329,10 +340,12 @@ def get_strategies() -> list[dict]:
         rows = c.execute("SELECT * FROM strategies ORDER BY name").fetchall()
     return [
         {
-            "name": r["name"],
-            "enabled": bool(r["enabled"]),
-            "params": json.loads(r["params_json"]),
-            "updated_at": r["updated_at"],
+            "name":         r["name"],
+            "enabled":      bool(r["enabled"]),
+            "params":       json.loads(r["params_json"]),
+            "active_start": r["active_start"],
+            "active_end":   r["active_end"],
+            "updated_at":   r["updated_at"],
         }
         for r in rows
     ]
@@ -344,10 +357,12 @@ def get_strategy(name: str) -> dict | None:
     if not r:
         return None
     return {
-        "name": r["name"],
-        "enabled": bool(r["enabled"]),
-        "params": json.loads(r["params_json"]),
-        "updated_at": r["updated_at"],
+        "name":         r["name"],
+        "enabled":      bool(r["enabled"]),
+        "params":       json.loads(r["params_json"]),
+        "active_start": r["active_start"],
+        "active_end":   r["active_end"],
+        "updated_at":   r["updated_at"],
     }
 
 
