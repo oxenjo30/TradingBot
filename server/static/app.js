@@ -2293,6 +2293,13 @@ async function initLogs() {
     });
   });
 
+  document.getElementById('export-trades-btn')?.addEventListener('click', () => {
+    const a = document.createElement('a');
+    a.href = '/api/export/trades?limit=5000';
+    a.download = 'tradebot_trades.csv';
+    a.click();
+  });
+
   createPoller(fetchSignals, 30_000).start();
 }
 
