@@ -71,18 +71,17 @@ def _worker():
     while True:
         item = _Q.get()
         if item is None:
+            _Q.task_done()
             break
         signal_id, sig = item
-        if not _explanations_enabled():
-            _Q.task_done()
-            continue
         try:
-            prompt = _build_prompt(sig)
-            explanation = _call_ollama(prompt)
-            if explanation:
-                db.set_signal_explanation(signal_id, explanation)
-            else:
-                log.debug("Ollama unreachable or empty response for signal %d", signal_id)
+            if _explanations_enabled():
+                prompt = _build_prompt(sig)
+                explanation = _call_ollama(prompt)
+                if explanation:
+                    db.set_signal_explanation(signal_id, explanation)
+                else:
+                    log.debug("Ollama unreachable or empty response for signal %d", signal_id)
         except Exception:
             log.exception("Explainer worker error for signal %d", signal_id)
         finally:
@@ -119,10 +118,13 @@ def enqueue(sig: dict) -> None:
     except queue.Full:
         try:
             _Q.get_nowait()
-            _Q.put_nowait((signal_id, sig))
-            log.warning("Explanation queue full — dropped oldest item")
         except queue.Empty:
             pass
+        try:
+            _Q.put_nowait((signal_id, sig))
+            log.warning("Explanation queue full — dropped oldest item")
+        except queue.Full:
+            log.warning("Explanation queue full — could not enqueue signal %d", signal_id)
 
 
 def ollama_status() -> dict:
