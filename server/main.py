@@ -92,6 +92,7 @@ class OrderIn(BaseModel):
     notional: float | None = Field(default=None, gt=0)
     limit_price: float | None = Field(default=None, gt=0)
     side: Literal["buy", "sell"]
+    account_id: int | None = None
 
 class WebhookSignal(BaseModel):
     symbol:     str
@@ -100,6 +101,22 @@ class WebhookSignal(BaseModel):
     notional:   float | None = None
     strategy:   str = "webhook"
     account_id: int | None = None
+
+def _get_broker_client(account_id: int | None):
+    """Return a broker client for the given account_id, or fall back to the global alpaca client."""
+    if account_id is None:
+        return alpaca_client
+    acct = db.get_broker_account_credentials(account_id)
+    if not acct:
+        raise HTTPException(404, f"Account {account_id} not found")
+    from .broker_factory import get_account_client
+    return get_account_client(
+        broker=acct.get("broker", "alpaca"),
+        api_key=crypto.decrypt(acct["api_key"]),
+        api_secret=crypto.decrypt(acct["api_secret"]),
+        paper=(acct["account_type"] == "paper"),
+    )
+
 
 class AlertCreate(BaseModel):
     symbol:       str
@@ -287,62 +304,74 @@ def clock():
     return alpaca_client.get_clock()
 
 @app.get("/api/positions")
-def positions(request: Request):
+def positions(request: Request, account_id: int | None = None):
     _require_auth(request)
-    return alpaca_client.get_positions()
+    return _get_broker_client(account_id).get_positions()
 
 @app.get("/api/orders")
-def orders(request: Request, status: str = "all", limit: int = 50):
+def orders(request: Request, status: str = "all", limit: int = 50, account_id: int | None = None):
     _require_auth(request)
-    return alpaca_client.get_orders(limit=limit, status=status)
+    return _get_broker_client(account_id).get_orders(limit=limit, status=status)
 
 @app.post("/api/orders")
 def submit_order(o: OrderIn, request: Request):
     _require_auth(request)
+    client = _get_broker_client(o.account_id)
     try:
         sym = o.symbol.upper()
         if o.limit_price and o.qty:
-            result = alpaca_client.submit_limit_order(sym, o.side, o.qty, o.limit_price)
+            result = client.submit_limit_order(sym, o.side, o.qty, o.limit_price)
             label = f"manual limit @${o.limit_price:.2f}"
         else:
-            result = alpaca_client.submit_market_order(sym, o.side, qty=o.qty, notional=o.notional)
+            result = client.submit_market_order(sym, o.side, qty=o.qty, notional=o.notional)
             label = f"manual ${o.notional:.2f}" if o.notional else "manual order"
         display = o.notional if o.notional else o.qty
-        db.log_signal("manual", sym, o.side, display, label, result["id"], result["status"])
+        db.log_signal("manual", sym, o.side, display, label, result["id"], result["status"],
+                      account_id=o.account_id)
         if o.notional:
             notifications.notify_trade("manual", sym, o.side, None, o.notional, label, result["id"])
         return result
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(400, str(e))
 
 @app.delete("/api/orders/{order_id}")
-def cancel(order_id: str, request: Request):
+def cancel(order_id: str, request: Request, account_id: int | None = None):
     _require_auth(request)
     try:
-        alpaca_client.cancel_order(order_id)
+        _get_broker_client(account_id).cancel_order(order_id)
         return {"ok": True}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(400, str(e))
 
 @app.delete("/api/orders")
-def cancel_all(request: Request):
+def cancel_all(request: Request, account_id: int | None = None):
     _require_auth(request)
-    alpaca_client.cancel_all_orders()
+    client = _get_broker_client(account_id)
+    if hasattr(client, "cancel_all_orders"):
+        client.cancel_all_orders()
     return {"ok": True}
 
 @app.delete("/api/positions/{symbol}")
-def close_pos(symbol: str, request: Request):
+def close_pos(symbol: str, request: Request, account_id: int | None = None):
     _require_auth(request)
     try:
-        alpaca_client.close_position(symbol)
+        _get_broker_client(account_id).close_position(symbol)
         return {"ok": True}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(400, str(e))
 
 @app.delete("/api/positions")
-def close_all(request: Request):
+def close_all(request: Request, account_id: int | None = None):
     _require_auth(request)
-    alpaca_client.close_all_positions()
+    client = _get_broker_client(account_id)
+    if hasattr(client, "close_all_positions"):
+        client.close_all_positions()
     return {"ok": True}
 
 @app.get("/api/quote/{symbol}")
