@@ -117,12 +117,13 @@ def run_tick():
                         sig.symbol, sig.side, account, acct_data["dtc"],
                         open_positions_count=len(acct_data["positions"]),
                         current_symbol_value=acct_data["market_values"].get(sig.symbol, 0.0),
+                        account_id=acct_id,
                     )
                 except risk.RiskViolation as rv:
                     reason = f"RISK BLOCK: {rv}"
                     log.warning("%s %s blocked — %s", sig.side, sig.symbol, rv)
                     db.log_signal(s["name"], sig.symbol, sig.side, sig.qty,
-                                  reason, None, "blocked")
+                                  reason, None, "blocked", blocked=True, account_id=acct_id)
                     _last_run["signals"].append({
                         "strategy": s["name"], "symbol": sig.symbol,
                         "side": sig.side, "qty": sig.qty,
@@ -162,7 +163,7 @@ def run_tick():
                     )
                     display_qty = final_qty if not sig.notional else sig.notional
                     db.log_signal(s["name"], sig.symbol, sig.side, display_qty,
-                                  sig.reason, order["id"], order["status"])
+                                  sig.reason, order["id"], order["status"], account_id=acct_id)
                     notifications.notify_trade(
                         s["name"], sig.symbol, sig.side,
                         final_qty, sig.notional, sig.reason, order["id"]
@@ -189,7 +190,51 @@ def run_tick():
                                   sig.symbol, sig.side, final_qty)
                     db.increment_consecutive_losses()
                     db.log_signal(s["name"], sig.symbol, sig.side, final_qty,
-                                  f"{sig.reason} | submit error: {e}", None, "error")
+                                  f"{sig.reason} | submit error: {e}", None, "error",
+                                  account_id=acct_id)
+
+    # Check price alerts using quotes fetched during this tick
+    try:
+        symbols = list({
+            sig.symbol
+            for s in db.get_strategies() if s["enabled"]
+            for acct in db.get_strategy_accounts(s["name"])
+            for sig in []  # placeholder — use known active symbols from cache
+        })
+        quote_prices = {}
+        for acct_data in client_cache.values():
+            for sym in list(acct_data.get("positions", {}).keys()):
+                if sym not in quote_prices:
+                    try:
+                        q = alpaca_client.get_latest_quote(sym)
+                        mid = (q["bid"] + q["ask"]) / 2 if q["bid"] and q["ask"] else q["bid"] or q["ask"]
+                        if mid:
+                            quote_prices[sym] = mid
+                    except Exception:
+                        pass
+        if quote_prices:
+            check_price_alerts(quote_prices)
+    except Exception as e:
+        log.warning("price alert check failed: %s", e)
+
+
+def check_price_alerts(prices: dict) -> None:
+    """Check open price alerts against current prices and fire notifications on trigger."""
+    alerts = db.list_price_alerts(include_triggered=False)
+    for alert in alerts:
+        symbol = alert["symbol"]
+        price  = prices.get(symbol)
+        if price is None:
+            continue
+        target = float(alert["target_price"])
+        fired  = False
+        if alert["direction"] == "above" and price >= target:
+            fired = True
+        elif alert["direction"] == "below" and price <= target:
+            fired = True
+        if fired:
+            db.trigger_price_alert(alert["id"])
+            notifications.notify_price_alert(symbol, alert["direction"], target, price)
 
 
 def last_run() -> dict:

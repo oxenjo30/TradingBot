@@ -121,6 +121,45 @@ def _send_telegram(text: str):
         log.warning("telegram failed: %s", e)
 
 
+# ── Slack ──────────────────────────────────────────────────────────────────────
+
+def send_slack_direct(webhook_url: str, text: str):
+    """POST a message to a Slack incoming webhook URL."""
+    try:
+        r = httpx.post(webhook_url, json={"text": text}, timeout=10)
+        r.raise_for_status()
+        log.info("slack sent")
+    except Exception as e:
+        log.warning("slack failed: %s", e)
+        raise
+
+def _send_slack(text: str):
+    s = _settings()
+    if not s.get("slack_enabled") or not s.get("slack_webhook_url"):
+        return
+    _send_async(send_slack_direct, s["slack_webhook_url"], text)
+
+
+# ── Discord ───────────────────────────────────────────────────────────────────
+
+def send_discord_direct(webhook_url: str, content: str):
+    """POST a message to a Discord webhook URL."""
+    try:
+        r = httpx.post(webhook_url, json={"content": content}, timeout=10)
+        if r.status_code not in (200, 204):
+            r.raise_for_status()
+        log.info("discord sent")
+    except Exception as e:
+        log.warning("discord failed: %s", e)
+        raise
+
+def _send_discord(text: str):
+    s = _settings()
+    if not s.get("discord_enabled") or not s.get("discord_webhook_url"):
+        return
+    _send_async(send_discord_direct, s["discord_webhook_url"], text)
+
+
 # ── Public API ────────────────────────────────────────────────────────────────
 
 def notify_trade(strategy: str, symbol: str, side: str, qty,
@@ -146,8 +185,11 @@ def notify_trade(strategy: str, symbol: str, side: str, qty,
     </div>"""
 
     tg = f"{side_emoji} <b>{symbol}</b> — {amount}\n📋 {strategy}\n💬 {reason}"
+    plain = f"TradeBot | {side_emoji} {symbol} — {amount} [{strategy}]"
     _send_async(_send_email, subject, html)
     _send_async(_send_telegram, tg)
+    _send_async(_send_slack, plain)
+    _send_async(_send_discord, plain)
 
 
 def notify_risk_block(symbol: str, side: str, reason: str):
@@ -163,8 +205,11 @@ def notify_risk_block(symbol: str, side: str, reason: str):
       <p style="color:#888">{reason}</p>
     </div>"""
     tg = f"⚠️ <b>Trade Blocked</b>\n{side.upper()} {symbol}\n{reason}"
+    plain = f"TradeBot | BLOCKED {side.upper()} {symbol}: {reason}"
     _send_async(_send_email, subject, html)
     _send_async(_send_telegram, tg)
+    _send_async(_send_slack, plain)
+    _send_async(_send_discord, plain)
 
 
 def notify_kill_switch(day_pl_pct: float):
@@ -221,3 +266,19 @@ def send_daily_summary(account: dict, signals_today: list):
     tg = f"{emoji} <b>Daily Summary</b>\nEquity: ${eq:,.2f}\nDay P&L: {sign}${abs(pl):,.2f} ({sign}{plp:.2f}%)\nTrades: {len(signals_today)}"
     _send_async(_send_email, subject, html)
     _send_async(_send_telegram, tg)
+
+
+def notify_price_alert(symbol: str, direction: str, target: float, current_price: float):
+    msg = (f"TradeBot | Price Alert: {symbol} is {direction} ${target:.2f} "
+           f"(current: ${current_price:.2f})")
+    subject = f"Price Alert: {symbol} {direction} ${target:.2f}"
+    html = f"""
+    <div style="font-family:sans-serif">
+      <h2>🔔 Price Alert Triggered</h2>
+      <p><b>{symbol}</b> is now {direction} ${target:.2f}</p>
+      <p>Current price: <b>${current_price:.2f}</b></p>
+    </div>"""
+    _send_async(_send_email, subject, html)
+    _send_async(_send_telegram, f"🔔 <b>Price Alert</b>\n{msg}")
+    _send_async(_send_slack, msg)
+    _send_async(_send_discord, msg)

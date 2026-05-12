@@ -96,6 +96,23 @@ CREATE TABLE IF NOT EXISTS backtest_runs (
   equity_curve      TEXT,
   trades            TEXT
 );
+
+CREATE TABLE IF NOT EXISTS account_settings (
+  account_id  INTEGER PRIMARY KEY REFERENCES broker_accounts(id) ON DELETE CASCADE,
+  kill_switch INTEGER NOT NULL DEFAULT 0,
+  updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS price_alerts (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  symbol       TEXT NOT NULL,
+  direction    TEXT NOT NULL CHECK(direction IN ('above', 'below')),
+  target_price REAL NOT NULL,
+  note         TEXT NOT NULL DEFAULT '',
+  triggered    INTEGER NOT NULL DEFAULT 0,
+  triggered_at TEXT,
+  created_at   TEXT NOT NULL DEFAULT (datetime('now'))
+);
 """
 
 RISK_DEFAULTS = {
@@ -167,6 +184,18 @@ def init_db():
             )
     _migrate_broker_column()
     _migrate_env_account()
+    # Migration: add account_id to signals if missing
+    with get_conn() as c:
+        cols = [r[1] for r in c.execute("PRAGMA table_info(signals)")]
+        if "account_id" not in cols:
+            c.execute("ALTER TABLE signals ADD COLUMN account_id INTEGER DEFAULT NULL")
+        if "blocked" not in cols:
+            c.execute("ALTER TABLE signals ADD COLUMN blocked INTEGER NOT NULL DEFAULT 0")
+    # Migration: add account_id to strategy_perf if missing
+    with get_conn() as c:
+        cols = [r[1] for r in c.execute("PRAGMA table_info(strategy_perf)")]
+        if "account_id" not in cols:
+            c.execute("ALTER TABLE strategy_perf ADD COLUMN account_id INTEGER DEFAULT NULL")
 
 
 def get_risk_settings() -> dict:
@@ -222,19 +251,46 @@ def set_license_key(key: str) -> None:
     set_app_config("license_key", key)
 
 
+def get_webhook_token() -> str:
+    return get_app_config("webhook_token", "")
+
+def set_webhook_token(token: str) -> None:
+    set_app_config("webhook_token", token)
+
+def rotate_webhook_token() -> str:
+    import secrets
+    token = secrets.token_hex(32)
+    set_webhook_token(token)
+    return token
+
+
 def get_notification_settings() -> dict:
-    keys = ["email_enabled", "email_to", "email_smtp", "email_port",
-            "email_user", "email_pass", "telegram_enabled",
-            "telegram_token", "telegram_chat_id", "notify_on_trade",
-            "notify_on_block", "notify_daily_summary"]
+    keys = [
+        "email_enabled", "email_to", "email_smtp", "email_port",
+        "email_user", "email_pass", "telegram_enabled",
+        "telegram_token", "telegram_chat_id",
+        "slack_enabled", "slack_webhook_url",
+        "discord_enabled", "discord_webhook_url",
+        "notify_on_trade", "notify_on_block", "notify_daily_summary",
+    ]
+    defaults = {
+        "email_enabled": "false", "email_port": "587",
+        "telegram_enabled": "false",
+        "slack_enabled": "false", "slack_webhook_url": "",
+        "discord_enabled": "false", "discord_webhook_url": "",
+        "notify_on_trade": "true", "notify_on_block": "true", "notify_daily_summary": "false",
+    }
     with get_conn() as c:
-        rows = c.execute("SELECT key, value FROM app_config WHERE key IN ({})".format(
-            ",".join("?" * len(keys))), keys).fetchall()
-    result = {k: "" for k in keys}
+        rows = c.execute(
+            "SELECT key, value FROM app_config WHERE key IN ({})".format(
+                ",".join("?" * len(keys))
+            ),
+            keys,
+        ).fetchall()
+    result = dict(defaults)
     result.update({r["key"]: r["value"] for r in rows})
-    # booleans
-    for bk in ["email_enabled", "telegram_enabled", "notify_on_trade",
-                "notify_on_block", "notify_daily_summary"]:
+    for bk in ["email_enabled", "telegram_enabled", "slack_enabled", "discord_enabled",
+                "notify_on_trade", "notify_on_block", "notify_daily_summary"]:
         result[bk] = result.get(bk, "") == "true"
     return result
 
@@ -296,12 +352,13 @@ def get_strategy(name: str) -> dict | None:
 
 
 def log_signal(strategy: str, symbol: str, side: str, qty: float, reason: str,
-               order_id: str | None, status: str):
+               order_id: str | None = None, status: str = "ok",
+               blocked: bool = False, account_id: int | None = None):
     with get_conn() as c:
         c.execute(
-            """INSERT INTO signals(ts, strategy, symbol, side, qty, reason, order_id, status)
-               VALUES(?,?,?,?,?,?,?,?)""",
-            (now_iso(), strategy, symbol, side, qty, reason, order_id, status),
+            """INSERT INTO signals(ts, strategy, symbol, side, qty, reason, order_id, status, blocked, account_id)
+               VALUES(?,?,?,?,?,?,?,?,?,?)""",
+            (now_iso(), strategy, symbol, side, qty, reason, order_id, status, int(blocked), account_id),
         )
 
 
@@ -333,6 +390,26 @@ def performance_by_strategy() -> list[dict]:
             WHERE strategy != 'manual'
             GROUP BY strategy
             ORDER BY total DESC
+        """).fetchall()
+    return [dict(r) for r in rows]
+
+
+def performance_by_strategy_account() -> list[dict]:
+    """P&L grouped by (strategy, account_id) for attribution table."""
+    with get_conn() as c:
+        rows = c.execute("""
+            SELECT
+                s.strategy,
+                s.account_id,
+                ba.label  AS account_label,
+                COUNT(*)  AS total_signals,
+                SUM(CASE WHEN s.blocked=0 THEN 1 ELSE 0 END) AS executed,
+                SUM(CASE WHEN s.blocked=1 THEN 1 ELSE 0 END) AS blocked
+            FROM signals s
+            LEFT JOIN broker_accounts ba ON ba.id = s.account_id
+            WHERE s.strategy != 'manual'
+            GROUP BY s.strategy, s.account_id
+            ORDER BY s.strategy, s.account_id
         """).fetchall()
     return [dict(r) for r in rows]
 
@@ -518,6 +595,32 @@ def get_account_strategy_assignments(account_id: int) -> dict[str, bool]:
         return {r["strategy_name"]: bool(r["enabled"]) for r in rows}
 
 
+# ── Per-account kill switch ────────────────────────────────────────────────────
+
+def get_account_kill_switch(account_id: int) -> bool:
+    with get_conn() as c:
+        row = c.execute(
+            "SELECT kill_switch FROM account_settings WHERE account_id=?",
+            (account_id,)
+        ).fetchone()
+    return bool(row["kill_switch"]) if row else False
+
+def set_account_kill_switch(account_id: int, on: bool) -> None:
+    with get_conn() as c:
+        c.execute(
+            """INSERT INTO account_settings(account_id, kill_switch, updated_at)
+               VALUES(?, ?, datetime('now'))
+               ON CONFLICT(account_id) DO UPDATE
+               SET kill_switch=excluded.kill_switch, updated_at=excluded.updated_at""",
+            (account_id, 1 if on else 0)
+        )
+
+def get_all_account_kill_switches() -> dict[int, bool]:
+    with get_conn() as c:
+        rows = c.execute("SELECT account_id, kill_switch FROM account_settings").fetchall()
+    return {r["account_id"]: bool(r["kill_switch"]) for r in rows}
+
+
 # ── Symbol Blacklist ───────────────────────────────────────────────────────────
 
 def get_symbol_blacklist() -> list[str]:
@@ -534,6 +637,38 @@ def add_symbol_to_blacklist(symbol: str) -> None:
 def remove_symbol_from_blacklist(symbol: str) -> None:
     with get_conn() as c:
         c.execute("DELETE FROM symbol_blacklist WHERE symbol=?", (symbol.upper(),))
+
+
+# ── Price Alerts ───────────────────────────────────────────────────────────────
+
+def create_price_alert(symbol: str, direction: str, target_price: float, note: str = "") -> int:
+    with get_conn() as c:
+        cur = c.execute(
+            """INSERT INTO price_alerts(symbol, direction, target_price, note)
+               VALUES(?, ?, ?, ?)""",
+            (symbol.upper(), direction, target_price, note)
+        )
+    return cur.lastrowid
+
+def list_price_alerts(include_triggered: bool = False) -> list[dict]:
+    sql = "SELECT * FROM price_alerts"
+    if not include_triggered:
+        sql += " WHERE triggered = 0"
+    sql += " ORDER BY created_at DESC"
+    with get_conn() as c:
+        rows = c.execute(sql).fetchall()
+    return [dict(r) for r in rows]
+
+def delete_price_alert(alert_id: int) -> None:
+    with get_conn() as c:
+        c.execute("DELETE FROM price_alerts WHERE id=?", (alert_id,))
+
+def trigger_price_alert(alert_id: int) -> None:
+    with get_conn() as c:
+        c.execute(
+            "UPDATE price_alerts SET triggered=1, triggered_at=datetime('now') WHERE id=?",
+            (alert_id,)
+        )
 
 
 # ── Extended risk helpers ──────────────────────────────────────────────────────
