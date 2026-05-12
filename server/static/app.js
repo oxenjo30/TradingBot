@@ -1,4 +1,4 @@
-/* ─────────────────────────────────────────
+﻿/* ─────────────────────────────────────────
    TradeBot Dashboard — app.js
    All page-specific init functions follow
    the core utilities section.
@@ -1518,26 +1518,39 @@ async function initPositions() {
 
   // ── Manual order ticket ──────────────────────────────────────────────
   let moSide = 'buy';
-  const buyBtn       = document.getElementById('mo-buy-btn');
-  const sellBtn      = document.getElementById('mo-sell-btn');
-  const submitBtn    = document.getElementById('mo-submit');
-  const modeQtyBtn   = document.getElementById('mo-mode-qty');
+  let moMidPrice = 0;
+
+  const buyBtn          = document.getElementById('mo-buy-btn');
+  const sellBtn         = document.getElementById('mo-sell-btn');
+  const submitBtn       = document.getElementById('mo-submit');
+  const modeQtyBtn      = document.getElementById('mo-mode-qty');
   const modeNotionalBtn = document.getElementById('mo-mode-notional');
-  const qtyLabel     = document.getElementById('mo-qty-label');
-  const symInput     = document.getElementById('mo-sym-input');
-  const qtyInput     = document.getElementById('mo-qty-input');
-  const priceInput   = document.getElementById('mo-price-input');
-  const priceWrap    = document.getElementById('mo-price-wrap');
-  const resultEl     = document.getElementById('mo-result');
+  const qtyLabel        = document.getElementById('mo-qty-label');
+  const symInput        = document.getElementById('mo-sym-input');
+  const qtyInput        = document.getElementById('mo-qty-input');
+  const priceInput      = document.getElementById('mo-price-input');
+  const priceWrap       = document.getElementById('mo-price-wrap');
+  const resultEl        = document.getElementById('mo-result');
+  const estTotal        = document.getElementById('mo-est-total');
+  const quoteDisplay    = document.getElementById('mo-quote-display');
+
+  function updateEstTotal() {
+    if (!estTotal) return;
+    const qty = parseFloat(qtyInput?.value) || 0;
+    if (!qty || !moMidPrice || !modeIsQty) { estTotal.textContent = ''; return; }
+    const limitVal = parseFloat(priceInput?.value) || moMidPrice;
+    const est = qty * limitVal;
+    estTotal.textContent = '≈ $' + est.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
 
   function setMoSide(side) {
     moSide = side;
     const isBuy = side === 'buy';
-    buyBtn?.classList.toggle('mo-tab-active', isBuy);
-    sellBtn?.classList.toggle('mo-tab-active', !isBuy);
+    buyBtn?.classList.toggle('mot-tab-active', isBuy);
+    sellBtn?.classList.toggle('mot-tab-active', !isBuy);
     if (submitBtn) {
-      submitBtn.classList.toggle('mo-submit-buy',  isBuy);
-      submitBtn.classList.toggle('mo-submit-sell', !isBuy);
+      submitBtn.classList.toggle('mot-submit-buy',  isBuy);
+      submitBtn.classList.toggle('mot-submit-sell', !isBuy);
       submitBtn.innerHTML = isBuy
         ? '<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg> Place Buy Order'
         : '<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></svg> Place Sell Order';
@@ -1550,58 +1563,60 @@ async function initPositions() {
   let modeIsQty = true;
   function setMoMode(isQty) {
     modeIsQty = isQty;
-    modeQtyBtn?.classList.toggle('mo-mode-active', isQty);
-    modeNotionalBtn?.classList.toggle('mo-mode-active', !isQty);
+    modeQtyBtn?.classList.toggle('mot-toggle-active', isQty);
+    modeNotionalBtn?.classList.toggle('mot-toggle-active', !isQty);
     if (isQty) {
-      qtyLabel.textContent = 'Number of Shares';
-      qtyInput.placeholder = '0';
-      qtyInput.step = 'any';
+      if (qtyLabel) qtyLabel.textContent = 'Shares';
+      if (qtyInput) { qtyInput.placeholder = '0'; qtyInput.step = 'any'; }
       if (priceWrap) priceWrap.style.display = '';
     } else {
-      qtyLabel.textContent = 'USD Value';
-      qtyInput.placeholder = '0.00';
-      qtyInput.step = '0.01';
+      if (qtyLabel) qtyLabel.textContent = 'USD Value';
+      if (qtyInput) { qtyInput.placeholder = '0.00'; qtyInput.step = '0.01'; }
       if (priceWrap) priceWrap.style.display = 'none';
       if (priceInput) priceInput.value = '';
     }
+    updateEstTotal();
   }
   modeQtyBtn?.addEventListener('click',      () => setMoMode(true));
   modeNotionalBtn?.addEventListener('click', () => setMoMode(false));
 
-  const quoteDisplay = document.getElementById('mo-quote-display');
   let quoteTimer = null;
 
   async function fetchQuote(sym) {
     if (!quoteDisplay || !sym) return;
-    quoteDisplay.style.display = '';
     quoteDisplay.textContent = 'Fetching price…';
-    quoteDisplay.style.color = '#64748B';
+    moMidPrice = 0;
     try {
-      const res = await fetch(`/api/quote/${encodeURIComponent(sym)}`);
+      const res = await fetch('/api/quote/' + encodeURIComponent(sym));
       if (!res.ok) throw new Error('not found');
       const q = await res.json();
       const bid = parseFloat(q.bid) || 0;
       const ask = parseFloat(q.ask) || 0;
       const mid = bid && ask ? (bid + ask) / 2 : bid || ask;
       if (!mid) { quoteDisplay.textContent = 'No quote available'; return; }
-      const midStr = `$${mid.toFixed(2)}`;
-      const bidStr = bid ? `bid $${bid.toFixed(2)}` : '';
-      const askStr = ask ? `ask $${ask.toFixed(2)}` : '';
-      const detail = [bidStr, askStr].filter(Boolean).join('  ');
-      quoteDisplay.innerHTML = `<span style="color:#E6EBF5;font-weight:700;">${midStr}</span>${detail ? '  ' + detail : ''}`;
-      quoteDisplay.style.color = '#64748B';
+      moMidPrice = mid;
+      const chg = q.change_pct != null ? parseFloat(q.change_pct) : null;
+      const chgColor = chg != null && chg >= 0 ? '#10B981' : '#EF4444';
+      const chgStr = chg != null ? '<span style="color:' + chgColor + ';font-weight:700;margin-left:6px;">' + (chg >= 0 ? '+' : '') + chg.toFixed(2) + '%</span>' : '';
+      quoteDisplay.innerHTML = '<span style="color:#E6EBF5;font-size:14px;font-weight:800;">$' + mid.toFixed(2) + '</span>' + chgStr + '<span style="color:#475569;margin-left:6px;font-size:11px;">mid &middot; bid $' + bid.toFixed(2) + ' &middot; ask $' + ask.toFixed(2) + '</span>';
       if (priceInput && !priceInput.value) priceInput.value = mid.toFixed(2);
+      updateEstTotal();
     } catch {
-      quoteDisplay.textContent = 'Symbol not found';
-      quoteDisplay.style.color = '#EF4444';
+      quoteDisplay.innerHTML = '<span style="color:#EF4444;">Symbol not found</span>';
+      moMidPrice = 0;
     }
   }
+
+  qtyInput?.addEventListener('input', updateEstTotal);
+  priceInput?.addEventListener('input', updateEstTotal);
 
   symInput?.addEventListener('input', () => {
     symInput.value = symInput.value.toUpperCase();
     clearTimeout(quoteTimer);
     if (priceInput) priceInput.value = '';
-    quoteDisplay.style.display = 'none';
+    if (quoteDisplay) quoteDisplay.textContent = '';
+    moMidPrice = 0;
+    updateEstTotal();
     const sym = symInput.value.trim();
     if (sym.length >= 1) quoteTimer = setTimeout(() => fetchQuote(sym), 600);
   });
@@ -1941,16 +1956,16 @@ async function initRisk() {
     if (on) {
       card.style.borderColor = 'rgba(239,68,68,.6)';
       card.style.background = 'rgba(239,68,68,.07)';
-      badge.className = 'badge b-error';
-      badge.textContent = 'ACTIVE';
-      btn.textContent = 'Deactivate Kill Switch';
+      badge.className = 'ks-badge2 ks-badge-on';
+      badge.innerHTML = '<span style="width:6px;height:6px;border-radius:50%;background:#EF4444;box-shadow:0 0 6px rgba(239,68,68,.6);display:inline-block;"></span>ACTIVE';
+      btn.innerHTML = '<svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg> Deactivate';
       btn.className = 'btn btn-ghost';
     } else {
       card.style.borderColor = 'rgba(239,68,68,.25)';
       card.style.background = '';
-      badge.className = 'badge b-disabled';
-      badge.textContent = 'OFF';
-      btn.textContent = 'Activate Kill Switch';
+      badge.className = 'ks-badge2 ks-badge-off';
+      badge.innerHTML = '<span style="width:6px;height:6px;border-radius:50%;background:#475569;display:inline-block;"></span>OFF';
+      btn.innerHTML = '<svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg> Activate';
       btn.className = 'btn btn-danger';
     }
   }
@@ -2058,7 +2073,7 @@ async function initRisk() {
   function renderBlacklist(symbols) {
     const wrap  = document.getElementById('blacklist-chips');
     const empty = document.getElementById('blacklist-empty');
-    wrap.querySelectorAll('.blacklist-chip').forEach(c => c.remove());
+    wrap.querySelectorAll('.ntl-chip2').forEach(c => c.remove());
     if (!symbols || symbols.length === 0) {
       empty.classList.remove('hidden');
       return;
@@ -2066,7 +2081,7 @@ async function initRisk() {
     empty.classList.add('hidden');
     symbols.forEach(sym => {
       const chip = document.createElement('span');
-      chip.className = 'blacklist-chip';
+      chip.className = 'ntl-chip2';
       chip.innerHTML = `${sym}<button title="Remove" aria-label="Remove ${sym}">
         <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>`;
