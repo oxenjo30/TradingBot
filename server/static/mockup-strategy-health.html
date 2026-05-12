@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Strategy Health Mockup &mdash; TradeBot</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="icon" href="data:,">
+  <style>
+    /* ── Design tokens ── */
+    :root {
+      --bg:      #080D14;
+      --card:    rgba(17,24,39,0.82);
+      --border:  #1E2D45;
+      --sidebar: #0D1117;
+      --blue:    #3B82F6;
+      --green:   #10B981;
+      --red:     #EF4444;
+      --orange:  #F59E0B;
+      --purple:  #8B5CF6;
+      --indigo:  #6366F1;
+      --cyan:    #06B6D4;
+      --text:    #E6EBF5;
+      --muted:   #94A3B8;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 14px;
+      display: flex;
+    }
+    a { text-decoration: none; color: inherit; }
+    button { cursor: pointer; font-family: inherit; }
+
+    /* ── Sidebar ── */
+    .sidebar {
+      width: 220px; flex-shrink: 0;
+      position: fixed; top: 0; left: 0;
+      height: 100vh;
+      background: var(--sidebar);
+      border-right: 1px solid var(--border);
+      display: flex; flex-direction: column;
+      z-index: 40; overflow-y: auto;
+    }
+    .main { margin-left: 220px; flex: 1; min-width: 0; display: flex; flex-direction: column; min-height: 100vh; }
+    .content { flex: 1; padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem; }
+
+    /* ── Logo ── */
+    .logo {
+      display: flex; align-items: center; gap: 10px;
+      padding: 1.25rem 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .logo-mark {
+      width: 32px; height: 32px; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(59,130,246,.15); box-shadow: 0 0 20px rgba(59,130,246,.35);
+    }
+    .logo-text { font-size: 15px; font-weight: 700; letter-spacing: -.3px; }
+    .nav { flex: 1; padding: .75rem 0; overflow-y: auto; }
+    .nav-section {
+      font-size: 10px; font-weight: 600; letter-spacing: .08em;
+      color: var(--muted); text-transform: uppercase;
+      padding: .75rem 1rem .25rem;
+    }
+    .nav-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: .5rem 1rem;
+      border-left: 3px solid transparent;
+      color: var(--muted);
+      font-size: 13px; font-weight: 500;
+      transition: color .15s, background .15s;
+    }
+    .nav-item svg { flex-shrink: 0; }
+    .nav-item:hover { color: var(--text); background: rgba(255,255,255,.04); }
+    .nav-item.active {
+      color: var(--blue); border-left-color: var(--blue);
+      background: linear-gradient(90deg, rgba(59,130,246,.12), transparent);
+    }
+    .sidebar-footer { padding: 1rem; border-top: 1px solid var(--border); }
+    .paper-card {
+      background: rgba(59,130,246,.08); border: 1px solid rgba(59,130,246,.2);
+      border-radius: 10px; padding: .75rem;
+    }
+    .paper-label { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+    .go-live { font-size: 12px; font-weight: 600; color: var(--blue); display: block; margin-top: 4px; }
+    .logout-btn { width: 100%; margin-top: .5rem; border: none; background: none; border-radius: 8px; text-align: left; color: var(--muted); }
+    .logout-btn:hover { color: var(--red); background: rgba(239,68,68,.06); }
+
+    /* ── Header ── */
+    .page-header {
+      position: sticky; top: 0; z-index: 30;
+      background: rgba(8,13,20,.9); backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding: .75rem 1.5rem;
+      display: flex; align-items: center; gap: 1rem;
+    }
+    .page-title { font-size: 17px; font-weight: 700; }
+    .page-sub   { font-size: 12px; color: var(--muted); }
+    .search-bar {
+      display: flex; align-items: center; gap: 8px;
+      background: rgba(30,45,69,.5); border: 1px solid var(--border);
+      border-radius: 8px; padding: 6px 12px;
+      width: 240px; flex-shrink: 0;
+    }
+    .search-text { font-size: 13px; color: var(--muted); }
+    .market-chip {
+      display: flex; align-items: center; gap: 6px;
+      padding: 4px 10px; border-radius: 999px;
+      font-size: 12px; font-weight: 500;
+      border: 1px solid rgba(16,185,129,.3);
+      color: var(--green); background: rgba(16,185,129,.08);
+      white-space: nowrap;
+    }
+    .avatar {
+      width: 30px; height: 30px; border-radius: 50%;
+      background: linear-gradient(135deg, var(--blue), var(--purple));
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; font-weight: 700; flex-shrink: 0;
+    }
+    .online-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--green); box-shadow: 0 0 6px rgba(16,185,129,.5);
+    }
+    .plan-badge {
+      font-size: 10px; font-weight: 600; padding: 2px 7px;
+      border-radius: 4px; background: rgba(59,130,246,.15); color: var(--blue);
+    }
+
+    /* ── Card ── */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      backdrop-filter: blur(12px);
+      padding: 1.25rem;
+      transition: box-shadow .2s;
+      min-width: 0;
+    }
+    .card:hover { box-shadow: 0 0 0 1px rgba(59,130,246,.08), 0 8px 32px rgba(0,0,0,.5); }
+    .row-2col { display: grid; gap: 1rem; }
+
+    /* ── Table ── */
+    .dtable-wrap { overflow-x: auto; }
+    .dtable { width: 100%; table-layout: auto; border-collapse: collapse; }
+    .dtable th {
+      font-size: 11px; font-weight: 600; color: var(--muted);
+      text-transform: uppercase; letter-spacing: .06em;
+      padding: .5rem .75rem; text-align: left;
+      border-bottom: 1px solid var(--border); white-space: nowrap;
+    }
+    .dtable td {
+      padding: .65rem .75rem; font-size: 13px;
+      border-bottom: 1px solid rgba(30,45,69,.5);
+      white-space: nowrap;
+    }
+    .dtable tr:last-child td { border-bottom: none; }
+    .dtable tr:hover td { background: rgba(59,130,246,.04); }
+
+    /* ── Badges ── */
+    .badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 2px 8px; border-radius: 999px;
+      font-size: 11px; font-weight: 500; white-space: nowrap;
+    }
+    .b-enabled  { background: rgba(16,185,129,.15); color: var(--green); }
+    .b-disabled { background: rgba(100,116,139,.12); color: var(--muted); }
+    .pdot {
+      width: 6px; height: 6px; border-radius: 50%; background: var(--green);
+      animation: pdot 1.5s ease-in-out infinite;
+    }
+    @keyframes pdot { 0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.7)} }
+
+    /* ── Btn ── */
+    .btn {
+      padding: 7px 16px; border-radius: 8px;
+      font-size: 13px; font-weight: 600; border: none;
+      cursor: pointer; transition: opacity .15s;
+      display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+    }
+    .btn-primary { background: var(--blue); color: #fff; }
+    .btn-ghost   { background: rgba(255,255,255,.07); color: var(--text); }
+    .btn-sm      { padding: 4px 10px; font-size: 12px; border-radius: 6px; }
+    .btn:hover   { opacity: .85; }
+
+    /* ═══════════════════════════════
+       STRATEGY HEALTH CARD (new)
+    ═══════════════════════════════ */
+
+    /* Section header with badge count */
+    .sh-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 1rem;
+    }
+    .sh-title-row {
+      display: flex; align-items: center; gap: .6rem;
+    }
+    .sh-title {
+      font-size: 14px; font-weight: 600;
+    }
+    .sh-subtitle {
+      font-size: 12px; color: var(--muted); margin-top: 1px;
+    }
+    .sh-badge-count {
+      font-size: 10px; font-weight: 700; padding: 1px 7px;
+      border-radius: 99px; background: rgba(239,68,68,.15);
+      color: #F87171; border: 1px solid rgba(239,68,68,.25);
+      white-space: nowrap;
+    }
+    .sh-badge-count.sh-badge-ok {
+      background: rgba(16,185,129,.12); color: #34D399;
+      border-color: rgba(16,185,129,.25);
+    }
+    .sh-no-bench-hint {
+      font-size: 12px; color: var(--muted);
+      display: flex; align-items: center; gap: 6px;
+    }
+
+    /* Health status pill */
+    .health-pill {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 3px 10px; border-radius: 999px;
+      font-size: 11px; font-weight: 600; white-space: nowrap;
+    }
+    .health-green  { background: rgba(16,185,129,.13);  color: #34D399; border: 1px solid rgba(16,185,129,.25); }
+    .health-yellow { background: rgba(245,158,11,.13);  color: #FCD34D; border: 1px solid rgba(245,158,11,.25); }
+    .health-red    { background: rgba(239,68,68,.13);   color: #F87171; border: 1px solid rgba(239,68,68,.25); }
+    .health-none   { background: rgba(100,116,139,.1);  color: var(--muted); border: 1px solid rgba(100,116,139,.2); }
+
+    .health-dot {
+      width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
+    }
+    .health-dot-green  { background: #10B981; box-shadow: 0 0 6px rgba(16,185,129,.6); }
+    .health-dot-yellow { background: #F59E0B; box-shadow: 0 0 6px rgba(245,158,11,.6); }
+    .health-dot-red    { background: #EF4444; box-shadow: 0 0 6px rgba(239,68,68,.6); }
+    .health-dot-none   { background: #64748B; }
+
+    /* Metric pair: live vs benchmark */
+    .metric-pair {
+      display: flex; flex-direction: column; gap: 2px;
+    }
+    .metric-live {
+      font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums;
+    }
+    .metric-bench {
+      font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums;
+      display: flex; align-items: center; gap: 3px;
+    }
+    .metric-bench-label {
+      font-size: 10px; text-transform: uppercase; letter-spacing: .05em;
+      color: #475569;
+    }
+
+    /* Delta chip (inline divergence indicator) */
+    .delta-chip {
+      display: inline-flex; align-items: center;
+      font-size: 10px; font-weight: 700;
+      padding: 1px 5px; border-radius: 4px;
+    }
+    .delta-down { background: rgba(239,68,68,.12); color: #F87171; }
+    .delta-up   { background: rgba(16,185,129,.12); color: #34D399; }
+    .delta-flat { background: rgba(100,116,139,.1); color: var(--muted); }
+
+    /* Expand row detail */
+    .sh-detail-row { display: none; }
+    .sh-detail-row.open { display: table-row; }
+    .sh-detail-cell {
+      background: rgba(15,23,42,.6);
+      border-bottom: 1px solid var(--border) !important;
+      padding: .75rem 1rem !important;
+    }
+    .sh-detail-inner {
+      display: flex; gap: 2rem; flex-wrap: wrap;
+    }
+    .sh-detail-item {
+      display: flex; flex-direction: column; gap: 3px;
+    }
+    .sh-detail-label {
+      font-size: 10px; font-weight: 600; color: #475569;
+      text-transform: uppercase; letter-spacing: .06em;
+    }
+    .sh-detail-val {
+      font-size: 13px; font-weight: 500; color: var(--text);
+    }
+    .sh-detail-val.muted { color: var(--muted); }
+
+    /* Row clickable indicator */
+    .sh-expand-btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 22px; height: 22px; border-radius: 6px;
+      background: rgba(30,45,69,.6); border: 1px solid var(--border);
+      color: var(--muted); transition: background .15s, color .15s;
+      cursor: pointer; flex-shrink: 0;
+    }
+    .sh-expand-btn:hover { background: rgba(59,130,246,.15); color: var(--blue); }
+    .sh-expand-btn.expanded { background: rgba(59,130,246,.15); color: var(--blue); }
+
+    /* ══════════════════════════════════
+       BACKTESTING HISTORY — set benchmark
+    ══════════════════════════════════ */
+    .bench-star-btn {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 3px 9px; border-radius: 6px;
+      font-size: 11px; font-weight: 600;
+      background: rgba(30,45,69,.6); border: 1px solid var(--border);
+      color: var(--muted); cursor: pointer; white-space: nowrap;
+      transition: background .15s, color .15s, border-color .15s;
+    }
+    .bench-star-btn:hover { background: rgba(245,158,11,.12); color: #FCD34D; border-color: rgba(245,158,11,.3); }
+    .bench-star-btn.is-bench {
+      background: rgba(245,158,11,.12); color: #FCD34D;
+      border-color: rgba(245,158,11,.3);
+    }
+
+    /* empty state */
+    .state-empty { text-align: center; padding: 2rem 1rem; color: var(--muted); font-size: 13px; }
+
+    /* helper */
+    .text-muted { color: var(--muted); }
+    .text-green { color: var(--green); }
+    .text-red   { color: var(--red); }
+    .text-orange { color: var(--orange); }
+
+    /* Tooltip-style info icon */
+    .info-icon {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 14px; height: 14px; border-radius: 50%;
+      background: rgba(100,116,139,.2); color: var(--muted);
+      font-size: 9px; font-weight: 700; cursor: default;
+      flex-shrink: 0;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Sidebar ── -->
+<aside class="sidebar">
+  <div class="logo">
+    <div class="logo-mark">
+      <svg width="18" height="18" viewBox="0 0 22 22" fill="none">
+        <path d="M11 2L20 7.5V14.5L11 20L2 14.5V7.5L11 2Z" fill="url(#lgs)"/>
+        <defs><linearGradient id="lgs" x1="2" y1="2" x2="20" y2="20">
+          <stop stop-color="#3B82F6"/><stop offset="1" stop-color="#8B5CF6"/>
+        </linearGradient></defs>
+      </svg>
+    </div>
+    <span class="logo-text">TradeBot</span>
+  </div>
+
+  <nav class="nav">
+    <p class="nav-section">Overview</p>
+    <a href="#" class="nav-item">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      Dashboard
+    </a>
+    <p class="nav-section">Analysis</p>
+    <a href="#" class="nav-item active">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      Performance
+    </a>
+    <a href="#" class="nav-item">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      Backtesting
+    </a>
+    <p class="nav-section">Portfolio</p>
+    <a href="#" class="nav-item">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+      Positions &amp; Orders
+    </a>
+    <a href="#" class="nav-item">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+      Balances
+    </a>
+    <a href="#" class="nav-item">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="2" height="2"/><rect x="13" y="9" width="2" height="2"/><path d="M9 13a3 3 0 0 0 6 0"/></svg>
+      Bots &amp; Strategies
+    </a>
+    <p class="nav-section">System</p>
+    <a href="#" class="nav-item">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      Risk
+    </a>
+    <a href="#" class="nav-item">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+      Logs &amp; Signals
+    </a>
+    <a href="#" class="nav-item">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+      Broker Accounts
+    </a>
+    <a href="#" class="nav-item">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      Settings
+    </a>
+  </nav>
+
+  <div class="sidebar-footer">
+    <div class="paper-card">
+      <p class="paper-label">Paper Trading Mode</p>
+      <p style="font-size:12px;color:#E6EBF5;margin-top:2px;">Safe sandbox environment</p>
+      <a href="#" class="go-live">Go Live &rarr;</a>
+    </div>
+    <button class="nav-item logout-btn" style="margin-top:.5rem;">
+      <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      Sign Out
+    </button>
+  </div>
+</aside>
+
+<!-- ── Main ── -->
+<div class="main">
+
+  <!-- Header -->
+  <header class="page-header">
+    <div class="flex-1 min-w-0">
+      <div class="page-title">Performance</div>
+      <div class="page-sub">Signal and strategy analytics</div>
+    </div>
+    <div class="search-bar">
+      <svg width="14" height="14" fill="none" stroke="#64748B" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <span class="search-text">Search&hellip;</span>
+    </div>
+    <div style="cursor:pointer;position:relative;">
+      <svg width="18" height="18" fill="none" stroke="#64748B" stroke-width="1.8" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+    </div>
+    <div class="market-chip">
+      <span style="width:6px;height:6px;border-radius:50%;background:#10B981;box-shadow:0 0 6px rgba(16,185,129,.5);display:inline-block;"></span>
+      US Equities Open
+    </div>
+    <span class="plan-badge">Paper Mode</span>
+    <div style="display:flex;align-items:center;gap:.5rem;">
+      <div class="avatar">JR</div>
+      <div>
+        <div style="font-size:13px;font-weight:600;">Trader</div>
+        <div style="font-size:11px;color:var(--muted);">Admin</div>
+      </div>
+      <div class="online-dot"></div>
+    </div>
+  </header>
+
+  <!-- Page content -->
+  <main class="content">
+
+    <!-- ─── Existing cards (collapsed/placeholder to show context) ─── -->
+    <div class="row-2col" style="grid-template-columns:1fr 1fr;">
+      <div class="card">
+        <div style="font-size:14px;font-weight:600;margin-bottom:.75rem;">Strategy Statistics</div>
+        <div class="dtable-wrap">
+          <table class="dtable">
+            <thead><tr><th>Status</th><th>Strategy</th><th>Total</th><th>Buys</th><th>Sells</th><th>Blocked</th></tr></thead>
+            <tbody>
+              <tr>
+                <td><span class="badge b-enabled"><span class="pdot"></span>Running</span></td>
+                <td style="font-weight:500;">RSI Mean Reversion</td><td>127</td><td>64</td><td>63</td><td>8</td>
+              </tr>
+              <tr>
+                <td><span class="badge b-enabled"><span class="pdot"></span>Running</span></td>
+                <td style="font-weight:500;">Golden Cross</td><td>89</td><td>45</td><td>44</td><td>3</td>
+              </tr>
+              <tr>
+                <td><span class="badge b-enabled"><span class="pdot"></span>Running</span></td>
+                <td style="font-weight:500;">Bollinger Bands</td><td>54</td><td>27</td><td>27</td><td>11</td>
+              </tr>
+              <tr>
+                <td><span class="badge b-disabled">Paused</span></td>
+                <td style="font-weight:500;">MACD Volume</td><td>22</td><td>11</td><td>11</td><td>2</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card">
+        <div style="font-size:14px;font-weight:600;margin-bottom:.75rem;">Top Symbols</div>
+        <div class="dtable-wrap">
+          <table class="dtable">
+            <thead><tr><th>Symbol</th><th>Total</th><th>Buys</th><th>Sells</th></tr></thead>
+            <tbody>
+              <tr><td style="font-weight:600;">AAPL</td><td>34</td><td>18</td><td>16</td></tr>
+              <tr><td style="font-weight:600;">NVDA</td><td>28</td><td>15</td><td>13</td></tr>
+              <tr><td style="font-weight:600;">MSFT</td><td>21</td><td>10</td><td>11</td></tr>
+              <tr><td style="font-weight:600;">TSLA</td><td>17</td><td>9</td><td>8</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════
+         NEW: STRATEGY HEALTH CARD
+    ═══════════════════════════════════════════════════ -->
+    <div class="card" style="position:relative;overflow:hidden;">
+
+      <!-- Accent top bar -->
+      <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,#3B82F6,#8B5CF6);opacity:.7;"></div>
+
+      <div class="sh-header" style="margin-top:.25rem;">
+        <div>
+          <div class="sh-title-row">
+            <!-- Icon -->
+            <div style="width:32px;height:32px;border-radius:8px;background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.2);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+              <svg width="16" height="16" fill="none" stroke="#3B82F6" stroke-width="1.8" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+            </div>
+            <div>
+              <div class="sh-title">Strategy Health</div>
+              <div class="sh-subtitle">Live performance vs your designated backtest benchmark</div>
+            </div>
+            <!-- Tooltip hint -->
+            <span class="info-icon" title="Set a backtest run as benchmark in the Backtesting page. Drift is flagged when win rate or avg return diverges more than 15%.">?</span>
+          </div>
+        </div>
+        <!-- Summary counts -->
+        <div style="display:flex;align-items:center;gap:.5rem;">
+          <span style="font-size:11px;color:var(--muted);">2 on track</span>
+          <span class="sh-badge-count">1 drifting</span>
+        </div>
+      </div>
+
+      <div class="dtable-wrap">
+        <table class="dtable">
+          <colgroup>
+            <col style="width:28px"><!-- expand toggle -->
+            <col><!-- strategy name -->
+            <col style="width:130px"><!-- live win rate -->
+            <col style="width:130px"><!-- live avg return -->
+            <col style="width:110px"><!-- live trades -->
+            <col style="width:120px"><!-- health -->
+          </colgroup>
+          <thead>
+            <tr>
+              <th></th>
+              <th>Strategy</th>
+              <th>Win Rate</th>
+              <th>Avg Return / Trade</th>
+              <th>Live Trades</th>
+              <th>Health</th>
+            </tr>
+          </thead>
+          <tbody>
+
+            <!-- ── Row 1: DRIFTING (red) — expanded ── -->
+            <tr id="sh-row-1" style="cursor:pointer;" onclick="toggleDetail('sh-detail-1','sh-exp-1')">
+              <td>
+                <button class="sh-expand-btn expanded" id="sh-exp-1" tabindex="-1">
+                  <svg width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="18 15 12 9 6 15"/></svg>
+                </button>
+              </td>
+              <td>
+                <div style="font-weight:600;font-size:13px;">RSI Mean Reversion</div>
+                <div style="font-size:11px;color:var(--muted);margin-top:1px;">Benchmark: RSI MR Apr-2025 · 90 days</div>
+              </td>
+              <td>
+                <div class="metric-pair">
+                  <span class="metric-live text-red">42%</span>
+                  <span class="metric-bench">
+                    <span class="metric-bench-label">BT</span>
+                    62%
+                    <span class="delta-chip delta-down">&#8722;20pp</span>
+                  </span>
+                </div>
+              </td>
+              <td>
+                <div class="metric-pair">
+                  <span class="metric-live text-red">+0.7%</span>
+                  <span class="metric-bench">
+                    <span class="metric-bench-label">BT</span>
+                    +1.8%
+                    <span class="delta-chip delta-down">&#8722;61%</span>
+                  </span>
+                </div>
+              </td>
+              <td>
+                <div style="font-size:13px;font-weight:500;">42 trades</div>
+                <div style="font-size:11px;color:var(--muted);">Last: 2h ago</div>
+              </td>
+              <td>
+                <span class="health-pill health-red">
+                  <span class="health-dot health-dot-red"></span>
+                  Drifting
+                </span>
+              </td>
+            </tr>
+
+            <!-- ── Row 1 detail (expanded) ── -->
+            <tr class="sh-detail-row open" id="sh-detail-1">
+              <td colspan="6" class="sh-detail-cell">
+                <div class="sh-detail-inner">
+                  <div class="sh-detail-item">
+                    <span class="sh-detail-label">Benchmark Run</span>
+                    <span class="sh-detail-val">RSI MR Apr-2025</span>
+                  </div>
+                  <div class="sh-detail-item">
+                    <span class="sh-detail-label">Backtest Period</span>
+                    <span class="sh-detail-val">Jan 1 – Apr 30, 2025</span>
+                  </div>
+                  <div class="sh-detail-item">
+                    <span class="sh-detail-label">Backtest Win Rate</span>
+                    <span class="sh-detail-val">62%</span>
+                  </div>
+                  <div class="sh-detail-item">
+                    <span class="sh-detail-label">Backtest Avg Return</span>
+                    <span class="sh-detail-val">+1.8% / trade</span>
+                  </div>
+                  <div class="sh-detail-item">
+                    <span class="sh-detail-label">Backtest Total Trades</span>
+                    <span class="sh-detail-val">183 trades</span>
+                  </div>
+                  <div class="sh-detail-item">
+                    <span class="sh-detail-label">Account</span>
+                    <span class="sh-detail-val">Alpaca Paper</span>
+                  </div>
+                  <div class="sh-detail-item" style="margin-left:auto;align-self:center;">
+                    <a href="#backtesting" class="btn btn-ghost btn-sm" style="font-size:11px;">
+                      <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                      View Backtest
+                    </a>
+                  </div>
+                </div>
+              </td>
+            </tr>
+
+            <!-- ── Row 2: ON TRACK (green) ── -->
+            <tr style="cursor:pointer;" onclick="toggleDetail('sh-detail-2','sh-exp-2')">
+              <td>
+                <button class="sh-expand-btn" id="sh-exp-2" tabindex="-1">
+                  <svg width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+                </button>
+              </td>
+              <td>
+                <div style="font-weight:600;font-size:13px;">Golden Cross</div>
+                <div style="font-size:11px;color:var(--muted);margin-top:1px;">Benchmark: GC Baseline 2025 · 120 days</div>
+              </td>
+              <td>
+                <div class="metric-pair">
+                  <span class="metric-live text-green">71%</span>
+                  <span class="metric-bench">
+                    <span class="metric-bench-label">BT</span>
+                    68%
+                    <span class="delta-chip delta-up">+3pp</span>
+                  </span>
+                </div>
+              </td>
+              <td>
+                <div class="metric-pair">
+                  <span class="metric-live text-green">+2.1%</span>
+                  <span class="metric-bench">
+                    <span class="metric-bench-label">BT</span>
+                    +1.9%
+                    <span class="delta-chip delta-up">+11%</span>
+                  </span>
+                </div>
+              </td>
+              <td>
+                <div style="font-size:13px;font-weight:500;">89 trades</div>
+                <div style="font-size:11px;color:var(--muted);">Last: 45m ago</div>
+              </td>
+              <td>
+                <span class="health-pill health-green">
+                  <span class="health-dot health-dot-green"></span>
+                  On Track
+                </span>
+              </td>
+            </tr>
+            <tr class="sh-detail-row" id="sh-detail-2">
+              <td colspan="6" class="sh-detail-cell">
+                <div class="sh-detail-inner">
+                  <div class="sh-detail-item"><span class="sh-detail-label">Benchmark Run</span><span class="sh-detail-val">GC Baseline 2025</span></div>
+                  <div class="sh-detail-item"><span class="sh-detail-label">Backtest Period</span><span class="sh-detail-val">Jan 1 – May 1, 2025</span></div>
+                  <div class="sh-detail-item"><span class="sh-detail-label">Backtest Win Rate</span><span class="sh-detail-val">68%</span></div>
+                  <div class="sh-detail-item"><span class="sh-detail-label">Backtest Avg Return</span><span class="sh-detail-val">+1.9% / trade</span></div>
+                  <div class="sh-detail-item"><span class="sh-detail-label">Backtest Total Trades</span><span class="sh-detail-val">241 trades</span></div>
+                  <div class="sh-detail-item"><span class="sh-detail-label">Account</span><span class="sh-detail-val">Alpaca Paper</span></div>
+                  <div class="sh-detail-item" style="margin-left:auto;align-self:center;">
+                    <a href="#backtesting" class="btn btn-ghost btn-sm" style="font-size:11px;">
+                      <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                      View Backtest
+                    </a>
+                  </div>
+                </div>
+              </td>
+            </tr>
+
+            <!-- ── Row 3: WATCHING (yellow) ── -->
+            <tr style="cursor:pointer;" onclick="toggleDetail('sh-detail-3','sh-exp-3')">
+              <td>
+                <button class="sh-expand-btn" id="sh-exp-3" tabindex="-1">
+                  <svg width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+                </button>
+              </td>
+              <td>
+                <div style="font-weight:600;font-size:13px;">Bollinger Bands</div>
+                <div style="font-size:11px;color:var(--muted);margin-top:1px;">Benchmark: BB March 2025 · 60 days</div>
+              </td>
+              <td>
+                <div class="metric-pair">
+                  <span class="metric-live text-orange">54%</span>
+                  <span class="metric-bench">
+                    <span class="metric-bench-label">BT</span>
+                    63%
+                    <span class="delta-chip delta-down">&#8722;9pp</span>
+                  </span>
+                </div>
+              </td>
+              <td>
+                <div class="metric-pair">
+                  <span class="metric-live text-orange">+1.1%</span>
+                  <span class="metric-bench">
+                    <span class="metric-bench-label">BT</span>
+                    +1.4%
+                    <span class="delta-chip delta-down">&#8722;21%</span>
+                  </span>
+                </div>
+              </td>
+              <td>
+                <div style="font-size:13px;font-weight:500;">54 trades</div>
+                <div style="font-size:11px;color:var(--muted);">Last: 3h ago</div>
+              </td>
+              <td>
+                <span class="health-pill health-yellow">
+                  <span class="health-dot health-dot-yellow"></span>
+                  Watching
+                </span>
+              </td>
+            </tr>
+            <tr class="sh-detail-row" id="sh-detail-3">
+              <td colspan="6" class="sh-detail-cell">
+                <div class="sh-detail-inner">
+                  <div class="sh-detail-item"><span class="sh-detail-label">Benchmark Run</span><span class="sh-detail-val">BB March 2025</span></div>
+                  <div class="sh-detail-item"><span class="sh-detail-label">Backtest Period</span><span class="sh-detail-val">Jan 1 – Mar 31, 2025</span></div>
+                  <div class="sh-detail-item"><span class="sh-detail-label">Backtest Win Rate</span><span class="sh-detail-val">63%</span></div>
+                  <div class="sh-detail-item"><span class="sh-detail-label">Backtest Avg Return</span><span class="sh-detail-val">+1.4% / trade</span></div>
+                  <div class="sh-detail-item"><span class="sh-detail-label">Backtest Total Trades</span><span class="sh-detail-val">97 trades</span></div>
+                  <div class="sh-detail-item"><span class="sh-detail-label">Account</span><span class="sh-detail-val">Alpaca Paper</span></div>
+                  <div class="sh-detail-item" style="margin-left:auto;align-self:center;">
+                    <a href="#backtesting" class="btn btn-ghost btn-sm" style="font-size:11px;">
+                      <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                      View Backtest
+                    </a>
+                  </div>
+                </div>
+              </td>
+            </tr>
+
+            <!-- ── Row 4: NO BENCHMARK ── -->
+            <tr>
+              <td></td>
+              <td>
+                <div style="font-weight:600;font-size:13px;color:var(--muted);">MACD Volume</div>
+                <div style="font-size:11px;color:#475569;margin-top:1px;">No benchmark set</div>
+              </td>
+              <td><span style="font-size:13px;color:#475569;">—</span></td>
+              <td><span style="font-size:13px;color:#475569;">—</span></td>
+              <td>
+                <div style="font-size:13px;color:var(--muted);">22 trades</div>
+                <div style="font-size:11px;color:#475569;">Last: 1d ago</div>
+              </td>
+              <td>
+                <span class="health-pill health-none">
+                  <span class="health-dot health-dot-none"></span>
+                  No Benchmark
+                </span>
+              </td>
+            </tr>
+
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Footer hint -->
+      <div style="margin-top:.875rem;padding-top:.875rem;border-top:1px solid rgba(30,45,69,.6);display:flex;align-items:center;gap:.5rem;">
+        <svg width="13" height="13" fill="none" stroke="#475569" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        <span style="font-size:11px;color:#475569;">Set a backtest run as the benchmark for each strategy in the
+          <a href="#backtesting" style="color:#3B82F6;font-weight:500;">Backtesting page</a>.
+          Health is flagged when win rate or avg return diverges &gt;15% from the benchmark.
+        </span>
+      </div>
+    </div>
+
+    <!-- ─── BACKTESTING HISTORY — showing new Set Benchmark button ─── -->
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.875rem;">
+        <div>
+          <div style="font-size:14px;font-weight:600;">Backtest History</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:1px;">
+            Star a run to set it as the health benchmark for its strategy
+          </div>
+        </div>
+        <button class="btn btn-ghost btn-sm">
+          <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          New Run
+        </button>
+      </div>
+      <div class="dtable-wrap">
+        <table class="dtable">
+          <colgroup>
+            <col><!-- name -->
+            <col style="width:130px"><!-- strategy -->
+            <col style="width:130px"><!-- symbols -->
+            <col style="width:80px"><!-- win rate -->
+            <col style="width:90px"><!-- total return -->
+            <col style="width:80px"><!-- trades -->
+            <col style="width:100px"><!-- benchmark btn -->
+            <col style="width:60px"><!-- actions -->
+          </colgroup>
+          <thead>
+            <tr>
+              <th>Run Name</th>
+              <th>Strategy</th>
+              <th>Period</th>
+              <th>Win Rate</th>
+              <th>Total Return</th>
+              <th>Trades</th>
+              <th>Benchmark</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>
+                <div style="font-weight:500;">RSI MR Apr-2025</div>
+                <div style="font-size:11px;color:var(--muted);">May 12, 2025</div>
+              </td>
+              <td style="color:var(--muted);">RSI Mean Reversion</td>
+              <td style="color:var(--muted);">Jan – Apr 2025</td>
+              <td style="font-weight:500;">62%</td>
+              <td style="color:var(--green);font-weight:500;">+18.4%</td>
+              <td>183</td>
+              <td>
+                <!-- Currently set as benchmark → filled star -->
+                <button class="bench-star-btn is-bench" onclick="toggleBench(this)">
+                  <svg width="11" height="11" fill="currentColor" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                  Benchmark
+                </button>
+              </td>
+              <td>
+                <button class="btn btn-ghost btn-sm" style="padding:3px 8px;font-size:11px;">
+                  <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.56"/></svg>
+                </button>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <div style="font-weight:500;">RSI MR Jan-2025</div>
+                <div style="font-size:11px;color:var(--muted);">Jan 15, 2025</div>
+              </td>
+              <td style="color:var(--muted);">RSI Mean Reversion</td>
+              <td style="color:var(--muted);">Oct – Dec 2024</td>
+              <td style="font-weight:500;">58%</td>
+              <td style="color:var(--green);font-weight:500;">+12.1%</td>
+              <td>142</td>
+              <td>
+                <button class="bench-star-btn" onclick="toggleBench(this)">
+                  <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                  Set Benchmark
+                </button>
+              </td>
+              <td>
+                <button class="btn btn-ghost btn-sm" style="padding:3px 8px;font-size:11px;">
+                  <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.56"/></svg>
+                </button>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <div style="font-weight:500;">GC Baseline 2025</div>
+                <div style="font-size:11px;color:var(--muted);">May 1, 2025</div>
+              </td>
+              <td style="color:var(--muted);">Golden Cross</td>
+              <td style="color:var(--muted);">Jan – May 2025</td>
+              <td style="font-weight:500;">68%</td>
+              <td style="color:var(--green);font-weight:500;">+24.7%</td>
+              <td>241</td>
+              <td>
+                <button class="bench-star-btn is-bench" onclick="toggleBench(this)">
+                  <svg width="11" height="11" fill="currentColor" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                  Benchmark
+                </button>
+              </td>
+              <td>
+                <button class="btn btn-ghost btn-sm" style="padding:3px 8px;font-size:11px;">
+                  <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.56"/></svg>
+                </button>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <div style="font-weight:500;">BB March 2025</div>
+                <div style="font-size:11px;color:var(--muted);">Apr 2, 2025</div>
+              </td>
+              <td style="color:var(--muted);">Bollinger Bands</td>
+              <td style="color:var(--muted);">Jan – Mar 2025</td>
+              <td style="font-weight:500;">63%</td>
+              <td style="color:var(--green);font-weight:500;">+9.3%</td>
+              <td>97</td>
+              <td>
+                <button class="bench-star-btn is-bench" onclick="toggleBench(this)">
+                  <svg width="11" height="11" fill="currentColor" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                  Benchmark
+                </button>
+              </td>
+              <td>
+                <button class="btn btn-ghost btn-sm" style="padding:3px 8px;font-size:11px;">
+                  <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.56"/></svg>
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+  function toggleDetail(detailId, btnId) {
+    const row = document.getElementById(detailId);
+    const btn = document.getElementById(btnId);
+    const isOpen = row.classList.contains('open');
+    row.classList.toggle('open', !isOpen);
+    btn.classList.toggle('expanded', !isOpen);
+    // swap chevron direction
+    const svg = btn.querySelector('svg polyline');
+    if (svg) svg.setAttribute('points', isOpen ? '6 9 12 15 18 9' : '18 15 12 9 6 15');
+  }
+
+  function toggleBench(btn) {
+    const isNow = btn.classList.contains('is-bench');
+    if (isNow) return; // already set — no-op in mockup
+    // In real implementation: POST /api/backtest-runs/{id}/set-benchmark
+    btn.classList.add('is-bench');
+    btn.innerHTML = `
+      <svg width="11" height="11" fill="currentColor" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+      Benchmark`;
+  }
+</script>
+</body>
+</html>
