@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
@@ -442,7 +442,7 @@ async function doLogin(e) {
       btn.style.background = 'linear-gradient(135deg,#16c784,#0fa066)';
       setTimeout(() => { window.location.href = '/static/index.html'; }, 400);
     } else {
-      document.getElementById('error-text').textContent = 'Incorrect password &mdash; please try again';
+      document.getElementById('error-text').textContent = 'Incorrect password — please try again';
       errBox.style.display = 'block';
       btn.disabled = false;
       btn.innerHTML = 'Sign In';
@@ -450,7 +450,7 @@ async function doLogin(e) {
       document.getElementById('password').focus();
     }
   } catch {
-    document.getElementById('error-text').textContent = 'Cannot reach server &mdash; is TradeBot running?';
+    document.getElementById('error-text').textContent = 'Cannot reach server — is TradeBot running?';
     errBox.style.display = 'block';
     btn.disabled = false;
     btn.innerHTML = 'Sign In';
