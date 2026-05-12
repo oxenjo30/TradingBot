@@ -777,6 +777,57 @@ def delete_alert(alert_id: int, request: Request):
     db.delete_price_alert(alert_id)
 
 
+# ── Watchlists ─────────────────────────────────────────────────────────────────
+
+class WatchlistCreate(BaseModel):
+    name: str
+
+class WatchlistSymbol(BaseModel):
+    symbol: str
+
+class WatchlistRename(BaseModel):
+    name: str
+
+@app.get("/api/watchlists")
+def list_watchlists(request: Request):
+    _require_auth(request)
+    return db.get_watchlists()
+
+@app.post("/api/watchlists", status_code=201)
+def create_watchlist(body: WatchlistCreate, request: Request):
+    _require_auth(request)
+    try:
+        return db.create_watchlist(body.name.strip())
+    except Exception as e:
+        raise HTTPException(400, str(e))
+
+@app.delete("/api/watchlists/{wl_id}", status_code=204)
+def delete_watchlist(wl_id: int, request: Request):
+    _require_auth(request)
+    db.delete_watchlist(wl_id)
+
+@app.patch("/api/watchlists/{wl_id}")
+def rename_watchlist(wl_id: int, body: WatchlistRename, request: Request):
+    _require_auth(request)
+    wl = db.rename_watchlist(wl_id, body.name.strip())
+    if not wl:
+        raise HTTPException(404, "watchlist not found")
+    return wl
+
+@app.post("/api/watchlists/{wl_id}/symbols", status_code=201)
+def add_symbol(wl_id: int, body: WatchlistSymbol, request: Request):
+    _require_auth(request)
+    wl = db.add_watchlist_symbol(wl_id, body.symbol)
+    if not wl:
+        raise HTTPException(404, "watchlist not found")
+    return wl
+
+@app.delete("/api/watchlists/{wl_id}/symbols/{symbol}", status_code=204)
+def remove_symbol(wl_id: int, symbol: str, request: Request):
+    _require_auth(request)
+    db.remove_watchlist_symbol(wl_id, symbol)
+
+
 # ── Scanner ────────────────────────────────────────────────────────────────────
 
 @app.get("/api/scanner")

@@ -103,6 +103,14 @@ CREATE TABLE IF NOT EXISTS account_settings (
   updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+CREATE TABLE IF NOT EXISTS watchlists (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  name       TEXT NOT NULL UNIQUE,
+  symbols    TEXT NOT NULL DEFAULT '[]',
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS price_alerts (
   id           INTEGER PRIMARY KEY AUTOINCREMENT,
   symbol       TEXT NOT NULL,
@@ -798,3 +806,61 @@ def rename_backtest_run(run_id: int, name: str) -> bool:
             "UPDATE backtest_runs SET name=? WHERE id=?", (name, run_id)
         )
         return cur.rowcount > 0
+
+
+# ── Watchlists ─────────────────────────────────────────────────────────────────
+
+def get_watchlists() -> list[dict]:
+    with get_conn() as c:
+        rows = c.execute("SELECT * FROM watchlists ORDER BY name").fetchall()
+    return [{"id": r["id"], "name": r["name"],
+             "symbols": json.loads(r["symbols"]), "updated_at": r["updated_at"]} for r in rows]
+
+def get_watchlist(wl_id: int) -> dict | None:
+    with get_conn() as c:
+        r = c.execute("SELECT * FROM watchlists WHERE id=?", (wl_id,)).fetchone()
+    if not r:
+        return None
+    return {"id": r["id"], "name": r["name"],
+            "symbols": json.loads(r["symbols"]), "updated_at": r["updated_at"]}
+
+def create_watchlist(name: str) -> dict:
+    with get_conn() as c:
+        c.execute("INSERT INTO watchlists(name, symbols, updated_at) VALUES(?,?,?)",
+                  (name, "[]", now_iso()))
+        wl_id = c.execute("SELECT last_insert_rowid()").fetchone()[0]
+    return get_watchlist(wl_id)
+
+def delete_watchlist(wl_id: int) -> bool:
+    with get_conn() as c:
+        cur = c.execute("DELETE FROM watchlists WHERE id=?", (wl_id,))
+        return cur.rowcount > 0
+
+def add_watchlist_symbol(wl_id: int, symbol: str) -> dict | None:
+    wl = get_watchlist(wl_id)
+    if not wl:
+        return None
+    syms = wl["symbols"]
+    symbol = symbol.upper().strip()
+    if symbol not in syms:
+        syms.append(symbol)
+    with get_conn() as c:
+        c.execute("UPDATE watchlists SET symbols=?, updated_at=? WHERE id=?",
+                  (json.dumps(syms), now_iso(), wl_id))
+    return get_watchlist(wl_id)
+
+def remove_watchlist_symbol(wl_id: int, symbol: str) -> dict | None:
+    wl = get_watchlist(wl_id)
+    if not wl:
+        return None
+    syms = [s for s in wl["symbols"] if s != symbol.upper().strip()]
+    with get_conn() as c:
+        c.execute("UPDATE watchlists SET symbols=?, updated_at=? WHERE id=?",
+                  (json.dumps(syms), now_iso(), wl_id))
+    return get_watchlist(wl_id)
+
+def rename_watchlist(wl_id: int, name: str) -> dict | None:
+    with get_conn() as c:
+        c.execute("UPDATE watchlists SET name=?, updated_at=? WHERE id=?",
+                  (name, now_iso(), wl_id))
+    return get_watchlist(wl_id)
