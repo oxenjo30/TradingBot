@@ -315,33 +315,120 @@ async function initAccountModeBadge() {
   } catch { /* silently keep default paper state */ }
 }
 
-// ── Global search — navigates to relevant page ──────────────────────
+// ── Global search overlay ────────────────────────────────────────────
+const SEARCH_PAGES = [
+  { label: 'Dashboard',          desc: 'Overview & metrics',                        url: '/static/index.html',       keywords: ['dash','home','index','overview'],                icon: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>' },
+  { label: 'Positions & Orders', desc: 'Open holdings, order history & manual trade',url: '/static/positions.html',  keywords: ['pos','order','hold','trade','manual','buy','sell'],icon: '<polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/>' },
+  { label: 'Balances',           desc: 'Account cash and equity',                   url: '/static/balances.html',   keywords: ['bal','cash','fund','equity','money'],            icon: '<rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/>' },
+  { label: 'Performance',        desc: 'P&L, signals & strategy analytics',         url: '/static/performance.html',keywords: ['perf','pnl','profit','analytics'],               icon: '<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>' },
+  { label: 'Bots & Strategies',  desc: 'Assign strategies to broker accounts',      url: '/static/bots.html',       keywords: ['bot','strat','strategy','algo'],                 icon: '<rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="2" height="2"/><rect x="13" y="9" width="2" height="2"/><path d="M9 13a3 3 0 0 0 6 0"/>' },
+  { label: 'Risk',               desc: 'Guards, kill switch & limits',              url: '/static/risk.html',       keywords: ['risk','guard','kill','limit','loss'],            icon: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>' },
+  { label: 'Logs & Signals',     desc: 'Strategy signal feed',                      url: '/static/logs.html',       keywords: ['log','sig','signal','history','feed'],           icon: '<line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/>' },
+  { label: 'Backtesting',        desc: 'Test strategies on historical data',        url: '/static/backtesting.html',keywords: ['back','test','backtest','hist','simul'],         icon: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>' },
+  { label: 'Broker Accounts',    desc: 'API keys & account management',             url: '/static/apikeys.html',    keywords: ['key','api','broker','acc','account','cred'],    icon: '<path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/>' },
+  { label: 'Settings',           desc: 'Notifications & preferences',               url: '/static/settings.html',   keywords: ['set','conf','setting','notif','email','telegram'],icon: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>' },
+  { label: 'User Guide',         desc: 'Help & documentation',                      url: '/static/help.html',       keywords: ['help','guide','doc','faq'],                     icon: '<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>' },
+];
+
+function _buildSearchOverlay() {
+  if (document.getElementById('search-overlay')) return document.getElementById('search-overlay');
+  const el = document.createElement('div');
+  el.id = 'search-overlay';
+  el.className = 'hidden';
+  el.setAttribute('role', 'dialog');
+  el.setAttribute('aria-label', 'Search');
+  el.innerHTML = `
+    <div id="search-overlay-box">
+      <div id="search-input-wrap">
+        <svg width="16" height="16" fill="none" stroke="#64748B" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input id="search-input" type="text" placeholder="Search pages or type a symbol&hellip;" autocomplete="off" spellcheck="false">
+        <div id="search-close-btn" title="Esc">ESC</div>
+      </div>
+      <div id="search-results"></div>
+      <div id="search-hint">
+        <span><span class="search-kbd">&uarr;</span> <span class="search-kbd">&darr;</span> navigate</span>
+        <span><span class="search-kbd">Enter</span> open</span>
+        <span><span class="search-kbd">Esc</span> close</span>
+      </div>
+    </div>`;
+  document.body.appendChild(el);
+
+  const input   = el.querySelector('#search-input');
+  const results = el.querySelector('#search-results');
+  let focusIdx  = -1;
+
+  function close() { el.classList.add('hidden'); input.value = ''; render(''); }
+  function open()  { el.classList.remove('hidden'); input.focus(); render(''); }
+
+  function render(q) {
+    const t = q.trim().toLowerCase();
+    const matches = t
+      ? SEARCH_PAGES.filter(p =>
+          p.label.toLowerCase().includes(t) ||
+          p.desc.toLowerCase().includes(t) ||
+          p.keywords.some(k => k.startsWith(t))
+        )
+      : SEARCH_PAGES;
+    focusIdx = -1;
+    results.innerHTML = matches.map((p, i) => `
+      <a class="search-result-item" href="${p.url}" data-idx="${i}">
+        <div class="search-result-icon">
+          <svg width="14" height="14" fill="none" stroke="#60A5FA" stroke-width="1.8" viewBox="0 0 24 24">${p.icon}</svg>
+        </div>
+        <div>
+          <div class="search-result-label">${p.label}</div>
+          <div class="search-result-desc">${p.desc}</div>
+        </div>
+      </a>`).join('');
+    if (!t && /^[A-Z]{1,5}$/.test(q.trim().toUpperCase()) && q.trim()) {
+      results.innerHTML += `<a class="search-result-item" href="/static/positions.html">
+        <div class="search-result-icon"><svg width="14" height="14" fill="none" stroke="#10B981" stroke-width="1.8" viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/></svg></div>
+        <div><div class="search-result-label">View ${q.trim().toUpperCase()} on Positions</div><div class="search-result-desc">Go to Positions &amp; Orders page</div></div>
+      </a>`;
+    }
+  }
+
+  input.addEventListener('input', e => render(e.target.value));
+
+  input.addEventListener('keydown', e => {
+    const items = results.querySelectorAll('.search-result-item');
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      focusIdx = Math.min(focusIdx + 1, items.length - 1);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      focusIdx = Math.max(focusIdx - 1, 0);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      const focused = results.querySelector('.focused');
+      if (focused) { location.href = focused.href; return; }
+      if (/^[A-Z]{1,5}$/i.test(input.value.trim())) { location.href = '/static/positions.html'; return; }
+      const first = results.querySelector('.search-result-item');
+      if (first) location.href = first.href;
+    } else if (e.key === 'Escape') {
+      close(); return;
+    }
+    items.forEach((item, i) => item.classList.toggle('focused', i === focusIdx));
+    if (focusIdx >= 0 && items[focusIdx]) items[focusIdx].scrollIntoView({ block: 'nearest' });
+  });
+
+  el.addEventListener('click', e => { if (e.target === el) close(); });
+  el.querySelector('#search-close-btn').addEventListener('click', close);
+
+  // Global shortcut: Ctrl+K
+  document.addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'k') { e.preventDefault(); open(); }
+  });
+
+  el._open = open;
+  return el;
+}
+
 function initGlobalSearch() {
   const bar = document.getElementById('global-search-bar');
   if (!bar) return;
-  bar.addEventListener('click', () => {
-    const q = prompt('Search TradeBot (e.g. a symbol, page name):');
-    if (!q) return;
-    const t = q.trim().toUpperCase();
-    const pages = [
-      [/^(DASH|HOME|INDEX)/, '/static/index.html'],
-      [/^(POS|ORDER|HOLD)/, '/static/positions.html'],
-      [/^(BAL|CASH|FUND)/, '/static/balances.html'],
-      [/^(PERF|P&L|PNL)/, '/static/performance.html'],
-      [/^(BOT|STRAT)/, '/static/bots.html'],
-      [/^(RISK|GUARD)/, '/static/risk.html'],
-      [/^(LOG|SIG)/, '/static/logs.html'],
-      [/^(BACK|TEST)/, '/static/backtesting.html'],
-      [/^(KEY|API|BROKER|ACC)/, '/static/apikeys.html'],
-      [/^(SET|CONF)/, '/static/settings.html'],
-    ];
-    for (const [re, url] of pages) {
-      if (re.test(t)) { location.href = url; return; }
-    }
-    // Default: go to positions search if it looks like a ticker
-    if (/^[A-Z]{1,5}$/.test(t)) { location.href = `/static/positions.html`; return; }
-    alert('No matching page found. Try: dashboard, positions, logs, bots, risk, settings, backtesting, balances, performance, broker accounts.');
-  });
+  const overlay = _buildSearchOverlay();
+  bar.addEventListener('click', () => overlay._open());
 }
 
 // ── Bell / notification indicator ───────────────────────────────────
@@ -1189,16 +1276,15 @@ async function initPositions() {
 
   function setMoSide(side) {
     moSide = side;
-    if (side === 'buy') {
-      buyBtn.style.cssText  = 'background:rgba(16,185,129,.15);color:#10B981;border-color:rgba(16,185,129,.3);font-weight:600;';
-      sellBtn.style.cssText = 'background:transparent;color:#64748B;border-color:#1E2D45;font-weight:600;';
-      submitBtn.style.cssText = 'width:100%;background:#10B981;color:#fff;border-color:#10B981;font-weight:600;padding:.65rem;';
-      submitBtn.textContent = 'Place Buy Order';
-    } else {
-      sellBtn.style.cssText  = 'background:rgba(239,68,68,.15);color:#EF4444;border-color:rgba(239,68,68,.3);font-weight:600;';
-      buyBtn.style.cssText   = 'background:transparent;color:#64748B;border-color:#1E2D45;font-weight:600;';
-      submitBtn.style.cssText = 'width:100%;background:#EF4444;color:#fff;border-color:#EF4444;font-weight:600;padding:.65rem;';
-      submitBtn.textContent = 'Place Sell Order';
+    const isBuy = side === 'buy';
+    buyBtn?.classList.toggle('mo-tab-active', isBuy);
+    sellBtn?.classList.toggle('mo-tab-active', !isBuy);
+    if (submitBtn) {
+      submitBtn.classList.toggle('mo-submit-buy',  isBuy);
+      submitBtn.classList.toggle('mo-submit-sell', !isBuy);
+      submitBtn.innerHTML = isBuy
+        ? '<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg> Place Buy Order'
+        : '<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></svg> Place Sell Order';
     }
   }
 
@@ -1208,15 +1294,13 @@ async function initPositions() {
   let modeIsQty = true;
   function setMoMode(isQty) {
     modeIsQty = isQty;
+    modeQtyBtn?.classList.toggle('mo-mode-active', isQty);
+    modeNotionalBtn?.classList.toggle('mo-mode-active', !isQty);
     if (isQty) {
-      modeQtyBtn.classList.add('active');
-      modeNotionalBtn.classList.remove('active');
       qtyLabel.textContent = 'Number of Shares';
       qtyInput.placeholder = '0';
       qtyInput.step = 'any';
     } else {
-      modeNotionalBtn.classList.add('active');
-      modeQtyBtn.classList.remove('active');
       qtyLabel.textContent = 'USD Value';
       qtyInput.placeholder = '0.00';
       qtyInput.step = '0.01';
