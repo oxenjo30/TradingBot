@@ -1647,6 +1647,10 @@ button { cursor: pointer; font-family: inherit; }
 [data-theme="light"] .paper-card { border-color: rgba(59,130,246,.25); }
 [data-theme="light"] .paper-card p:last-of-type { color: #0F172A; }
 
+/* watchlist suggestions dropdown */
+.wl-suggestions-drop { background: var(--card); }
+[data-theme="light"] .wl-suggestions-drop { background: #FFFFFF; box-shadow: 0 8px 24px rgba(0,0,0,.1); }
+
 /* order ticket */
 [data-theme="light"] .mot-sym-input { background: #F8FAFC; border-color: var(--border); color: var(--text); }
 [data-theme="light"] .mot-qty-input { background: #F8FAFC; border-color: var(--border); color: var(--text); }
