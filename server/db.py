@@ -490,13 +490,14 @@ def assign_strategy_account(strategy_name: str, account_id: int, enabled: bool) 
 
 
 def update_strategy_account_enabled(strategy_name: str, account_id: int, enabled: bool) -> bool:
-    """Returns True if updated, False if (strategy_name, account_id) pair not found."""
+    """Upsert the enabled flag — creates the row if it doesn't exist yet."""
     with get_conn() as c:
-        cur = c.execute(
-            "UPDATE strategy_accounts SET enabled=? WHERE strategy_name=? AND account_id=?",
-            (int(enabled), strategy_name, account_id)
+        c.execute(
+            "INSERT INTO strategy_accounts (strategy_name, account_id, enabled) VALUES (?,?,?) "
+            "ON CONFLICT(strategy_name, account_id) DO UPDATE SET enabled=excluded.enabled",
+            (strategy_name, account_id, int(enabled))
         )
-        return cur.rowcount > 0
+        return True
 
 
 def unassign_strategy_account(strategy_name: str, account_id: int) -> None:

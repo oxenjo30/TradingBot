@@ -504,9 +504,7 @@ def assign_strategy_account(name: str, body: StrategyAccountAssign, request: Req
 @app.patch("/api/strategies/{name}/accounts/{account_id}")
 def patch_strategy_account(name: str, account_id: int, body: StrategyAccountPatch, request: Request):
     _require_auth(request)
-    updated = db.update_strategy_account_enabled(name, account_id, body.enabled)
-    if not updated:
-        raise HTTPException(404, "assignment not found")
+    db.update_strategy_account_enabled(name, account_id, body.enabled)
     return db.get_strategy_account_list(name)
 
 
