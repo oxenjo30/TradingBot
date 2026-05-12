@@ -211,6 +211,35 @@ def init_db():
             c.execute("ALTER TABLE strategies ADD COLUMN active_start TEXT DEFAULT NULL")
         if "active_end" not in cols:
             c.execute("ALTER TABLE strategies ADD COLUMN active_end TEXT DEFAULT NULL")
+    # Migration: create watchlists table if missing (added after initial schema)
+    with get_conn() as c:
+        tables = [r[0] for r in c.execute("SELECT name FROM sqlite_master WHERE type='table'")]
+        if "watchlists" not in tables:
+            c.executescript("""
+                CREATE TABLE IF NOT EXISTS watchlists (
+                  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                  name       TEXT NOT NULL UNIQUE,
+                  symbols    TEXT NOT NULL DEFAULT '[]',
+                  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+                );
+            """)
+    # Migration: create price_alerts table if missing
+    with get_conn() as c:
+        tables = [r[0] for r in c.execute("SELECT name FROM sqlite_master WHERE type='table'")]
+        if "price_alerts" not in tables:
+            c.executescript("""
+                CREATE TABLE IF NOT EXISTS price_alerts (
+                  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                  symbol     TEXT NOT NULL,
+                  condition  TEXT NOT NULL,
+                  price      REAL NOT NULL,
+                  note       TEXT,
+                  triggered  INTEGER NOT NULL DEFAULT 0,
+                  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+                );
+            """)
+
 
 
 def get_risk_settings() -> dict:
