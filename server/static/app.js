@@ -603,7 +603,7 @@ async function initDashboard() {
       const pnlEl = document.getElementById('daypnl-val');
       clearState(pnlEl);
       pnlEl.textContent = fmt.usdSigned(a.day_pl, '—');
-      pnlEl.className = 'text-tabular truncate ' + (a.day_pl >= 0 ? 'glow-green' : 'glow-red');
+      pnlEl.className = 'text-tabular truncate ' + (a.day_pl >= 0 ? 'text-green glow-green' : 'text-red glow-red');
       pnlEl.style.fontSize = '20px';
       pnlEl.style.fontWeight = '700';
 
@@ -621,7 +621,7 @@ async function initDashboard() {
 
       const pct = (a.day_pl_pct || 0) * 100;
       document.getElementById('pnl-daypnl').textContent = fmt.usdSigned(a.day_pl, '$0.00');
-      document.getElementById('pnl-daypnl').className = 'text-tabular ' + (a.day_pl >= 0 ? 'glow-green' : 'glow-red');
+      document.getElementById('pnl-daypnl').className = 'text-tabular ' + (a.day_pl >= 0 ? 'text-green glow-green' : 'text-red glow-red');
 
       if (radialChart) { radialChart.destroy(); }
       const radEl = document.getElementById('radial-chart');
@@ -644,7 +644,7 @@ async function initDashboard() {
       clearState(upnlEl);
       const upnl = p.total_unrealized_pl || 0;
       upnlEl.textContent = fmt.usdSigned(upnl, '$0.00');
-      upnlEl.className = 'text-tabular truncate ' + (upnl >= 0 ? 'glow-green' : 'glow-red');
+      upnlEl.className = 'text-tabular truncate ' + (upnl >= 0 ? 'text-green glow-green' : 'text-red glow-red');
       upnlEl.style.fontSize = '20px';
       upnlEl.style.fontWeight = '700';
 
@@ -653,7 +653,7 @@ async function initDashboard() {
       opEl.textContent = fmt.integer(p.open_positions, '0');
 
       document.getElementById('pnl-upnl').textContent = fmt.usdSigned(p.total_unrealized_pl, '$0.00');
-      document.getElementById('pnl-upnl').className = 'text-tabular ' + (upnl >= 0 ? 'glow-green' : 'glow-red');
+      document.getElementById('pnl-upnl').className = 'text-tabular ' + (upnl >= 0 ? 'text-green glow-green' : 'text-red glow-red');
       document.getElementById('pnl-openpos').textContent = fmt.integer(p.open_positions, '0');
 
       const counts = (p.daily_counts || []).slice(-7).map(d => d.total || 0);
@@ -1604,7 +1604,7 @@ async function initPositions() {
           const td = document.createElement('td');
           if (i === 6) {
             td.textContent = fmt.usdSigned(pnl, '&mdash;');
-            td.className = 'text-tabular ' + (pnl >= 0 ? 'glow-green' : 'glow-red');
+            td.className = 'text-tabular ' + (pnl >= 0 ? 'text-green glow-green' : 'text-red glow-red');
           } else { td.textContent = v; }
           tr.appendChild(td);
         });
@@ -2371,7 +2371,7 @@ async function initBalances() {
           const td = document.createElement('td');
           if (i === 5) {
             td.textContent = fmt.usdSigned(pnl, '—');
-            td.className = 'text-tabular ' + (pnl >= 0 ? 'glow-green' : 'glow-red');
+            td.className = 'text-tabular ' + (pnl >= 0 ? 'text-green glow-green' : 'text-red glow-red');
           } else { td.textContent = v; }
           tr.appendChild(td);
         });

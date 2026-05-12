@@ -153,6 +153,7 @@ button { cursor: pointer; font-family: inherit; }
 .text-muted   { color: var(--muted); }
 .text-error   { color: var(--red); }
 .text-green   { color: var(--green); }
+.text-red     { color: var(--red); }
 .text-tabular { font-variant-numeric: tabular-nums; }
 
 /* ── Overflow protection ── */
