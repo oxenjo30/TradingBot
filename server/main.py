@@ -35,6 +35,9 @@ async def lifespan(app: FastAPI):
         if cls.name not in existing:
             db.upsert_strategy(cls.name, enabled=False, params=cls.default_params)
     engine.start(interval_seconds=60)
+    # Pre-load asset search cache in background so first search is instant
+    import threading
+    threading.Thread(target=alpaca_client._load_asset_cache, daemon=True).start()
     yield
     engine.shutdown()
 
@@ -358,6 +361,11 @@ def quotes_snapshot(symbols: str, request: Request):
     except Exception as e:
         raise HTTPException(400, str(e))
 
+@app.get("/api/assets/search")
+def assets_search(q: str = "", request: Request = None):
+    _require_auth(request)
+    return alpaca_client.search_assets(q, limit=8)
+
 @app.get("/api/portfolio_history")
 def portfolio_history(request: Request, period: str = "1M", timeframe: str = "1D"):
     _require_auth(request)
@@ -588,7 +596,11 @@ def assign_strategy_account(name: str, body: StrategyAccountAssign, request: Req
 def patch_strategy_account(name: str, account_id: int, body: StrategyAccountPatch, request: Request):
     _require_auth(request)
     db.update_strategy_account_enabled(name, account_id, body.enabled)
-    return db.get_strategy_account_list(name)
+    # Sync global enabled flag: on if any account has it enabled, off if none do
+    account_list = db.get_strategy_account_list(name)
+    globally_enabled = any(a["enabled"] for a in account_list)
+    db.upsert_strategy(name, enabled=globally_enabled)
+    return account_list
 
 
 @app.delete("/api/strategies/{name}/accounts/{account_id}")
