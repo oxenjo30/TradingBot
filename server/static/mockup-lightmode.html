@@ -465,8 +465,8 @@ body { font-family: 'Inter', system-ui, sans-serif; background: #E2E8F0; color: 
             <div class="metric-card">
               <div class="icon-circle icon-green"><svg width="15" height="15" fill="none" stroke="#10B981" stroke-width="1.8" viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/></svg></div>
               <div class="metric-label">Daily P&L</div>
-              <div class="metric-value text-green">+$312.40</div>
-              <div class="metric-sub">+1.27%</div>
+              <div class="metric-value" style="color:#059669;font-weight:800;">+$312.40</div>
+              <div class="metric-sub" style="color:#059669;">+1.27% today</div>
               <div class="sparkline green"></div>
             </div>
             <div class="metric-card">
@@ -486,8 +486,8 @@ body { font-family: 'Inter', system-ui, sans-serif; background: #E2E8F0; color: 
             <div class="metric-card">
               <div class="icon-circle icon-orange"><svg width="15" height="15" fill="none" stroke="#F59E0B" stroke-width="1.8" viewBox="0 0 24 24"><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><path d="M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83"/></svg></div>
               <div class="metric-label">Unrealized P&L</div>
-              <div class="metric-value text-green">+$891</div>
-              <div class="metric-sub">Open positions</div>
+              <div class="metric-value" style="color:#059669;font-weight:800;">+$891</div>
+              <div class="metric-sub" style="color:#059669;">Open positions</div>
               <div class="sparkline green"></div>
             </div>
             <div class="metric-card">
@@ -684,16 +684,16 @@ body { font-family: 'Inter', system-ui, sans-serif; background: #E2E8F0; color: 
               </div>
               <div style="display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid var(--border);">
                 <div style="padding:.7rem 1.25rem;border-right:1px solid var(--border);"><div class="text-xs text-muted mb-1">Market Value</div><div style="font-size:16px;font-weight:700;">$12,480</div></div>
-                <div style="padding:.7rem 1.25rem;border-right:1px solid var(--border);"><div class="text-xs text-muted mb-1">Unrealized P&L</div><div style="font-size:16px;font-weight:700;color:var(--green);">+$891</div></div>
+                <div style="padding:.7rem 1.25rem;border-right:1px solid var(--border);"><div class="text-xs text-muted mb-1">Unrealized P&L</div><div style="font-size:16px;font-weight:800;color:#059669;">+$891.00</div></div>
                 <div style="padding:.7rem 1.25rem;border-right:1px solid var(--border);"><div class="text-xs text-muted mb-1">Positions</div><div style="font-size:16px;font-weight:700;">8</div></div>
                 <div style="padding:.7rem 1.25rem;"><div class="text-xs text-muted mb-1">Day Trades</div><div style="font-size:16px;font-weight:700;">2 / 3</div></div>
               </div>
               <table class="dtable">
                 <thead><tr><th>Symbol</th><th>Side</th><th>Qty</th><th>Avg Entry</th><th>Price</th><th>Market Value</th><th>P&L</th></tr></thead>
                 <tbody>
-                  <tr><td><strong>NVDA</strong></td><td><span class="badge b-green">Long</span></td><td>5</td><td>$875.20</td><td>$892.40</td><td>$4,462</td><td class="text-green">+$86.00</td></tr>
-                  <tr><td><strong>AAPL</strong></td><td><span class="badge b-green">Long</span></td><td>10</td><td>$186.50</td><td>$189.30</td><td>$1,893</td><td class="text-green">+$28.00</td></tr>
-                  <tr><td><strong>MSFT</strong></td><td><span class="badge b-red">Short</span></td><td>3</td><td>$415.80</td><td>$412.10</td><td>$1,236</td><td class="text-green">+$11.10</td></tr>
+                  <tr><td><strong>NVDA</strong></td><td><span class="badge b-green">Long</span></td><td>5</td><td>$875.20</td><td style="color:#059669;font-weight:600;">$892.40</td><td>$4,462</td><td><span style="display:inline-flex;align-items:center;gap:4px;background:#D1FAE5;color:#065F46;border:1px solid #6EE7B7;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:700;">▲ +$86.00</span></td></tr>
+                  <tr><td><strong>AAPL</strong></td><td><span class="badge b-green">Long</span></td><td>10</td><td>$186.50</td><td style="color:#059669;font-weight:600;">$189.30</td><td>$1,893</td><td><span style="display:inline-flex;align-items:center;gap:4px;background:#D1FAE5;color:#065F46;border:1px solid #6EE7B7;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:700;">▲ +$28.00</span></td></tr>
+                  <tr><td><strong>IREN</strong></td><td><span class="badge b-red">Short</span></td><td>1</td><td>$59.74</td><td style="color:#DC2626;font-weight:600;">$54.99</td><td>$54.99</td><td><span style="display:inline-flex;align-items:center;gap:4px;background:#FEE2E2;color:#991B1B;border:1px solid #FCA5A5;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:700;">▼ -$4.75</span></td></tr>
                 </tbody>
               </table>
             </div>
@@ -1154,19 +1154,43 @@ body { font-family: 'Inter', system-ui, sans-serif; background: #E2E8F0; color: 
       <div class="scrollable">
         <div class="content-pad">
           <div class="grid-4">
-            <div class="metric-card"><div class="metric-label">Equity</div><div class="metric-value">$24,831</div></div>
-            <div class="metric-card"><div class="metric-label">Cash</div><div class="metric-value">$12,351</div></div>
-            <div class="metric-card"><div class="metric-label">Buying Power</div><div class="metric-value">$49,702</div></div>
-            <div class="metric-card"><div class="metric-label">Portfolio Value</div><div class="metric-value">$24,831</div></div>
+            <div class="metric-card"><div class="metric-label">Equity</div><div class="metric-value">$24,831</div><div class="metric-sub">Total account value</div></div>
+            <div class="metric-card"><div class="metric-label">Cash</div><div class="metric-value">$12,351</div><div class="metric-sub">Available to trade</div></div>
+            <div class="metric-card"><div class="metric-label">Buying Power</div><div class="metric-value">$49,702</div><div class="metric-sub">With 2× margin</div></div>
+            <div class="metric-card">
+              <div class="metric-label">Unrealized P&L</div>
+              <div class="metric-value" style="color:#059669;font-weight:800;">+$629.28</div>
+              <div class="metric-sub" style="color:#059669;">Today's open gain</div>
+            </div>
           </div>
           <div class="card p-0">
-            <div style="padding:.8rem 1.25rem;border-bottom:1px solid var(--border);"><div class="card-title">Holdings</div></div>
+            <div style="padding:.8rem 1.25rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+              <div class="card-title">Holdings</div>
+              <span style="font-size:12px;color:#059669;font-weight:700;background:#D1FAE5;border:1px solid #6EE7B7;padding:2px 10px;border-radius:999px;">+$629.28 unrealized</span>
+            </div>
             <table class="dtable">
               <thead><tr><th>Symbol</th><th>Qty</th><th>Avg Entry</th><th>Current Price</th><th>Market Value</th><th>Unrealized P&L</th></tr></thead>
               <tbody>
-                <tr><td><strong>NVDA</strong></td><td>5</td><td>$875.20</td><td>$892.40</td><td>$4,462</td><td class="text-green">+$86.00</td></tr>
-                <tr><td><strong>AAPL</strong></td><td>10</td><td>$186.50</td><td>$189.30</td><td>$1,893</td><td class="text-green">+$28.00</td></tr>
-                <tr><td><strong>BTC</strong></td><td>0.12</td><td>$62,400</td><td>$67,800</td><td>$8,136</td><td class="text-green">+$648</td></tr>
+                <tr>
+                  <td><strong>NVDA</strong></td><td>5</td><td>$875.20</td><td style="color:#059669;font-weight:600;">$892.40</td><td>$4,462</td>
+                  <td><span style="display:inline-flex;align-items:center;gap:4px;background:#D1FAE5;color:#065F46;border:1px solid #6EE7B7;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:700;">▲ +$86.00</span></td>
+                </tr>
+                <tr>
+                  <td><strong>AAPL</strong></td><td>10</td><td>$186.50</td><td style="color:#059669;font-weight:600;">$189.30</td><td>$1,893</td>
+                  <td><span style="display:inline-flex;align-items:center;gap:4px;background:#D1FAE5;color:#065F46;border:1px solid #6EE7B7;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:700;">▲ +$28.00</span></td>
+                </tr>
+                <tr>
+                  <td><strong>IREN</strong></td><td>1</td><td>$59.74</td><td style="color:#DC2626;font-weight:600;">$54.99</td><td>$54.99</td>
+                  <td><span style="display:inline-flex;align-items:center;gap:4px;background:#FEE2E2;color:#991B1B;border:1px solid #FCA5A5;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:700;">▼ -$4.75</span></td>
+                </tr>
+                <tr>
+                  <td><strong>BTC</strong></td><td>0.12</td><td>$62,400</td><td style="color:#059669;font-weight:600;">$67,800</td><td>$8,136</td>
+                  <td><span style="display:inline-flex;align-items:center;gap:4px;background:#D1FAE5;color:#065F46;border:1px solid #6EE7B7;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:700;">▲ +$648.00</span></td>
+                </tr>
+                <tr>
+                  <td><strong>TSLL</strong></td><td>2</td><td>$15.09</td><td style="color:#059669;font-weight:600;">$16.49</td><td>$32.98</td>
+                  <td><span style="display:inline-flex;align-items:center;gap:4px;background:#D1FAE5;color:#065F46;border:1px solid #6EE7B7;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:700;">▲ +$2.80</span></td>
+                </tr>
               </tbody>
             </table>
           </div>
