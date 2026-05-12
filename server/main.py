@@ -295,9 +295,9 @@ def license_deactivate(request: Request):
 # ── Account & market ───────────────────────────────────────────────────────────
 
 @app.get("/api/account")
-def account(request: Request):
+def account(request: Request, account_id: int | None = None):
     _require_auth(request)
-    return alpaca_client.get_account_summary()
+    return _get_broker_client(account_id).get_account_summary()
 
 @app.get("/api/clock")
 def clock():

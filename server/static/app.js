@@ -2517,9 +2517,39 @@ async function initRisk() {
 async function initBalances() {
   initClockChip(document.getElementById('market-chip'));
 
+  let balAccountId = null;
+
+  // Build account selector (only shown when >1 account exists)
+  try {
+    const accounts = await api('/api/broker-accounts', { key: 'bal-acct-list' });
+    if (accounts && accounts.length >= 2) {
+      const wrap = document.getElementById('bal-account-wrap');
+      if (wrap) {
+        const sel = document.createElement('select');
+        sel.className = 'form-input';
+        sel.style.cssText = 'font-size:12px;padding:.3rem .6rem;height:auto;';
+        const all = document.createElement('option');
+        all.value = ''; all.textContent = 'All accounts';
+        sel.appendChild(all);
+        accounts.forEach(a => {
+          const opt = document.createElement('option');
+          opt.value = a.id; opt.textContent = a.label || `Account ${a.id}`;
+          sel.appendChild(opt);
+        });
+        sel.addEventListener('change', () => {
+          balAccountId = sel.value ? parseInt(sel.value) : null;
+          fetchAccount();
+          fetchHoldings();
+        });
+        wrap.appendChild(sel);
+      }
+    }
+  } catch {}
+
   async function fetchAccount() {
+    const qs = balAccountId ? `?account_id=${balAccountId}` : '';
     try {
-      const a = await api('/api/account', { key: 'bal-account' });
+      const a = await api(`/api/account${qs}`, { key: 'bal-account' });
       document.getElementById('bal-equity').textContent = fmt.usd(a.equity);
       document.getElementById('bal-cash').textContent   = fmt.usd(a.cash);
       document.getElementById('bal-bp').textContent     = fmt.usd(a.buying_power);
@@ -2538,8 +2568,9 @@ async function initBalances() {
 
   async function fetchHoldings() {
     const tbody = document.getElementById('holdings-body');
+    const qs = balAccountId ? `?account_id=${balAccountId}` : '';
     try {
-      const positions = await api('/api/positions', { key: 'bal-positions' });
+      const positions = await api(`/api/positions${qs}`, { key: 'bal-positions' });
       tbody.innerHTML = '';
       if (!positions.length) {
         tbody.innerHTML = '<tr><td colspan="6" class="state-empty">No open holdings.</td></tr>';
