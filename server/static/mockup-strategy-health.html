@@ -608,12 +608,8 @@
                     <span class="sh-detail-label">Backtest Total Trades</span>
                     <span class="sh-detail-val">183 trades</span>
                   </div>
-                  <div class="sh-detail-item">
-                    <span class="sh-detail-label">Account</span>
-                    <span class="sh-detail-val">Alpaca Paper</span>
-                  </div>
                   <div class="sh-detail-item" style="margin-left:auto;align-self:center;">
-                    <a href="#backtesting" class="btn btn-ghost btn-sm" style="font-size:11px;">
+                    <a href="/static/backtesting.html?run=3" class="btn btn-ghost btn-sm" style="font-size:11px;">
                       <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
                       View Backtest
                     </a>
@@ -672,9 +668,8 @@
                   <div class="sh-detail-item"><span class="sh-detail-label">Backtest Win Rate</span><span class="sh-detail-val">68%</span></div>
                   <div class="sh-detail-item"><span class="sh-detail-label">Backtest Avg Return</span><span class="sh-detail-val">+1.9% / trade</span></div>
                   <div class="sh-detail-item"><span class="sh-detail-label">Backtest Total Trades</span><span class="sh-detail-val">241 trades</span></div>
-                  <div class="sh-detail-item"><span class="sh-detail-label">Account</span><span class="sh-detail-val">Alpaca Paper</span></div>
                   <div class="sh-detail-item" style="margin-left:auto;align-self:center;">
-                    <a href="#backtesting" class="btn btn-ghost btn-sm" style="font-size:11px;">
+                    <a href="/static/backtesting.html?run=5" class="btn btn-ghost btn-sm" style="font-size:11px;">
                       <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
                       View Backtest
                     </a>
@@ -733,9 +728,8 @@
                   <div class="sh-detail-item"><span class="sh-detail-label">Backtest Win Rate</span><span class="sh-detail-val">63%</span></div>
                   <div class="sh-detail-item"><span class="sh-detail-label">Backtest Avg Return</span><span class="sh-detail-val">+1.4% / trade</span></div>
                   <div class="sh-detail-item"><span class="sh-detail-label">Backtest Total Trades</span><span class="sh-detail-val">97 trades</span></div>
-                  <div class="sh-detail-item"><span class="sh-detail-label">Account</span><span class="sh-detail-val">Alpaca Paper</span></div>
                   <div class="sh-detail-item" style="margin-left:auto;align-self:center;">
-                    <a href="#backtesting" class="btn btn-ghost btn-sm" style="font-size:11px;">
+                    <a href="/static/backtesting.html?run=7" class="btn btn-ghost btn-sm" style="font-size:11px;">
                       <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
                       View Backtest
                     </a>
@@ -744,7 +738,53 @@
               </td>
             </tr>
 
-            <!-- ── Row 4: NO BENCHMARK ── -->
+            <!-- ── Row 4: NEED MORE DATA (benchmark set, <10 live trades) ── -->
+            <tr style="cursor:pointer;" onclick="toggleDetail('sh-detail-4','sh-exp-4')">
+              <td>
+                <button class="sh-expand-btn" id="sh-exp-4" tabindex="-1">
+                  <svg width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+                </button>
+              </td>
+              <td>
+                <div style="font-weight:600;font-size:13px;color:var(--muted);">Gap Momentum</div>
+                <div style="font-size:11px;color:#475569;margin-top:1px;">Benchmark: Gap BT May-2025 · need 10+ live trades</div>
+              </td>
+              <td><span style="font-size:13px;color:#475569;">—</span></td>
+              <td><span style="font-size:13px;color:#475569;">—</span></td>
+              <td>
+                <div style="font-size:13px;color:var(--muted);">6 trades</div>
+                <div style="font-size:11px;color:#475569;">Last: 6h ago</div>
+              </td>
+              <td>
+                <span class="health-pill health-none">
+                  <span class="health-dot health-dot-none"></span>
+                  Need More Data
+                </span>
+              </td>
+            </tr>
+            <tr class="sh-detail-row" id="sh-detail-4">
+              <td colspan="6" class="sh-detail-cell">
+                <div class="sh-detail-inner">
+                  <div class="sh-detail-item"><span class="sh-detail-label">Benchmark Run</span><span class="sh-detail-val">Gap BT May-2025</span></div>
+                  <div class="sh-detail-item"><span class="sh-detail-label">Backtest Period</span><span class="sh-detail-val">Jan 1 – May 1, 2025</span></div>
+                  <div class="sh-detail-item"><span class="sh-detail-label">Backtest Win Rate</span><span class="sh-detail-val">58%</span></div>
+                  <div class="sh-detail-item"><span class="sh-detail-label">Backtest Avg Return</span><span class="sh-detail-val">+2.3% / trade</span></div>
+                  <div class="sh-detail-item"><span class="sh-detail-label">Backtest Total Trades</span><span class="sh-detail-val">74 trades</span></div>
+                  <div class="sh-detail-item">
+                    <span class="sh-detail-label">Live Trades</span>
+                    <span class="sh-detail-val" style="color:var(--muted);">6 of 10 needed</span>
+                  </div>
+                  <div class="sh-detail-item" style="margin-left:auto;align-self:center;">
+                    <a href="/static/backtesting.html?run=9" class="btn btn-ghost btn-sm" style="font-size:11px;">
+                      <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                      View Backtest
+                    </a>
+                  </div>
+                </div>
+              </td>
+            </tr>
+
+            <!-- ── Row 5: NO BENCHMARK ── -->
             <tr>
               <td></td>
               <td>
@@ -773,8 +813,8 @@
       <div style="margin-top:.875rem;padding-top:.875rem;border-top:1px solid rgba(30,45,69,.6);display:flex;align-items:center;gap:.5rem;">
         <svg width="13" height="13" fill="none" stroke="#475569" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
         <span style="font-size:11px;color:#475569;">Set a backtest run as the benchmark for each strategy in the
-          <a href="#backtesting" style="color:#3B82F6;font-weight:500;">Backtesting page</a>.
-          Health is flagged when win rate or avg return diverges &gt;15% from the benchmark.
+          <a href="/static/backtesting.html" style="color:#3B82F6;font-weight:500;">Backtesting page</a>.
+          Health turns yellow above 15% divergence and red above 30%.
         </span>
       </div>
     </div>

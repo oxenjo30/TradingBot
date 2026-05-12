@@ -54,21 +54,23 @@ One run per strategy may be the benchmark at a time. Enforced at the DB helper l
 - Returns `True` if successful, `False` if run not found
 
 **`get_benchmark(strategy: str) -> dict | None`**
-- Returns the benchmark run for the given strategy: `{id, name, win_rate_pct, avg_return_pct, total_trades, start_date, end_date}`
-- `avg_return_pct` = `total_return_pct / total_trades` (computed in Python, not SQL)
+- Returns the benchmark run for the given strategy: `{id, name, win_rate_pct, avg_return_pct, total_trades, start_date, end_date, last_trade_at}`
+- `avg_return_pct` = `total_return_pct / total_trades if total_trades else 0.0` (computed in Python, not SQL; guards against zero/NULL `total_trades`)
 - Returns `None` if no benchmark is set
 
 **`get_live_health_stats(strategy: str) -> dict`**
-- SQL aggregate over `strategy_perf` for the given strategy:
+- SQL aggregate over `strategy_perf` for the given strategy (all-time — no date scoping; this is intentional for simplicity; a future rolling-window option can be added without a schema change):
   - `total_trades`: `COUNT(*)`
   - `winning_trades`: `COUNT(*) WHERE pnl > 0`
   - `live_win_rate`: `winning_trades / total_trades` (0.0 if no trades)
   - `live_avg_return_pct`: `AVG(pnl_pct)` (0.0 if no trades)
-- Returns dict with those four keys
+  - `last_trade_at`: `MAX(date)` (None if no trades)
+- Returns dict with those five keys
 
 **`list_backtest_runs_with_benchmark() -> list[dict]`**
 - Extends existing `list_backtest_runs()` to include `is_benchmark` column
 - Used by backtesting page to show star state per row
+- The existing `GET /api/backtest/runs` endpoint calls this helper instead of `list_backtest_runs()` — additive, no breaking change
 
 ---
 
@@ -76,9 +78,10 @@ One run per strategy may be the benchmark at a time. Enforced at the DB helper l
 
 **`GET /api/strategy-health`**
 
-Returns health stats for all registered strategies. Calls `get_strategies()`, then for each strategy calls `get_benchmark()` and `get_live_health_stats()` and computes `drift_status`.
+Returns health stats for all registered strategies. Iterates `strategies.REGISTRY.values()` (same source as `GET /api/strategies`) — NOT `db.get_strategies()` — so all registered strategies appear even if their settings have never been saved to the DB. For each strategy calls `get_benchmark()` and `get_live_health_stats()` and computes `drift_status`.
 
-Response shape (array):
+Response shape (array) — one object per registered strategy:
+
 ```json
 [
   {
@@ -86,6 +89,7 @@ Response shape (array):
     "live_trades": 42,
     "live_win_rate": 0.42,
     "live_avg_return_pct": 0.7,
+    "last_trade_at": "2025-05-12",
     "benchmark_run_id": 3,
     "benchmark_run_name": "RSI MR Apr-2025",
     "benchmark_start_date": "2025-01-01",
@@ -100,6 +104,10 @@ Response shape (array):
 
 `drift_status` values: `"green"` | `"yellow"` | `"red"` | `"no_benchmark"` | `"no_data"`
 
+When `drift_status == "no_benchmark"`: all `benchmark_*` fields are `null`.
+When `drift_status == "no_data"`: benchmark fields ARE populated (benchmark is set), but `live_trades < 10`. Live metric fields (`live_win_rate`, `live_avg_return_pct`) are still returned as-is (may be 0.0). UI shows "Need More Data" pill and renders benchmark column as `—`.
+When `drift_status == "no_data"` and `drift_status == "no_benchmark"` simultaneously: `"no_benchmark"` takes priority.
+
 Drift computation logic:
 ```python
 def compute_drift_status(live_wr, live_ar, bench_wr, bench_ar, live_trades):
@@ -113,15 +121,13 @@ def compute_drift_status(live_wr, live_ar, bench_wr, bench_ar, live_trades):
     return "red"
 ```
 
-**`POST /api/backtest-runs/{run_id}/set-benchmark`**
+**`POST /api/backtest/runs/{run_id}/set-benchmark`**
 
 Calls `db.set_benchmark(run_id)`. Returns `{"ok": true}` or 404 if run not found. Auth-gated via `_require_auth`.
 
-**`GET /api/backtest-runs/{run_id}/benchmark-status`**
+> The `GET /api/backtest-runs/{run_id}/benchmark-status` endpoint originally proposed is **dropped** — it is redundant because `is_benchmark` is already returned per-row by `GET /api/backtest/runs`. The backtesting page reads it from the list response on load.
 
-Returns `{"is_benchmark": true/false}` for the given run. Used by backtesting page on load to restore star state.
-
-> Note: `list_backtest_runs` response already returns all fields needed — the existing `GET /api/backtest/runs` endpoint is extended to include `is_benchmark` in the response (no breaking change, additive field only).
+> Note: The existing `GET /api/backtest/runs` endpoint is extended to include `is_benchmark` in each row (no breaking change, additive field only).
 
 ---
 
@@ -132,11 +138,12 @@ Returns `{"is_benchmark": true/false}` for the given run. Used by backtesting pa
 Add a new card **after** the "Strategy Statistics / Top Symbols" row and **before** the "Daily Signal Activity" chart. The card:
 
 - Has a blue→purple gradient accent bar at the top (matching modal style)
-- Header: icon + "Strategy Health" title + subtitle + summary count badges ("N on track · N drifting")
+- Header: icon + "Strategy Health" title + subtitle + summary count badges: "N on track" (green+yellow count) · "N drifting" badge (red count only; strategies with `no_benchmark` or `no_data` are excluded from both counts)
 - Table columns: *(expand toggle)* | Strategy | Win Rate | Avg Return / Trade | Live Trades | Health
 - Each metric cell shows two rows: live value (colored by drift) + benchmark value in muted text with a delta chip
 - Health pill: **On Track** (green), **Watching** (yellow), **Drifting** (red), **No Benchmark** (grey), **Need More Data** (grey, <10 trades)
-- Clicking a row toggles an expand panel showing: benchmark run name, period, backtest win rate, backtest avg return, backtest total trades, account name, "View Backtest" button
+- Clicking a row toggles an expand panel showing: benchmark run name, period, backtest win rate, backtest avg return, backtest total trades, "View Backtest" button
+- "View Backtest" links to `/static/backtesting.html?run={benchmark_run_id}` — the backtesting page reads the `run` query param on load and calls the existing `loadRun(id)` function to auto-load that run's results
 - Footer hint linking to Backtesting page to set a benchmark
 - Exact visual: matches `mockup-strategy-health.html`
 
@@ -155,7 +162,9 @@ Backtest History table gains a **Benchmark** column. Each row shows:
 - If `is_benchmark === true`: filled star button styled as `bench-star-btn is-bench` with label "Benchmark"
 - If `is_benchmark === false`: outline star button with label "Set Benchmark"
 
-Clicking "Set Benchmark": `POST /api/backtest-runs/{id}/set-benchmark` → on success, update all rows for same strategy (clear other benchmarks for that strategy in the UI), set this row to filled star.
+Clicking "Set Benchmark": `POST /api/backtest/runs/{id}/set-benchmark` → on success, update all rows for same strategy (clear other benchmarks for that strategy in the UI), set this row to filled star. Benchmark designation is one-way — there is no "unset" action; to change the benchmark, set a different run as the benchmark for that strategy.
+
+`backtesting.html` also reads the `?run=` query parameter on load and calls `loadRun(id)` to auto-display that run (used by the "View Backtest" link from the health card expand panel).
 
 ---
 
@@ -164,7 +173,7 @@ Clicking "Set Benchmark": `POST /api/backtest-runs/{id}/set-benchmark` → on su
 | File | Action | Purpose |
 |---|---|---|
 | `server/db.py` | **Modify** | Add `is_benchmark` migration + 3 new helpers |
-| `server/main.py` | **Modify** | Add 3 new endpoints; extend `list_backtest_runs` response |
+| `server/main.py` | **Modify** | Add 2 new endpoints (`GET /api/strategy-health`, `POST /api/backtest/runs/{id}/set-benchmark`); extend `GET /api/backtest/runs` to include `is_benchmark` |
 | `server/static/performance.html` | **Modify** | Add Strategy Health card |
 | `server/static/backtesting.html` | **Modify** | Add Benchmark column to run history table |
 | `server/static/app.js` | **Modify** | Wire health card + benchmark toggle |
@@ -175,14 +184,17 @@ Clicking "Set Benchmark": `POST /api/backtest-runs/{id}/set-benchmark` → on su
 
 ## Tests (`tests/test_strategy_health.py`)
 
-- `test_set_benchmark_sets_flag` — verifies `is_benchmark=1` after call, other runs for same strategy cleared
+- `test_set_benchmark_sets_flag` — verifies `is_benchmark=1` on the target run; other runs for the same strategy are cleared to 0; runs for a different strategy are NOT affected
 - `test_set_benchmark_unknown_run_returns_false` — returns False for non-existent run_id
 - `test_get_benchmark_returns_none_when_none_set` — no benchmark set → returns None
-- `test_get_live_health_stats_empty` — no rows in strategy_perf → returns zeros
-- `test_get_live_health_stats_counts_correctly` — insert known rows, verify win rate and avg return
-- `test_strategy_health_endpoint_returns_all_strategies` — GET /api/strategy-health returns one entry per strategy
-- `test_set_benchmark_endpoint_returns_ok` — POST /api/backtest-runs/{id}/set-benchmark → 200 + `{"ok": true}`
+- `test_get_benchmark_zero_trades_guard` — benchmark run with total_trades=0 returns avg_return_pct=0.0, no ZeroDivisionError
+- `test_get_live_health_stats_empty` — no rows in strategy_perf → returns zeros and last_trade_at=None
+- `test_get_live_health_stats_counts_correctly` — insert known rows, verify win rate, avg return, and last_trade_at
+- `test_strategy_health_endpoint_returns_all_strategies` — GET /api/strategy-health returns one entry per registered strategy
+- `test_strategy_health_no_data_state` — strategy with benchmark set but <10 live trades → drift_status="no_data", benchmark fields populated
+- `test_set_benchmark_endpoint_returns_ok` — POST /api/backtest/runs/{id}/set-benchmark → 200 + `{"ok": true}`
 - `test_set_benchmark_endpoint_404` — POST with unknown id → 404
+- `test_backtest_runs_list_includes_is_benchmark` — GET /api/backtest/runs includes `is_benchmark` field per row
 
 ---
 
