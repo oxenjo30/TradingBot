@@ -2764,13 +2764,22 @@ async function initBacktesting() {
   }
 }
 
+let _btLastData = null;
+
 async function runBacktest() {
-  const btn   = document.getElementById('bt-run-btn');
-  const errEl = document.getElementById('bt-error');
+  const btn      = document.getElementById('bt-run-btn');
+  const errEl    = document.getElementById('bt-error');
+  const statusEl = document.getElementById('bt-status');
   errEl.classList.add('hidden');
 
   const rawSymbols = document.getElementById('bt-symbols').value;
   const symbols = rawSymbols.split(',').map(s => s.trim()).filter(Boolean);
+
+  if (!symbols.length) {
+    errEl.textContent = 'Enter at least one symbol.';
+    errEl.classList.remove('hidden');
+    return;
+  }
 
   const body = {
     strategy:          document.getElementById('bt-strategy').value,
@@ -2785,6 +2794,7 @@ async function runBacktest() {
 
   btn.disabled = true;
   btn.innerHTML = '<svg style="width:14px;height:14px;animation:spin 1s linear infinite;margin-right:6px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>Running&hellip;';
+  if (statusEl) { statusEl.textContent = `Fetching ${symbols.length} symbol${symbols.length > 1 ? 's' : ''}…`; statusEl.style.display = 'inline'; }
 
   try {
     const res = await fetch('/api/backtest', {
@@ -2798,6 +2808,7 @@ async function runBacktest() {
       throw new Error(payload.detail || `HTTP ${res.status}`);
     }
     const data = await res.json();
+    _btLastData = data;
     renderResults(data);
     try { renderHistory(await api('/api/backtest/runs')); } catch (_) { /* non-fatal */ }
   } catch (e) {
@@ -2806,10 +2817,12 @@ async function runBacktest() {
   } finally {
     btn.disabled = false;
     btn.innerHTML = 'Run Backtest';
+    if (statusEl) statusEl.style.display = 'none';
   }
 }
 
 function renderResults(data) {
+  _btLastData     = data;
   _btCurrentRunId = data.id;
   document.getElementById('bt-results').classList.remove('hidden');
 
@@ -2936,4 +2949,20 @@ async function renameRun() {
   } catch (e) {
     console.error('renameRun error', e);
   }
+}
+
+function exportBtCsv() {
+  if (!_btLastData?.trades?.length) return;
+  const rows = [['Date', 'Symbol', 'Side', 'Shares', 'Fill Price', 'P&L']];
+  _btLastData.trades.forEach(t => {
+    rows.push([t.date, t.symbol, t.side, t.qty, t.price, t.pnl]);
+  });
+  const csv = rows.map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  const label = (_btLastData.name || _btLastData.strategy || 'backtest').replace(/\s+/g, '_');
+  a.download = `tradebot_${label}_trades.csv`;
+  a.click();
+  URL.revokeObjectURL(a.href);
 }

@@ -172,7 +172,8 @@
         </div>
       </div>
 
-      <div class="flex justify-end">
+      <div class="flex justify-end items-center gap-3">
+        <span id="bt-status" style="font-size:12px;color:#64748B;display:none;"></span>
         <button id="bt-run-btn" class="btn btn-primary" onclick="runBacktest()">Run Backtest</button>
       </div>
     </div>
@@ -221,15 +222,23 @@
 
       <!-- Trades table -->
       <div class="card">
-        <div style="font-size:14px;font-weight:600;margin-bottom:.875rem;">Trades</div>
-        <table class="dtable">
-          <thead><tr>
-            <th>Date</th><th>Symbol</th><th>Side</th><th>Shares</th><th>Fill Price</th><th>P&amp;L</th>
-          </tr></thead>
-          <tbody id="bt-trades-body">
-            <tr><td colspan="6" class="state-empty">No trades yet.</td></tr>
-          </tbody>
-        </table>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.875rem;">
+          <div style="font-size:14px;font-weight:600;">Trades</div>
+          <button class="btn btn-ghost btn-sm" onclick="exportBtCsv()" id="bt-export-btn">
+            <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Export CSV
+          </button>
+        </div>
+        <div class="dtable-wrap">
+          <table class="dtable">
+            <thead><tr>
+              <th>Date</th><th>Symbol</th><th>Side</th><th>Shares</th><th>Fill Price</th><th>P&amp;L</th>
+            </tr></thead>
+            <tbody id="bt-trades-body">
+              <tr><td colspan="6" class="state-empty">No trades yet.</td></tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
 
