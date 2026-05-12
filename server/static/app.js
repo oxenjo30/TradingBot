@@ -1248,8 +1248,36 @@ async function initPositions() {
   modeQtyBtn?.addEventListener('click',      () => setMoMode(true));
   modeNotionalBtn?.addEventListener('click', () => setMoMode(false));
 
+  const quoteDisplay = document.getElementById('mo-quote-display');
+  let quoteTimer = null;
+
+  async function fetchQuote(sym) {
+    if (!sym || sym.length < 1) { quoteDisplay.style.display = 'none'; return; }
+    quoteDisplay.style.display = '';
+    quoteDisplay.textContent = 'Fetching price…';
+    quoteDisplay.style.color = '#64748B';
+    try {
+      const q = await api(`/api/quote/${sym}`, { key: `quote-${sym}` });
+      const mid = q.ask_price && q.bid_price
+        ? ((parseFloat(q.ask_price) + parseFloat(q.bid_price)) / 2)
+        : parseFloat(q.ask_price || q.bid_price || 0);
+      if (!mid) { quoteDisplay.textContent = 'No quote available'; return; }
+      quoteDisplay.innerHTML = `<span style="color:#E6EBF5;font-weight:700;">$${mid.toFixed(2)}</span> &nbsp;bid $${parseFloat(q.bid_price||0).toFixed(2)} &nbsp;ask $${parseFloat(q.ask_price||0).toFixed(2)}`;
+      quoteDisplay.style.color = '#64748B';
+      if (priceInput && !priceInput.value) priceInput.value = mid.toFixed(2);
+    } catch {
+      quoteDisplay.textContent = 'Symbol not found';
+      quoteDisplay.style.color = '#EF4444';
+    }
+  }
+
   symInput?.addEventListener('input', () => {
     symInput.value = symInput.value.toUpperCase();
+    clearTimeout(quoteTimer);
+    if (priceInput) priceInput.value = '';
+    quoteDisplay.style.display = 'none';
+    const sym = symInput.value.trim();
+    if (sym.length >= 1) quoteTimer = setTimeout(() => fetchQuote(sym), 600);
   });
 
   submitBtn?.addEventListener('click', () => {
