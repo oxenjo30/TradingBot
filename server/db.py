@@ -253,6 +253,27 @@ def init_db():
                 "ALTER TABLE backtest_runs ADD COLUMN is_benchmark INTEGER NOT NULL DEFAULT 0"
             )
 
+    # Migration: add ai_explanation to signals if missing
+    with get_conn() as c:
+        cols = [r[1] for r in c.execute("PRAGMA table_info(signals)")]
+        if "ai_explanation" not in cols:
+            c.execute("ALTER TABLE signals ADD COLUMN ai_explanation TEXT DEFAULT NULL")
+    # Migration: create ai_tuning_log table if missing
+    with get_conn() as c:
+        tables = [r[0] for r in c.execute("SELECT name FROM sqlite_master WHERE type='table'")]
+        if "ai_tuning_log" not in tables:
+            c.executescript("""
+                CREATE TABLE IF NOT EXISTS ai_tuning_log (
+                  id               INTEGER PRIMARY KEY AUTOINCREMENT,
+                  created_at       TEXT NOT NULL,
+                  strategy         TEXT NOT NULL,
+                  old_params       TEXT NOT NULL,
+                  new_params       TEXT NOT NULL,
+                  rationale        TEXT NOT NULL,
+                  win_rate_before  REAL,
+                  win_rate_after   REAL DEFAULT NULL
+                );
+            """)
 
 
 def get_risk_settings() -> dict:
@@ -431,13 +452,14 @@ def get_strategy(name: str) -> dict | None:
 
 def log_signal(strategy: str, symbol: str, side: str, qty: float, reason: str,
                order_id: str | None = None, status: str = "ok",
-               blocked: bool = False, account_id: int | None = None):
+               blocked: bool = False, account_id: int | None = None) -> int:
     with get_conn() as c:
-        c.execute(
+        cur = c.execute(
             """INSERT INTO signals(ts, strategy, symbol, side, qty, reason, order_id, status, blocked, account_id)
                VALUES(?,?,?,?,?,?,?,?,?,?)""",
             (now_iso(), strategy, symbol, side, qty, reason, order_id, status, int(blocked), account_id),
         )
+        return cur.lastrowid
 
 
 def recent_signals(limit: int = 100) -> list[dict]:
@@ -995,3 +1017,111 @@ def list_backtest_runs_with_benchmark() -> list[dict]:
         d["symbols"] = json.loads(d["symbols"])
         result.append(d)
     return result
+
+
+# ── AI helpers ─────────────────────────────────────────────────────────────────
+
+def set_signal_explanation(signal_id: int, text: str) -> None:
+    with get_conn() as c:
+        c.execute("UPDATE signals SET ai_explanation=? WHERE id=?", (text, signal_id))
+
+
+def get_unexplained_signals(limit: int = 50) -> list[dict]:
+    with get_conn() as c:
+        rows = c.execute(
+            """SELECT id, ts, strategy, symbol, side, reason
+               FROM signals
+               WHERE ai_explanation IS NULL
+                 AND status NOT IN ('blocked', 'error')
+                 AND symbol NOT IN ('-', '')
+               ORDER BY id ASC
+               LIMIT ?""",
+            (limit,),
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def get_signal_explanation(signal_id: int) -> str | None:
+    with get_conn() as c:
+        row = c.execute(
+            "SELECT ai_explanation FROM signals WHERE id=?", (signal_id,)
+        ).fetchone()
+    return row["ai_explanation"] if row else None
+
+
+def log_tuning_run(
+    strategy: str,
+    old_params: dict,
+    new_params: dict,
+    rationale: str,
+    win_rate_before: float | None,
+) -> int:
+    with get_conn() as c:
+        cur = c.execute(
+            """INSERT INTO ai_tuning_log
+               (created_at, strategy, old_params, new_params, rationale, win_rate_before)
+               VALUES (?,?,?,?,?,?)""",
+            (now_iso(), strategy, json.dumps(old_params), json.dumps(new_params),
+             rationale, win_rate_before),
+        )
+        return cur.lastrowid
+
+
+def list_tuning_log() -> list[dict]:
+    with get_conn() as c:
+        rows = c.execute(
+            "SELECT * FROM ai_tuning_log ORDER BY id DESC"
+        ).fetchall()
+    result = []
+    for r in rows:
+        d = dict(r)
+        d["old_params"] = json.loads(d["old_params"])
+        d["new_params"] = json.loads(d["new_params"])
+        result.append(d)
+    return result
+
+
+def get_tuning_run(run_id: int) -> dict | None:
+    with get_conn() as c:
+        row = c.execute(
+            "SELECT * FROM ai_tuning_log WHERE id=?", (run_id,)
+        ).fetchone()
+    if not row:
+        return None
+    d = dict(row)
+    d["old_params"] = json.loads(d["old_params"])
+    d["new_params"] = json.loads(d["new_params"])
+    return d
+
+
+def revert_tuning_run(run_id: int) -> bool:
+    run = get_tuning_run(run_id)
+    if not run:
+        return False
+    strat = get_strategy(run["strategy"])
+    if not strat:
+        return False
+    upsert_strategy(run["strategy"], enabled=strat["enabled"], params=run["old_params"])
+    return True
+
+
+def get_strategy_perf_90d(strategy: str) -> dict:
+    """Win rate, avg P&L, and trade count for a strategy over the last 90 days."""
+    with get_conn() as c:
+        row = c.execute(
+            """SELECT
+                COUNT(*)                                      AS total_trades,
+                SUM(CASE WHEN pnl > 0 THEN 1 ELSE 0 END)    AS wins,
+                COALESCE(AVG(pnl), 0.0)                      AS avg_pnl
+               FROM strategy_perf
+               WHERE strategy=?
+                 AND date >= DATE('now', '-90 days')""",
+            (strategy,),
+        ).fetchone()
+    total = row["total_trades"] or 0
+    wins  = row["wins"] or 0
+    return {
+        "total_trades": total,
+        "win_rate":     round(wins / total * 100, 1) if total else 0.0,
+        "avg_pnl":      round(row["avg_pnl"], 2),
+    }
