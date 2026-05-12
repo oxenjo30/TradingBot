@@ -11,7 +11,7 @@ const BROKER_CATALOG = [
   // Stocks & Options
   { id: 'ibkr',        name: 'IBKR',          initials: 'IB', color: '#E31837', bg: 'rgba(227,24,55,.15)',    available: false },
   { id: 'schwab',      name: 'Schwab',        initials: 'SC', color: '#00A0DF', bg: 'rgba(0,160,223,.15)',    available: false },
-  { id: 'tradier',     name: 'Tradier',       initials: 'TR', color: '#4F8EF7', bg: 'rgba(79,142,247,.15)',   available: false },
+  { id: 'tradier',     name: 'Tradier',       initials: 'TR', color: '#4F8EF7', bg: 'rgba(79,142,247,.15)',   available: true  },
   { id: 'tastytrade',  name: 'Tastytrade',    initials: 'TT', color: '#FF6B35', bg: 'rgba(255,107,53,.15)',   available: false },
   { id: 'robinhood',   name: 'Robinhood',     initials: 'RH', color: '#00B300', bg: 'rgba(0,179,0,.15)',      available: false },
   { id: 'webull',      name: 'Webull',        initials: 'WB', color: '#00A0B0', bg: 'rgba(0,160,176,.15)',    available: false },
