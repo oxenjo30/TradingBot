@@ -1807,67 +1807,15 @@ async function initLogs() {
   createPoller(fetchSignals, 30_000).start();
 }
 
-// ─────────────────────────────────────────
 // initApiKeys — apikeys.html
 // ─────────────────────────────────────────
 async function initApiKeys() {
   initClockChip(document.getElementById('market-chip'));
-  let currentMode = 'paper';
 
-  // ── Trading Mode ──────────────────────────────────────────────────────────
-  async function loadMode() {
-    try {
-      const risk = await api('/api/risk', { key: 'apikeys-risk' });
-      currentMode = risk.trading_mode || 'paper';
-    } catch { currentMode = 'paper'; }
-    applyMode(currentMode, false);
-  }
-
-  function applyMode(mode, updateNote = true) {
-    currentMode = mode;
-    document.getElementById('mode-check-paper').classList.toggle('hidden', mode !== 'paper');
-    document.getElementById('mode-check-live').classList.toggle('hidden',  mode !== 'live');
-    document.getElementById('mode-opt-paper').classList.toggle('mode-opt-active', mode === 'paper');
-    document.getElementById('mode-opt-live').classList.toggle('mode-opt-active',  mode === 'live');
-    if (updateNote) {
-      const note = document.getElementById('accounts-mode-note');
-      note.textContent = mode === 'paper'
-        ? 'Showing all accounts · Paper accounts are active'
-        : 'Showing all accounts · Live accounts are active';
-    }
-  }
-
-  document.getElementById('mode-selector').addEventListener('click', async (e) => {
-    const opt = e.target.closest('.mode-option');
-    if (!opt) return;
-    const newMode = opt.dataset.mode;
-    if (newMode === currentMode) return;
-
-    if (newMode === 'live') {
-      openModal(document.getElementById('modal-live-confirm'), async () => {
-        await saveMode(newMode);
-      });
-    } else {
-      await saveMode(newMode);
-    }
-  });
-
-  async function saveMode(mode) {
-    try {
-      await api('/api/risk/trading_mode', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ value: mode }),
-        key: 'mode-save',
-      });
-      applyMode(mode);
-      await loadAccounts();
-    } catch { /* no-op */ }
-  }
-
-  // ── Type selector helper ──────────────────────────────────────────────────
+  // ── Type selector helpers ─────────────────────────────────────────
   function wireTypeSelector(selectorId, hiddenId) {
     const sel = document.getElementById(selectorId);
+    if (!sel) return;
     const hidden = document.getElementById(hiddenId);
     sel.querySelectorAll('.type-opt').forEach(opt => {
       opt.addEventListener('click', () => {
@@ -1880,8 +1828,9 @@ async function initApiKeys() {
 
   function setTypeSelector(selectorId, hiddenId, val) {
     const sel = document.getElementById(selectorId);
+    if (!sel) return;
     const hidden = document.getElementById(hiddenId);
-    hidden.value = val;
+    if (hidden) hidden.value = val;
     sel.querySelectorAll('.type-opt').forEach(o => {
       o.classList.toggle('active', o.dataset.val === val);
     });
@@ -1890,22 +1839,14 @@ async function initApiKeys() {
   wireTypeSelector('add-type-selector', 'add-account-type');
   wireTypeSelector('edit-type-selector', 'edit-account-type');
 
-  // ── Account cards ─────────────────────────────────────────────────────────
+  // ── Account cards ─────────────────────────────────────────────────
   async function loadAccounts() {
     const grid = document.getElementById('accounts-grid');
-    const note = document.getElementById('accounts-mode-note');
     try {
       const accounts = await api('/api/broker-accounts', { key: 'keys-list' });
       grid.innerHTML = '';
-      note.textContent = currentMode === 'paper'
-        ? 'Showing all accounts · Paper accounts are active'
-        : 'Showing all accounts · Live accounts are active';
-
       if (!accounts.length) {
-        const empty = document.createElement('div');
-        empty.className = 'state-empty';
-        empty.textContent = 'No broker accounts yet. Add one to get started.';
-        grid.appendChild(empty);
+        grid.innerHTML = '<div class="state-empty">No broker accounts yet. Click <strong>Add Account</strong> to connect your first broker.</div>';
         return;
       }
       accounts.forEach(acct => grid.appendChild(buildCard(acct)));
@@ -1917,51 +1858,53 @@ async function initApiKeys() {
   function buildCard(acct) {
     const broker = getBrokerMeta(acct.broker || 'alpaca');
     const isLive = acct.account_type === 'live';
-    const isActive = acct.account_type === currentMode;
+
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'display:flex;flex-direction:column;gap:0;';
 
     const card = document.createElement('div');
-    card.className = 'broker-card' + (isActive ? '' : ' broker-card-dim');
+    card.className = 'broker-card';
+    card.style.cssText = `border-left:3px solid ${isLive ? '#EF4444' : '#3B82F6'};`;
 
-    // ── Header ───────────────────────────────────────────────────────────────
-    const cardTop = document.createElement('div');
-    cardTop.className = 'broker-card-top';
+    // Header row
+    const hdr = document.createElement('div');
+    hdr.className = 'broker-card-top';
 
-    const logoEl = document.createElement('div');
-    logoEl.style.cssText = `width:42px;height:42px;border-radius:10px;background:${broker.bg};color:${broker.color};display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;letter-spacing:-.5px;flex-shrink:0;`;
-    logoEl.textContent = broker.initials;
+    // Broker logo
+    const logo = document.createElement('div');
+    logo.style.cssText = `width:44px;height:44px;border-radius:12px;background:${broker.bg};color:${broker.color};display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;letter-spacing:-.5px;flex-shrink:0;`;
+    logo.textContent = broker.initials;
 
-    const brokerInfo = document.createElement('div');
-    brokerInfo.style.cssText = 'flex:1;min-width:0;';
+    // Name + label
+    const info = document.createElement('div');
+    info.style.cssText = 'flex:1;min-width:0;';
     const brokerNameEl = document.createElement('div');
-    brokerNameEl.style.cssText = 'font-size:15px;font-weight:700;line-height:1.2;';
+    brokerNameEl.style.cssText = 'font-size:15px;font-weight:700;line-height:1.2;color:#E6EBF5;';
     brokerNameEl.textContent = broker.name;
     const acctLabelEl = document.createElement('div');
-    acctLabelEl.className = 'text-muted';
-    acctLabelEl.style.cssText = 'font-size:12px;margin-top:2px;';
+    acctLabelEl.style.cssText = 'font-size:12px;color:#94A3B8;margin-top:3px;';
     acctLabelEl.textContent = acct.label;
-    brokerInfo.append(brokerNameEl, acctLabelEl);
+    info.append(brokerNameEl, acctLabelEl);
 
-    const rightBadges = document.createElement('div');
-    rightBadges.style.cssText = 'display:flex;flex-direction:column;align-items:flex-end;gap:4px;';
-
+    // Type badge
+    const badges = document.createElement('div');
+    badges.style.cssText = 'display:flex;flex-direction:column;align-items:flex-end;gap:5px;';
     const typeBadge = document.createElement('span');
-    typeBadge.className = 'badge ' + (isLive ? 'b-enabled' : 'b-disabled');
+    typeBadge.style.cssText = `display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:20px;font-size:11px;font-weight:600;${
+      isLive
+        ? 'background:rgba(239,68,68,.15);color:#EF4444;border:1px solid rgba(239,68,68,.25);'
+        : 'background:rgba(59,130,246,.12);color:#60A5FA;border:1px solid rgba(59,130,246,.2);'
+    }`;
     if (isLive) {
-      const dot = document.createElement('span'); dot.className = 'pdot'; typeBadge.appendChild(dot);
-      typeBadge.appendChild(document.createTextNode('Live'));
-    } else {
-      typeBadge.textContent = 'Paper';
+      const dot = document.createElement('span');
+      dot.style.cssText = 'width:6px;height:6px;border-radius:50%;background:#EF4444;animation:pulse 2s infinite;';
+      typeBadge.appendChild(dot);
     }
+    typeBadge.appendChild(document.createTextNode(isLive ? 'Live' : 'Paper'));
+    badges.appendChild(typeBadge);
+    hdr.append(logo, info, badges);
 
-    const activeBadge = document.createElement('span');
-    activeBadge.className = 'badge ' + (isActive ? 'b-enabled' : 'b-disabled');
-    activeBadge.style.fontSize = '10px';
-    activeBadge.textContent = isActive ? 'Active Mode' : 'Inactive';
-
-    rightBadges.append(typeBadge, activeBadge);
-    cardTop.append(logoEl, brokerInfo, rightBadges);
-
-    // ── Key chip ─────────────────────────────────────────────────────────────
+    // API key chip
     const keyChip = document.createElement('div');
     keyChip.className = 'broker-key-chip';
     const keyLabel = document.createElement('span');
@@ -1969,59 +1912,56 @@ async function initApiKeys() {
     keyLabel.textContent = 'API KEY';
     const keyVal = document.createElement('span');
     keyVal.className = 'broker-key-val';
-    keyVal.textContent = acct.api_key;
+    keyVal.textContent = acct.api_key || '••••••••';
     keyChip.append(keyLabel, keyVal);
 
-    // ── Meta row ─────────────────────────────────────────────────────────────
-    const metaRow = document.createElement('div');
-    metaRow.style.cssText = 'display:flex;align-items:center;justify-content:space-between;min-height:20px;';
+    // Status row
+    const statusRow = document.createElement('div');
+    statusRow.style.cssText = 'display:flex;align-items:center;justify-content:space-between;min-height:18px;margin-top:2px;';
     const dateEl = document.createElement('span');
-    dateEl.className = 'text-muted';
-    dateEl.style.fontSize = '11px';
-    dateEl.textContent = 'Added ' + new Date(acct.created_at).toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
+    dateEl.style.cssText = 'font-size:11px;color:#475569;';
+    dateEl.textContent = acct.created_at ? 'Added ' + new Date(acct.created_at).toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' }) : '';
     const statusEl = document.createElement('span');
     statusEl.style.cssText = 'font-size:11px;font-weight:500;';
-    metaRow.append(dateEl, statusEl);
+    statusRow.append(dateEl, statusEl);
 
-    // ── Divider ──────────────────────────────────────────────────────────────
-    const divider = document.createElement('div');
-    divider.style.cssText = 'border-top:1px solid rgba(30,45,69,.8);';
+    // Divider
+    const div = document.createElement('div');
+    div.style.cssText = 'border-top:1px solid rgba(30,45,69,.8);margin:.5rem 0 .25rem;';
 
-    // ── Actions ──────────────────────────────────────────────────────────────
+    // Actions
     const actions = document.createElement('div');
     actions.style.cssText = 'display:flex;gap:.4rem;align-items:center;flex-wrap:wrap;';
 
-    const mkBtn = (iconPath, label, cls) => {
+    const mkBtn = (svgPath, label, extraStyle) => {
       const b = document.createElement('button');
-      b.className = 'btn btn-sm ' + (cls || 'btn-ghost');
-      b.style.fontSize = '11px';
-      b.innerHTML = `<svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">${iconPath}</svg>${label}`;
+      b.className = 'btn btn-sm btn-ghost';
+      b.style.cssText = 'font-size:11px;' + (extraStyle || '');
+      b.innerHTML = `<svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">${svgPath}</svg> ${label}`;
       return b;
     };
 
-    const btnTest   = mkBtn('<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>', ' Test');
-    const btnEdit   = mkBtn('<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>', ' Edit');
-    const btnRotate = mkBtn('<polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>', ' Rotate Keys');
-    const btnDel    = mkBtn('<polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>', ' Delete', '');
-    btnDel.style.cssText = 'font-size:11px;color:#EF4444;background:none;border:1px solid rgba(239,68,68,.25);margin-left:auto;';
+    const btnTest = mkBtn('<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>', 'Test');
+    const btnEdit = mkBtn('<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>', 'Edit');
+    const btnDel  = mkBtn('<polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>', 'Delete', 'color:#EF4444;border-color:rgba(239,68,68,.25);margin-left:auto;');
 
-    btnTest.addEventListener('click',   () => testConnection(acct.id, statusEl));
-    btnEdit.addEventListener('click',   () => openEditModal(acct));
-    btnRotate.addEventListener('click', () => openRotateModal(acct.id));
-    btnDel.addEventListener('click',    () => openDeleteModal(acct));
+    btnTest.addEventListener('click', () => testConnection(acct.id, statusEl));
+    btnEdit.addEventListener('click', () => openEditModal(acct));
+    btnDel.addEventListener('click',  () => openDeleteModal(acct));
 
-    actions.append(btnTest, btnEdit, btnRotate, btnDel);
-    card.append(cardTop, keyChip, metaRow, divider, actions);
-    return card;
+    actions.append(btnTest, btnEdit, btnDel);
+    card.append(hdr, keyChip, statusRow, div, actions);
+    wrap.appendChild(card);
+    return wrap;
   }
 
   async function testConnection(accountId, statusEl) {
     statusEl.textContent = 'Testing…';
-    statusEl.style.color = '';
+    statusEl.style.color = '#94A3B8';
     try {
       const result = await api(`/api/broker-accounts/${accountId}/status`, { key: `test-${accountId}` });
-      statusEl.style.color = '#22C55E';
-      statusEl.textContent = `✓ Connected · ${result.account_type} · equity ${fmt.usd(result.equity)}`;
+      statusEl.style.color = '#10B981';
+      statusEl.textContent = `✓ ${result.account_type} · equity ${fmt.usd(result.equity)}`;
     } catch {
       statusEl.style.color = '#EF4444';
       statusEl.textContent = '✗ Connection failed';
@@ -2029,51 +1969,46 @@ async function initApiKeys() {
   }
 
   function openEditModal(acct) {
+    const broker = getBrokerMeta(acct.broker || 'alpaca');
+    const nameEl = document.getElementById('edit-modal-broker-name');
+    if (nameEl) nameEl.textContent = `${broker.name} · ${acct.label}`;
     document.getElementById('edit-account-id').value = acct.id;
     document.getElementById('edit-label').value = acct.label;
+    const keyEl = document.getElementById('edit-api-key');
+    const secEl = document.getElementById('edit-api-secret');
+    if (keyEl) keyEl.value = '';
+    if (secEl) secEl.value = '';
     setTypeSelector('edit-type-selector', 'edit-account-type', acct.account_type);
     document.getElementById('edit-error').classList.add('hidden');
+
     openModal(document.getElementById('modal-edit-account'), async () => {
-      const label = document.getElementById('edit-label').value.trim();
+      const label       = document.getElementById('edit-label').value.trim();
       const accountType = document.getElementById('edit-account-type').value;
-      const errEl = document.getElementById('edit-error');
+      const newKey      = (document.getElementById('edit-api-key')?.value || '').trim();
+      const newSecret   = (document.getElementById('edit-api-secret')?.value || '').trim();
+      const errEl       = document.getElementById('edit-error');
       if (!label) { errEl.textContent = 'Label is required.'; errEl.classList.remove('hidden'); return; }
+
       try {
+        // Save label + type
         await api(`/api/broker-accounts/${acct.id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ label, account_type: accountType }),
           key: 'edit-account',
         });
+        // Rotate keys only if new ones were provided
+        if (newKey && newSecret) {
+          await api(`/api/broker-accounts/${acct.id}/credentials`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ api_key: newKey, api_secret: newSecret }),
+            key: 'rotate-account',
+          });
+        }
         await loadAccounts();
       } catch (e) {
-        errEl.textContent = 'Save failed.';
-        errEl.classList.remove('hidden');
-        throw e;
-      }
-    });
-  }
-
-  function openRotateModal(accountId) {
-    document.getElementById('rotate-account-id').value = accountId;
-    document.getElementById('rotate-api-key').value = '';
-    document.getElementById('rotate-api-secret').value = '';
-    document.getElementById('rotate-error').classList.add('hidden');
-    openModal(document.getElementById('modal-rotate'), async () => {
-      const apiKey = document.getElementById('rotate-api-key').value.trim();
-      const apiSecret = document.getElementById('rotate-api-secret').value.trim();
-      const errEl = document.getElementById('rotate-error');
-      if (!apiKey || !apiSecret) { errEl.textContent = 'Both fields required.'; errEl.classList.remove('hidden'); return; }
-      try {
-        await api(`/api/broker-accounts/${accountId}/credentials`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ api_key: apiKey, api_secret: apiSecret }),
-          key: 'rotate-account',
-        });
-        await loadAccounts();
-      } catch (e) {
-        errEl.textContent = 'Rotate failed.';
+        errEl.textContent = 'Save failed: ' + (e.message || 'server error');
         errEl.classList.remove('hidden');
         throw e;
       }
@@ -2091,14 +2026,14 @@ async function initApiKeys() {
         warnEl.textContent = `Will remove ${strategies.length} strategy assignment(s): ${strategies.join(', ')}`;
         warnEl.classList.remove('hidden');
       }
-    } catch { /* non-blocking */ }
+    } catch {}
     openModal(document.getElementById('modal-delete-account'), async () => {
       await api(`/api/broker-accounts/${acct.id}`, { method: 'DELETE', key: 'del-account' });
       await loadAccounts();
     });
   }
 
-  // Build broker picker with tabs (Step 1)
+  // ── Broker picker (Add Account 2-step) ───────────────────────────
   const BP_SECTIONS = [
     { label: 'Stocks & Options',      ids: ['alpaca','ibkr','schwab','tradier','tastytrade','robinhood','webull','fidelity','etrade'] },
     { label: 'Crypto',                ids: ['coinbase','kraken','binanceus'] },
@@ -2111,7 +2046,6 @@ async function initApiKeys() {
     const grid   = document.getElementById('broker-picker-grid');
     tabBar.innerHTML = '';
     grid.innerHTML   = '';
-
     let activeIdx = 0;
 
     function renderTab(idx) {
@@ -2148,17 +2082,14 @@ async function initApiKeys() {
       btn.addEventListener('click', () => renderTab(i));
       tabBar.appendChild(btn);
     });
-
     renderTab(0);
   }
 
-  // Step back button
   document.getElementById('add-step-back').addEventListener('click', () => {
     document.getElementById('add-step-1').classList.remove('hidden');
     document.getElementById('add-step-2').classList.add('hidden');
   });
 
-  // Broker picker click (step 1 → step 2)
   document.getElementById('broker-picker-grid').addEventListener('click', (e) => {
     const card = e.target.closest('.broker-pick-card:not(.broker-pick-soon)');
     if (!card) return;
@@ -2173,20 +2104,21 @@ async function initApiKeys() {
   });
 
   document.getElementById('btn-add-account').addEventListener('click', () => {
-    // Reset to step 1
     document.getElementById('add-step-1').classList.remove('hidden');
     document.getElementById('add-step-2').classList.add('hidden');
-    ['add-label', 'add-api-key', 'add-api-secret'].forEach(id => document.getElementById(id).value = '');
+    ['add-label','add-api-key','add-api-secret'].forEach(id => {
+      const el = document.getElementById(id); if (el) el.value = '';
+    });
     setTypeSelector('add-type-selector', 'add-account-type', 'paper');
     document.getElementById('add-error').classList.add('hidden');
     buildBrokerPicker();
     openModal(document.getElementById('modal-add-account'), async () => {
-      const label = document.getElementById('add-label').value.trim();
-      const apiKey = document.getElementById('add-api-key').value.trim();
-      const apiSecret = document.getElementById('add-api-secret').value.trim();
+      const label       = document.getElementById('add-label').value.trim();
+      const apiKey      = document.getElementById('add-api-key').value.trim();
+      const apiSecret   = document.getElementById('add-api-secret').value.trim();
       const accountType = document.getElementById('add-account-type').value;
-      const broker = document.getElementById('add-broker').value || 'alpaca';
-      const errEl = document.getElementById('add-error');
+      const broker      = document.getElementById('add-broker').value || 'alpaca';
+      const errEl       = document.getElementById('add-error');
       if (!label || !apiKey || !apiSecret) {
         errEl.textContent = 'All fields are required.';
         errEl.classList.remove('hidden');
@@ -2208,7 +2140,6 @@ async function initApiKeys() {
     });
   });
 
-  await loadMode();
   await loadAccounts();
 }
 

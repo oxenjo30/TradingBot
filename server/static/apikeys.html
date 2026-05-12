@@ -92,7 +92,7 @@
   <header class="page-header">
     <div class="title-wrap flex-1 min-w-0">
       <div class="page-title">Broker Accounts</div>
-      <div class="page-sub">Manage connections and trading mode</div>
+      <div class="page-sub">Manage your broker connections and API credentials</div>
     </div>
     <div class="search-bar">
       <svg width="14" height="14" fill="none" stroke="#64748B" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -116,46 +116,12 @@
   <!-- Main -->
   <main class="content flex flex-col gap-4">
 
-    <!-- Trading Mode -->
-    <div class="card">
-      <div style="margin-bottom:.875rem;">
-        <div style="font-size:14px;font-weight:600;">Trading Mode</div>
-        <div class="text-muted" style="font-size:12px;margin-top:2px;">Only accounts matching the active mode will execute trades. Switching to Live requires confirmation.</div>
-      </div>
-      <div class="mode-selector" id="mode-selector">
-        <div class="mode-option" id="mode-opt-paper" data-mode="paper">
-          <div class="mode-opt-icon mode-opt-paper">
-            <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-          </div>
-          <div style="flex:1;min-width:0;">
-            <div style="font-size:13px;font-weight:600;">Paper Trading</div>
-            <div class="text-muted" style="font-size:11px;margin-top:2px;">Simulated orders &mdash; no real money at risk</div>
-          </div>
-          <div class="mode-check" id="mode-check-paper">
-            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
-          </div>
-        </div>
-        <div class="mode-option" id="mode-opt-live" data-mode="live">
-          <div class="mode-opt-icon mode-opt-live">
-            <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-          </div>
-          <div style="flex:1;min-width:0;">
-            <div style="font-size:13px;font-weight:600;">Live Trading</div>
-            <div class="text-muted" style="font-size:11px;margin-top:2px;">Real orders with real money &mdash; trade carefully</div>
-          </div>
-          <div class="mode-check hidden" id="mode-check-live">
-            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
-          </div>
-        </div>
-      </div>
-    </div>
-
     <!-- Broker Accounts list -->
     <div class="card">
       <div class="flex items-center justify-between mb-3">
         <div>
-          <div style="font-size:14px;font-weight:600;">Connected Accounts</div>
-          <div id="accounts-mode-note" class="text-muted" style="font-size:11px;margin-top:2px;"></div>
+          <div style="font-size:14px;font-weight:600;">Broker Accounts</div>
+          <div class="text-muted" style="font-size:11px;margin-top:2px;">Connect your trading accounts. Account type (Paper/Live) is set per account.</div>
         </div>
         <button id="btn-add-account" class="btn btn-primary" style="font-size:12px;padding:.4rem .9rem;">
           <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -263,41 +229,46 @@
 
 <!-- Edit Account -->
 <div id="modal-edit-account" class="modal-overlay hidden" role="dialog" aria-modal="true">
-  <div class="modal-box" style="max-width:420px;">
+  <div class="modal-box" style="max-width:460px;">
     <div class="modal-head">
       <div class="modal-head-icon icon-purple">
         <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
       </div>
       <div>
         <div class="modal-head-title">Edit Account</div>
-        <div class="modal-head-sub">Update label or account type</div>
+        <div class="modal-head-sub" id="edit-modal-broker-name">Update account details and credentials</div>
       </div>
     </div>
     <div class="modal-form">
       <input id="edit-account-id" type="hidden">
       <div class="form-group">
         <label class="form-label">Account Label</label>
-        <input id="edit-label" type="text" class="input-field">
+        <input id="edit-label" type="text" class="input-field" placeholder="e.g. Alpaca Paper #1">
       </div>
       <div class="form-group">
         <label class="form-label">Account Type</label>
         <div class="type-selector" id="edit-type-selector">
           <div class="type-opt active" data-val="paper">
             <div class="type-opt-dot type-paper-dot"></div>
-            <div>
-              <div class="type-opt-name">Paper</div>
-              <div class="type-opt-desc">Simulated</div>
-            </div>
+            <div><div class="type-opt-name">Paper</div><div class="type-opt-desc">Simulated</div></div>
           </div>
           <div class="type-opt" data-val="live">
             <div class="type-opt-dot type-live-dot"></div>
-            <div>
-              <div class="type-opt-name">Live</div>
-              <div class="type-opt-desc">Real money</div>
-            </div>
+            <div><div class="type-opt-name">Live</div><div class="type-opt-desc">Real money</div></div>
           </div>
         </div>
         <input type="hidden" id="edit-account-type" value="paper">
+      </div>
+      <div style="border-top:1px solid #1E2D45;margin:.75rem 0;padding-top:.75rem;">
+        <div style="font-size:12px;font-weight:600;color:#94A3B8;margin-bottom:.75rem;text-transform:uppercase;letter-spacing:.04em;">API Credentials</div>
+        <div class="form-group">
+          <label class="form-label">API Key <span class="text-muted" style="font-weight:400;">(leave blank to keep existing)</span></label>
+          <input id="edit-api-key" type="text" class="input-field" placeholder="Leave blank to keep current" autocomplete="off">
+        </div>
+        <div class="form-group">
+          <label class="form-label">API Secret <span class="text-muted" style="font-weight:400;">(leave blank to keep existing)</span></label>
+          <input id="edit-api-secret" type="password" class="input-field" placeholder="Leave blank to keep current" autocomplete="new-password">
+        </div>
       </div>
       <div id="edit-error" class="form-error hidden"></div>
     </div>
@@ -363,27 +334,6 @@
   </div>
 </div>
 
-<!-- Live Mode Confirm -->
-<div id="modal-live-confirm" class="modal-overlay hidden" role="dialog" aria-modal="true">
-  <div class="modal-box" style="max-width:400px;">
-    <div class="modal-head">
-      <div class="modal-head-icon icon-red">
-        <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-      </div>
-      <div>
-        <div class="modal-head-title" style="color:#EF4444;">Switch to Live Trading</div>
-        <div class="modal-head-sub">Real money &mdash; proceed with caution</div>
-      </div>
-    </div>
-    <div class="modal-form">
-      <div style="font-size:13px;color:#94A3B8;line-height:1.6;">You are about to switch to <strong style="color:#E6EBF5;">Live Trading mode</strong>. Enabled strategies will place <strong style="color:#EF4444;">real orders</strong> using real funds on your next engine tick. Make sure your risk settings are configured correctly before proceeding.</div>
-    </div>
-    <div class="modal-actions">
-      <button class="btn btn-ghost" data-action="cancel">Cancel</button>
-      <button class="btn btn-danger" data-action="confirm">Switch to Live</button>
-    </div>
-  </div>
-</div>
 
 <script src="/static/app.js"></script>
 </body>
