@@ -1596,16 +1596,43 @@ async function initPositions() {
   }
   buildAccountSelectors();
 
+  document.getElementById('btn-close-all')?.addEventListener('click', closeAll);
+
+  async function closePosition(symbol) {
+    if (!confirm(`Close position in ${symbol}? This will submit a market sell order.`)) return;
+    const qs = posAccountId ? `?account_id=${posAccountId}` : '';
+    try {
+      await api(`/api/positions/${encodeURIComponent(symbol)}${qs}`, { method: 'DELETE' });
+      fetchPositions();
+    } catch (e) {
+      alert(`Failed to close ${symbol}: ${e.message || e}`);
+    }
+  }
+
+  async function closeAll() {
+    if (!confirm('Close ALL open positions? This will submit market sell orders for every open position.')) return;
+    const qs = posAccountId ? `?account_id=${posAccountId}` : '';
+    try {
+      await api(`/api/positions${qs}`, { method: 'DELETE' });
+      fetchPositions();
+    } catch (e) {
+      alert(`Failed to close all positions: ${e.message || e}`);
+    }
+  }
+
   async function fetchPositions() {
     const tbody = document.getElementById('pos-body');
+    const closeAllBtn = document.getElementById('btn-close-all');
     const qs = posAccountId ? `?account_id=${posAccountId}` : '';
     try {
       const positions = await api(`/api/positions${qs}`, { key: 'pos-positions' });
       tbody.innerHTML = '';
       if (!positions.length) {
-        tbody.innerHTML = '<tr><td colspan="7" class="state-empty">No open positions.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" class="state-empty">No open positions.</td></tr>';
+        if (closeAllBtn) closeAllBtn.classList.add('hidden');
         return;
       }
+      if (closeAllBtn) closeAllBtn.classList.remove('hidden');
       positions.forEach(p => {
         const tr = document.createElement('tr');
         const pnl = parseFloat(p.unrealized_pl) || 0;
@@ -1616,13 +1643,21 @@ async function initPositions() {
           fmt.usd(p.avg_entry_price),
           fmt.usd(p.current_price),
           fmt.usd(p.market_value),
-          ''
+          '', // pnl — handled below
+          '', // close button — handled below
         ];
         vals.forEach((v, i) => {
           const td = document.createElement('td');
           if (i === 6) {
-            td.textContent = fmt.usdSigned(pnl, '&mdash;');
+            td.textContent = fmt.usdSigned(pnl, '—');
             td.className = 'text-tabular ' + (pnl >= 0 ? 'text-green glow-green' : 'text-red glow-red');
+          } else if (i === 7) {
+            const btn = document.createElement('button');
+            btn.className = 'btn-close-pos';
+            btn.title = `Close ${p.symbol}`;
+            btn.textContent = '×';
+            btn.addEventListener('click', () => closePosition(p.symbol));
+            td.appendChild(btn);
           } else { td.textContent = v; }
           tr.appendChild(td);
         });
@@ -1630,7 +1665,7 @@ async function initPositions() {
       });
     } catch (e) {
       if (e.name === 'AbortError') return;
-      tbody.innerHTML = '<tr><td colspan="7" class="state-error">Failed to load &mdash; retrying in 30s</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="8" class="state-error">Failed to load — retrying in 30s</td></tr>';
     }
   }
 
@@ -2188,6 +2223,7 @@ async function initRisk() {
       document.getElementById('inp-max-orders').value  = s.max_orders_per_day      ?? 0;
       document.getElementById('inp-max-open').value    = s.max_open_positions      ?? 10;
       document.getElementById('inp-sym-exp').value     = s.max_symbol_exposure_pct ?? 0;
+      document.getElementById('inp-take-profit').value = s.take_profit_pct         ?? 0;
       if (s.trading_hours_start) document.getElementById('inp-hours-start').value = s.trading_hours_start;
       if (s.trading_hours_end)   document.getElementById('inp-hours-end').value   = s.trading_hours_end;
 

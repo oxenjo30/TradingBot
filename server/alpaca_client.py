@@ -319,6 +319,10 @@ class AccountClient:
                 "qty": float(p.qty),
                 "side": str(p.side).lower().replace("positionside.", ""),
                 "market_value": float(p.market_value) if p.market_value else 0.0,
+                "avg_entry_price": float(p.avg_entry_price) if p.avg_entry_price else 0.0,
+                "current_price": float(p.current_price) if p.current_price else 0.0,
+                "unrealized_pl": float(p.unrealized_pl) if p.unrealized_pl else 0.0,
+                "unrealized_plpc": float(p.unrealized_plpc) * 100 if p.unrealized_plpc else 0.0,
             })
         return out
 
