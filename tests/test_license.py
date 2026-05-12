@@ -36,3 +36,12 @@ def test_universal_key():
     key = mint_key(SELLER_SECRET, machine_id="ANY", days=365)
     result = verify_key(key, SELLER_SECRET, machine_id="SOME-REAL-MACHINE")
     assert result["valid"] is True
+
+def test_store_and_retrieve_license(tmp_path, monkeypatch):
+    import server.db as db_mod
+    monkeypatch.setattr(db_mod, "DB_PATH", tmp_path / "test.db")
+    db_mod.init_db()
+    from server.db import set_license_key, get_license_key
+    assert get_license_key() == ""
+    set_license_key("MYKEY123")
+    assert get_license_key() == "MYKEY123"
