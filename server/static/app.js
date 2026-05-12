@@ -1475,8 +1475,31 @@ async function initPerformance() {
     }
   }
 
+  async function fetchAttribution() {
+    const tbody = document.getElementById('attribution-body');
+    if (!tbody) return;
+    try {
+      const rows = await api('/api/performance/by-account', { key: 'perf-attr' });
+      tbody.innerHTML = '';
+      if (!rows.length) {
+        tbody.innerHTML = '<tr><td colspan="5" class="state-empty">No attribution data.</td></tr>'; return;
+      }
+      rows.forEach(r => {
+        const tr = document.createElement('tr');
+        [r.strategy, r.account_name || r.account_id || '—', r.total, r.executed, r.blocked].forEach(v => {
+          const td = document.createElement('td'); td.textContent = v ?? '0'; tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+      });
+    } catch (e) {
+      if (e.name === 'AbortError') return;
+      tbody.innerHTML = '<tr><td colspan="5" class="state-error">Failed to load</td></tr>';
+    }
+  }
+
   createPoller(fetchPerformance, 60_000).start();
   createPoller(fetchSignals,     30_000).start();
+  createPoller(fetchAttribution, 60_000).start();
 }
 
 // ─────────────────────────────────────────
@@ -1781,7 +1804,65 @@ async function initRisk() {
     if (e.key === 'Enter') document.getElementById('btn-blacklist-add').click();
   });
 
+  // ── Per-account kill switches ────────────────────────────────────────────
+  async function loadAccountKillSwitches() {
+    const container = document.getElementById('acct-ks-list');
+    if (!container) return;
+    try {
+      const accounts = await api('/api/broker-accounts', { key: 'risk-accts' });
+      if (!accounts.length) {
+        container.innerHTML = '<div class="state-empty">No broker accounts configured.</div>'; return;
+      }
+      container.innerHTML = '';
+      await Promise.all(accounts.map(async acct => {
+        let ksOn = false;
+        try {
+          const ks = await api(`/api/broker-accounts/${acct.id}/kill-switch`, { key: `ks-${acct.id}` });
+          ksOn = !!ks.kill_switch;
+        } catch {}
+        const row = document.createElement('div');
+        row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:.5rem 0;border-bottom:1px solid var(--border);';
+        row.dataset.acctId = acct.id;
+        const meta = getBrokerMeta(acct.broker);
+        row.innerHTML = `
+          <div style="display:flex;align-items:center;gap:.5rem;">
+            <span class="acct-initials" style="background:${meta.bg};color:${meta.color};border-radius:6px;padding:2px 6px;font-size:11px;font-weight:700;">${meta.initials}</span>
+            <span style="font-size:13px;">${acct.label || acct.broker}</span>
+            <span class="badge ${ksOn ? 'b-error' : 'b-enabled'}" id="acct-ks-badge-${acct.id}">${ksOn ? 'HALTED' : 'Running'}</span>
+          </div>
+          <button class="btn ${ksOn ? 'btn-ghost' : 'btn-danger'}" style="font-size:11px;padding:.25rem .6rem;" id="acct-ks-btn-${acct.id}"
+            data-acct="${acct.id}" data-on="${ksOn ? '1' : '0'}">
+            ${ksOn ? 'Resume' : 'Stop'}
+          </button>`;
+        container.appendChild(row);
+
+        row.querySelector('button').addEventListener('click', async (ev) => {
+          const btn = ev.currentTarget;
+          const id  = btn.dataset.acct;
+          const cur = btn.dataset.on === '1';
+          const next = !cur;
+          btn.disabled = true;
+          try {
+            await api(`/api/broker-accounts/${id}/kill-switch?on=${next}`, { method: 'POST', key: `ks-toggle-${id}` });
+            btn.dataset.on = next ? '1' : '0';
+            btn.textContent = next ? 'Resume' : 'Stop';
+            btn.className = `btn ${next ? 'btn-ghost' : 'btn-danger'}`;
+            btn.style.cssText = 'font-size:11px;padding:.25rem .6rem;';
+            const badge = document.getElementById(`acct-ks-badge-${id}`);
+            if (badge) { badge.className = `badge ${next ? 'b-error' : 'b-enabled'}`; badge.textContent = next ? 'HALTED' : 'Running'; }
+            showToast(next ? `Account ${id} halted` : `Account ${id} resumed`);
+          } catch { showToast('Failed to update', true); }
+          finally { btn.disabled = false; }
+        });
+      }));
+    } catch (e) {
+      if (e.name === 'AbortError') return;
+      container.innerHTML = '<div class="state-error">Failed to load accounts</div>';
+    }
+  }
+
   await loadRisk();
+  loadAccountKillSwitches();
 }
 
 // ─────────────────────────────────────────
@@ -2355,6 +2436,18 @@ async function initSettings() {
     notifyBlock.checked   = !!data.notify_on_block;
     notifyDaily.checked   = !!data.notify_daily_summary;
 
+    // Slack
+    const slackEn  = document.getElementById('slack-enabled');
+    const slackUrl = document.getElementById('slack-webhook-url');
+    if (slackEn)  slackEn.checked  = !!data.slack_enabled;
+    if (slackUrl) slackUrl.value   = data.slack_webhook_url || '';
+
+    // Discord
+    const discordEn  = document.getElementById('discord-enabled');
+    const discordUrl = document.getElementById('discord-webhook-url');
+    if (discordEn)  discordEn.checked  = !!data.discord_enabled;
+    if (discordUrl) discordUrl.value   = data.discord_webhook_url || '';
+
     syncEmailFields();
     syncTgFields();
   } catch (e) {
@@ -2382,6 +2475,10 @@ async function initSettings() {
           notify_on_trade:    notifyTrade.checked,
           notify_on_block:    notifyBlock.checked,
           notify_daily_summary: notifyDaily.checked,
+          slack_enabled:      document.getElementById('slack-enabled')?.checked   || false,
+          slack_webhook_url:  document.getElementById('slack-webhook-url')?.value.trim() || '',
+          discord_enabled:    document.getElementById('discord-enabled')?.checked  || false,
+          discord_webhook_url: document.getElementById('discord-webhook-url')?.value.trim() || '',
         }),
       });
       showMsg(saveMsg, 'Settings saved.', 'ok');
@@ -2445,6 +2542,113 @@ async function initSettings() {
       testTgBtn.innerHTML = '<svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="22 2 11 13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg> Send Test';
     }
   });
+
+  // ── TradingView Webhook ──────────────────────────────────────────────────
+  async function loadWebhook() {
+    try {
+      const data = await api('/api/webhook/token', { key: 'wh-load' });
+      const urlEl   = document.getElementById('webhook-url');
+      const tokenEl = document.getElementById('webhook-token');
+      if (urlEl)   urlEl.value   = data.url   || '';
+      if (tokenEl) tokenEl.value = data.token  || '';
+    } catch {}
+  }
+
+  document.getElementById('copy-webhook-url')?.addEventListener('click', () => {
+    const el = document.getElementById('webhook-url');
+    if (!el) return;
+    navigator.clipboard.writeText(el.value).then(() => showMsg(saveMsg, 'URL copied!', 'ok'));
+  });
+
+  document.getElementById('copy-webhook-token')?.addEventListener('click', () => {
+    const el = document.getElementById('webhook-token');
+    if (!el) return;
+    navigator.clipboard.writeText(el.value).then(() => showMsg(saveMsg, 'Token copied!', 'ok'));
+  });
+
+  document.getElementById('rotate-webhook-token')?.addEventListener('click', async () => {
+    if (!confirm('Rotate token? Your existing TradingView alerts will need updating.')) return;
+    try {
+      const data = await api('/api/webhook/token/rotate', { method: 'POST', key: 'wh-rotate' });
+      const tokenEl = document.getElementById('webhook-token');
+      if (tokenEl) tokenEl.value = data.token || '';
+      showMsg(saveMsg, 'Token rotated — update your TradingView alerts.', 'ok');
+    } catch (e) {
+      showMsg(saveMsg, 'Rotate failed: ' + e.message, 'err');
+    }
+  });
+
+  loadWebhook();
+
+  // ── Price Alerts ─────────────────────────────────────────────────────────
+  async function loadAlerts() {
+    const tbody = document.getElementById('alerts-body');
+    if (!tbody) return;
+    try {
+      const alerts = await api('/api/alerts', { key: 'alerts-load' });
+      tbody.innerHTML = '';
+      if (!alerts.length) {
+        tbody.innerHTML = '<tr><td colspan="5" class="state-empty">No alerts set.</td></tr>'; return;
+      }
+      alerts.forEach(a => {
+        const tr = document.createElement('tr');
+        const dirLabel = a.direction === 'above' ? '≥' : '≤';
+        const statusCls = a.triggered ? 'b-disabled' : 'b-enabled';
+        const statusLabel = a.triggered ? 'Triggered' : 'Active';
+        tr.innerHTML = `
+          <td>${a.symbol}</td>
+          <td>${dirLabel} $${Number(a.target_price).toFixed(2)}</td>
+          <td><span class="badge ${statusCls}">${statusLabel}</span></td>
+          <td>${a.note || '—'}</td>
+          <td><button class="btn btn-ghost" style="font-size:11px;padding:.2rem .5rem;"
+            onclick="window._deleteAlert(${a.id})">Remove</button></td>`;
+        tbody.appendChild(tr);
+      });
+    } catch (e) {
+      if (e.name === 'AbortError') return;
+      const tbody2 = document.getElementById('alerts-body');
+      if (tbody2) tbody2.innerHTML = '<tr><td colspan="5" class="state-error">Failed to load</td></tr>';
+    }
+  }
+
+  window._deleteAlert = async (id) => {
+    try {
+      await fetch(`/api/alerts/${id}`, { method: 'DELETE' });
+      loadAlerts();
+    } catch { showMsg(saveMsg, 'Delete failed', 'err'); }
+  };
+
+  document.getElementById('add-alert-btn')?.addEventListener('click', () => {
+    document.getElementById('add-alert-form')?.classList.remove('hidden');
+  });
+
+  document.getElementById('cancel-alert-btn')?.addEventListener('click', () => {
+    document.getElementById('add-alert-form')?.classList.add('hidden');
+  });
+
+  document.getElementById('save-alert-btn')?.addEventListener('click', async () => {
+    const sym  = document.getElementById('alert-symbol')?.value.trim().toUpperCase();
+    const dir  = document.getElementById('alert-direction')?.value;
+    const price = parseFloat(document.getElementById('alert-price')?.value);
+    const note = document.getElementById('alert-note')?.value.trim();
+    if (!sym || !dir || isNaN(price)) { showMsg(saveMsg, 'Fill in symbol, direction, and price.', 'err'); return; }
+    try {
+      await api('/api/alerts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ symbol: sym, direction: dir, target_price: price, note }),
+        key: 'alert-add',
+      });
+      document.getElementById('add-alert-form')?.classList.add('hidden');
+      document.getElementById('alert-symbol').value = '';
+      document.getElementById('alert-price').value  = '';
+      document.getElementById('alert-note').value   = '';
+      showMsg(saveMsg, 'Alert created.', 'ok');
+      loadAlerts();
+    } catch (e) { showMsg(saveMsg, 'Failed: ' + e.message, 'err'); }
+  });
+
+  loadAlerts();
 }
 
 // ─────────────────────────────────────────
