@@ -1,0 +1,1346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TradeBot — Light Mode Mockup</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* ── Reset ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body { font-family: 'Inter', system-ui, sans-serif; background: #E2E8F0; color: #0F172A; font-size: 14px; }
+
+/* ── Light theme tokens ── */
+:root {
+  --bg:      #F1F5F9;
+  --card:    #FFFFFF;
+  --border:  #CBD5E1;
+  --sidebar: #FFFFFF;
+  --text:    #0F172A;
+  --muted:   #64748B;
+  --blue:    #3B82F6;
+  --green:   #10B981;
+  --red:     #EF4444;
+  --orange:  #F59E0B;
+  --purple:  #8B5CF6;
+  --indigo:  #6366F1;
+  --cyan:    #06B6D4;
+}
+
+/* ── Nav ── */
+.mockup-nav {
+  position: sticky; top: 0; z-index: 100;
+  background: #1E293B;
+  padding: .6rem 1.5rem;
+  display: flex; align-items: center; gap: 1rem;
+  flex-wrap: wrap;
+}
+.mockup-nav-title { color: #F8FAFC; font-weight: 700; font-size: 14px; margin-right: .5rem; }
+.mockup-nav a {
+  color: #94A3B8; font-size: 12px; font-weight: 500;
+  padding: .3rem .65rem; border-radius: 6px;
+  text-decoration: none; white-space: nowrap;
+  transition: background .15s, color .15s;
+}
+.mockup-nav a:hover { background: rgba(255,255,255,.08); color: #F8FAFC; }
+
+/* ── Section wrapper ── */
+.page-section {
+  margin: 2rem auto;
+  max-width: 1300px;
+  padding: 0 1.5rem;
+}
+.page-label {
+  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em;
+  color: #64748B; margin-bottom: .75rem; display: flex; align-items: center; gap: .5rem;
+}
+.page-label::after { content: ''; flex: 1; height: 1px; background: #CBD5E1; }
+
+/* ── Sidebar ── */
+.sidebar {
+  width: 220px; background: var(--sidebar); border-right: 1px solid var(--border);
+  display: flex; flex-direction: column; height: 100%; padding-bottom: 1rem;
+  box-shadow: 1px 0 4px rgba(0,0,0,.06);
+}
+.logo { display: flex; align-items: center; gap: 10px; padding: 1.25rem 1rem; border-bottom: 1px solid var(--border); }
+.logo-mark {
+  width: 32px; height: 32px; border-radius: 8px;
+  background: rgba(59,130,246,.15); box-shadow: 0 0 12px rgba(59,130,246,.25);
+  display: flex; align-items: center; justify-content: center;
+}
+.logo-text { font-size: 15px; font-weight: 700; letter-spacing: -.3px; color: var(--text); }
+.nav { flex: 1; padding: .75rem 0; }
+.nav-section { font-size: 10px; font-weight: 600; letter-spacing: .08em; color: var(--muted); text-transform: uppercase; padding: .75rem 1rem .25rem; }
+.nav-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: .5rem 1rem; border-left: 3px solid transparent;
+  color: var(--muted); font-size: 13px; font-weight: 500;
+}
+.nav-item.active { color: var(--blue); border-left-color: var(--blue); background: rgba(59,130,246,.06); }
+.sidebar-footer { padding: 1rem; border-top: 1px solid var(--border); }
+.paper-card {
+  background: rgba(59,130,246,.06); border: 1px solid rgba(59,130,246,.2);
+  border-radius: 10px; padding: .75rem;
+}
+.paper-label { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+.go-live { font-size: 12px; font-weight: 600; color: var(--blue); display: block; margin-top: 4px; }
+.logout-btn {
+  display: flex; align-items: center; gap: 8px; width: 100%; margin-top: .5rem;
+  border: none; background: none; border-radius: 8px; padding: .45rem .75rem;
+  color: var(--muted); font-size: 13px; font-weight: 500; font-family: inherit; cursor: pointer;
+}
+.theme-btn {
+  display: flex; align-items: center; gap: 8px; width: 100%; margin-top: .25rem;
+  border: none; background: none; border-radius: 8px; padding: .45rem .75rem;
+  color: var(--muted); font-size: 12px; font-weight: 500; font-family: inherit; cursor: pointer;
+}
+
+/* ── Page header ── */
+.page-header {
+  background: rgba(241,245,249,.95); backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  padding: .75rem 1.5rem;
+  display: flex; align-items: center; gap: 1rem;
+}
+.page-title { font-size: 17px; font-weight: 700; color: var(--text); }
+.page-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.search-bar {
+  display: flex; align-items: center; gap: 8px;
+  background: #F1F5F9; border: 1px solid var(--border);
+  border-radius: 8px; padding: 6px 12px; width: 200px;
+  font-size: 13px; color: var(--muted);
+}
+.avatar { width: 32px; height: 32px; border-radius: 50%; background: rgba(59,130,246,.12); border: 1px solid rgba(59,130,246,.25); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: var(--blue); }
+.online-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 6px rgba(16,185,129,.5); }
+.market-chip { font-size: 11px; font-weight: 600; padding: .25rem .65rem; border-radius: 999px; background: rgba(16,185,129,.1); color: var(--green); border: 1px solid rgba(16,185,129,.2); }
+
+/* ── Card ── */
+.card {
+  background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+  padding: 1.25rem; box-shadow: 0 1px 4px rgba(0,0,0,.06);
+}
+.card-title { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: .25rem; }
+.card-sub { font-size: 12px; color: var(--muted); }
+
+/* ── Metric card ── */
+.metric-grid { display: grid; grid-template-columns: repeat(6,1fr); gap: 1rem; }
+.metric-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 1rem; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+.metric-label { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.metric-value { font-size: 22px; font-weight: 800; letter-spacing: -.03em; margin: .25rem 0 .1rem; }
+.metric-sub { font-size: 11px; color: var(--muted); }
+.icon-circle { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-bottom: .6rem; }
+.icon-blue   { background: rgba(59,130,246,.12);  box-shadow: 0 0 10px rgba(59,130,246,.18); }
+.icon-green  { background: rgba(16,185,129,.12);  box-shadow: 0 0 10px rgba(16,185,129,.18); }
+.icon-purple { background: rgba(139,92,246,.12);  box-shadow: 0 0 10px rgba(139,92,246,.18); }
+.icon-cyan   { background: rgba(6,182,212,.12);   box-shadow: 0 0 10px rgba(6,182,212,.18);  }
+.icon-orange { background: rgba(245,158,11,.12);  box-shadow: 0 0 10px rgba(245,158,11,.18); }
+.icon-indigo { background: rgba(99,102,241,.12);  box-shadow: 0 0 10px rgba(99,102,241,.18); }
+
+/* ── Sparkline placeholder ── */
+.sparkline { height: 36px; border-radius: 6px; background: linear-gradient(90deg, rgba(59,130,246,.08) 0%, rgba(59,130,246,.18) 100%); margin-top: .5rem; position: relative; overflow: hidden; }
+.sparkline::after { content: ''; position: absolute; inset: 0; background: url("data:image/svg+xml,%3Csvg viewBox='0 0 100 36' xmlns='http://www.w3.org/2000/svg'%3E%3Cpolyline points='0,30 15,22 30,25 45,14 60,18 75,8 90,12 100,6' fill='none' stroke='%233B82F6' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat center/cover; }
+.sparkline.green::after { background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 100 36' xmlns='http://www.w3.org/2000/svg'%3E%3Cpolyline points='0,28 20,20 40,22 60,12 80,8 100,4' fill='none' stroke='%2310B981' stroke-width='1.5'/%3E%3C/svg%3E"); }
+.sparkline.red::after   { background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 100 36' xmlns='http://www.w3.org/2000/svg'%3E%3Cpolyline points='0,6 20,10 40,8 60,18 80,22 100,30' fill='none' stroke='%23EF4444' stroke-width='1.5'/%3E%3C/svg%3E"); }
+
+/* ── Chart placeholder ── */
+.chart-ph { border-radius: 10px; background: linear-gradient(180deg, rgba(59,130,246,.04) 0%, rgba(59,130,246,.01) 100%); border: 1px solid rgba(59,130,246,.08); display: flex; align-items: flex-end; gap: 2px; padding: .75rem; overflow: hidden; position: relative; }
+.chart-line { position: absolute; inset: 1rem 1rem 2rem; }
+.chart-area { width: 100%; height: 100%; }
+
+/* ── Badges ── */
+.badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 500; }
+.b-green  { background: rgba(16,185,129,.12);  color: #059669; border: 1px solid rgba(16,185,129,.25); }
+.b-red    { background: rgba(239,68,68,.1);    color: #DC2626; border: 1px solid rgba(239,68,68,.2);  }
+.b-blue   { background: rgba(59,130,246,.1);   color: #2563EB; border: 1px solid rgba(59,130,246,.2); }
+.b-muted  { background: rgba(100,116,139,.1);  color: #475569; border: 1px solid rgba(100,116,139,.2); }
+.b-orange { background: rgba(245,158,11,.1);   color: #D97706; border: 1px solid rgba(245,158,11,.2); }
+.pdot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+/* ── Table ── */
+.dtable { width: 100%; border-collapse: collapse; font-size: 13px; }
+.dtable thead th { background: #F8FAFC; color: var(--muted); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; padding: .55rem .85rem; text-align: left; border-bottom: 1px solid var(--border); position: sticky; top: 0; }
+.dtable tbody td { padding: .6rem .85rem; border-bottom: 1px solid #F1F5F9; color: var(--text); vertical-align: middle; }
+.dtable tbody tr:hover { background: rgba(59,130,246,.03); }
+.dtable tbody tr:last-child td { border-bottom: none; }
+
+/* ── Buttons ── */
+.btn { display: inline-flex; align-items: center; gap: .4rem; padding: .45rem 1rem; border-radius: 8px; font-size: 13px; font-weight: 600; font-family: inherit; cursor: pointer; border: none; transition: opacity .15s; }
+.btn-primary { background: var(--blue); color: #fff; }
+.btn-danger  { background: var(--red);  color: #fff; }
+.btn-ghost   { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+.btn-sm      { font-size: 11px; padding: .3rem .7rem; }
+.btn:hover   { opacity: .85; }
+
+/* ── Input ── */
+.input {
+  width: 100%; background: #F8FAFC; border: 1px solid var(--border);
+  border-radius: 8px; padding: .45rem .75rem; font-size: 13px;
+  color: var(--text); font-family: inherit; outline: none;
+}
+.input:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(59,130,246,.1); }
+.label { font-size: 12px; font-weight: 600; color: var(--text); margin-bottom: .3rem; display: block; }
+.hint { font-size: 11px; color: var(--muted); margin-top: .25rem; line-height: 1.4; }
+.form-group { display: flex; flex-direction: column; gap: .25rem; margin-bottom: .9rem; }
+
+/* ── Toggle ── */
+.toggle { position: relative; width: 38px; height: 22px; flex-shrink: 0; }
+.toggle input { opacity: 0; width: 0; height: 0; }
+.toggle-track {
+  position: absolute; inset: 0; border-radius: 11px; cursor: pointer;
+  background: #CBD5E1; transition: background .2s;
+}
+.toggle input:checked + .toggle-track { background: var(--green); }
+.toggle-track::after {
+  content: ''; position: absolute; width: 16px; height: 16px;
+  background: #fff; border-radius: 50%; top: 3px; left: 3px;
+  transition: transform .2s; box-shadow: 0 1px 3px rgba(0,0,0,.15);
+}
+.toggle input:checked + .toggle-track::after { transform: translateX(16px); }
+
+/* ── Banners ── */
+.banner { padding: .65rem 1.25rem; font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 8px; border-radius: 10px; margin-bottom: 1rem; }
+.banner-paper { background: #DBEAFE; border: 1px solid #93C5FD; color: #1D4ED8; }
+.banner-kill  { background: #FEE2E2; border: 1px solid #FCA5A5; color: #B91C1C; }
+.banner-warn  { background: #FEF3C7; border: 1px solid #FCD34D; color: #92400E; }
+.banner-green { background: #D1FAE5; border: 1px solid #6EE7B7; color: #065F46; }
+
+/* ── Modal ── */
+.modal-overlay { position: fixed; inset: 0; background: rgba(15,23,42,.45); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 50; }
+.modal-box {
+  background: #FFFFFF; border: 1px solid var(--border); border-radius: 16px;
+  padding: 1.5rem; width: 440px; max-width: calc(100vw - 2rem);
+  box-shadow: 0 20px 60px rgba(0,0,0,.15), 0 0 0 1px rgba(203,213,225,.5);
+}
+.modal-title { font-size: 16px; font-weight: 700; color: var(--text); margin-bottom: .75rem; }
+.modal-body { font-size: 13px; color: var(--muted); line-height: 1.6; margin-bottom: 1.25rem; }
+.modal-actions { display: flex; justify-content: flex-end; gap: .5rem; margin-top: 1.25rem; }
+
+/* ── System bar ── */
+.sys-bar {
+  display: flex; flex-wrap: wrap; gap: .75rem;
+  padding: .65rem 1.5rem; border-top: 1px solid var(--border);
+  background: #F8FAFC; font-size: 12px; color: var(--muted);
+  margin-top: auto;
+}
+.sys-item { display: flex; align-items: center; gap: 6px; }
+.sys-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); box-shadow: 0 0 5px rgba(16,185,129,.4); }
+
+/* ── Range tabs ── */
+.range-tabs { display: flex; gap: .25rem; }
+.range-tab { padding: .25rem .6rem; border-radius: 6px; font-size: 11px; font-weight: 600; border: none; background: transparent; color: var(--muted); cursor: pointer; font-family: inherit; }
+.range-tab.active { background: rgba(59,130,246,.1); color: var(--blue); }
+
+/* ── Risk items ── */
+.ri { display: flex; align-items: center; gap: 1rem; padding: .9rem 0; border-bottom: 1px solid #F1F5F9; }
+.ri:last-child { border-bottom: none; }
+.ri-icon { width: 32px; height: 32px; border-radius: 9px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.ri-icon-orange { background: rgba(245,158,11,.1);  border: 1px solid rgba(245,158,11,.2); }
+.ri-icon-purple { background: rgba(139,92,246,.1);  border: 1px solid rgba(139,92,246,.2); }
+.ri-icon-cyan   { background: rgba(6,182,212,.1);   border: 1px solid rgba(6,182,212,.2);  }
+.ri-icon-red    { background: rgba(239,68,68,.1);   border: 1px solid rgba(239,68,68,.2);  }
+.ri-icon-indigo { background: rgba(99,102,241,.1);  border: 1px solid rgba(99,102,241,.2); }
+.ri-label { font-size: 13px; font-weight: 600; color: var(--text); }
+.ri-sub   { font-size: 11px; color: var(--muted); margin-top: 2px; line-height: 1.4; }
+.ri-field { display: flex; align-items: center; gap: .4rem; margin-left: auto; }
+.ri-input { width: 80px; background: #F8FAFC; border: 1px solid var(--border); border-radius: 8px; padding: .35rem .6rem; font-size: 13px; font-weight: 600; color: var(--text); text-align: center; font-family: inherit; }
+.ri-suffix { font-size: 12px; color: var(--muted); }
+
+/* ── Kill switch card ── */
+.ks-card {
+  border: 1px solid rgba(239,68,68,.25) !important;
+  background: linear-gradient(135deg, rgba(239,68,68,.04) 0%, #FFFFFF 60%) !important;
+}
+.ks-icon { width: 42px; height: 42px; border-radius: 12px; background: rgba(239,68,68,.1); border: 1px solid rgba(239,68,68,.2); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+
+/* ── Strategy row ── */
+.strat-row { display: flex; align-items: center; gap: .75rem; padding: .8rem 1.25rem; border-bottom: 1px solid #F1F5F9; }
+.strat-row:last-child { border-bottom: none; }
+.strat-row:hover { background: rgba(59,130,246,.02); }
+.strat-icon { width: 30px; height: 30px; border-radius: 8px; display: flex; align-items: center; justify-content: center; }
+.si-active   { background: rgba(139,92,246,.12); }
+.si-inactive { background: rgba(100,116,139,.08); }
+.strat-toggle { position: relative; width: 34px; height: 19px; border-radius: 10px; background: #CBD5E1; flex-shrink: 0; }
+.strat-toggle.on { background: #10B981; }
+.strat-toggle::after { content: ''; position: absolute; width: 13px; height: 13px; background: #fff; border-radius: 50%; top: 3px; left: 3px; box-shadow: 0 1px 3px rgba(0,0,0,.2); transition: transform .2s; }
+.strat-toggle.on::after { transform: translateX(15px); }
+
+/* ── Account item ── */
+.acct-item { display: flex; align-items: center; gap: .6rem; padding: .65rem 1rem; border-left: 2px solid transparent; cursor: pointer; }
+.acct-item.active { background: rgba(59,130,246,.06); border-left-color: var(--blue); }
+.acct-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+/* ── Section divider ── */
+.section-divider { font-size: 10px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; padding: .5rem 1.25rem .35rem; background: #F8FAFC; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+
+/* ── Settings row ── */
+.settings-row { display: flex; align-items: center; justify-content: space-between; padding: .9rem 0; border-bottom: 1px solid #F1F5F9; gap: 1rem; }
+.settings-row:last-child { border-bottom: none; }
+.settings-label { font-size: 13px; font-weight: 600; color: var(--text); }
+.settings-desc  { font-size: 11px; color: var(--muted); margin-top: 2px; line-height: 1.4; }
+
+/* ── Manual order ticket ── */
+.mot-tab { padding: .4rem 1rem; border-radius: 8px; font-size: 13px; font-weight: 600; border: 1px solid var(--border); background: #F8FAFC; color: var(--muted); cursor: pointer; font-family: inherit; }
+.mot-tab.buy  { background: rgba(16,185,129,.1);  color: var(--green); border-color: rgba(16,185,129,.3); }
+.mot-tab.sell { background: rgba(239,68,68,.1);   color: var(--red);   border-color: rgba(239,68,68,.3);  }
+
+/* ── Broker card ── */
+.broker-card {
+  background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+  padding: 1rem 1.25rem; display: flex; align-items: center; justify-content: space-between;
+  box-shadow: 0 1px 4px rgba(0,0,0,.06);
+}
+.broker-tag { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 5px; text-transform: uppercase; letter-spacing: .06em; }
+.broker-alpaca  { background: rgba(59,130,246,.1);  color: #1D4ED8; }
+.broker-tradier { background: rgba(16,185,129,.1);  color: #065F46; }
+.broker-binance { background: rgba(245,158,11,.1);  color: #92400E; }
+
+/* ── Stat pill ── */
+.stat-pill { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: .85rem 1rem; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+.stat-pill-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: .3rem; }
+.stat-pill-value { font-size: 20px; font-weight: 800; letter-spacing: -.02em; }
+
+/* ── Page frame ── */
+.page-frame { display: flex; background: var(--bg); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,.1); min-height: 580px; }
+.page-frame .sidebar { flex-shrink: 0; }
+.page-content { flex: 1; display: flex; flex-direction: column; min-width: 0; background: var(--bg); overflow: hidden; }
+.scrollable { flex: 1; overflow: hidden; }
+.content-pad { padding: 1.25rem; display: flex; flex-direction: column; gap: 1rem; }
+
+/* ── Two-panel layout ── */
+.two-panel { display: grid; grid-template-columns: 200px 1fr; gap: 1rem; }
+.panel { background: var(--card); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
+.panel-header { font-size: 10px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; padding: .65rem 1rem; border-bottom: 1px solid var(--border); }
+
+/* ── Chip / tag ── */
+.chip { display: inline-flex; align-items: center; gap: 4px; padding: .2rem .55rem; border-radius: 6px; font-size: 11px; font-weight: 600; }
+.chip-paper { background: rgba(59,130,246,.1); color: #2563EB; border: 1px solid rgba(59,130,246,.2); }
+.chip-live  { background: rgba(245,158,11,.1); color: #D97706; border: 1px solid rgba(245,158,11,.2); }
+
+/* ── Misc helpers ── */
+.flex { display: flex; }
+.items-center { align-items: center; }
+.justify-between { justify-content: space-between; }
+.gap-2 { gap: .5rem; }
+.gap-3 { gap: .75rem; }
+.gap-4 { gap: 1rem; }
+.flex-1 { flex: 1; }
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; }
+.grid-4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 1rem; }
+.grid-5 { display: grid; grid-template-columns: repeat(5,1fr); gap: 1rem; }
+.text-green  { color: var(--green); }
+.text-red    { color: var(--red);   }
+.text-blue   { color: var(--blue);  }
+.text-muted  { color: var(--muted); }
+.text-sm     { font-size: 12px; }
+.text-xs     { font-size: 11px; }
+.font-bold   { font-weight: 700; }
+.font-semibold { font-weight: 600; }
+.mt-1 { margin-top: .25rem; }
+.mt-2 { margin-top: .5rem; }
+.mb-1 { margin-bottom: .25rem; }
+.mb-2 { margin-bottom: .5rem; }
+.mb-3 { margin-bottom: .75rem; }
+.p-0  { padding: 0; }
+.overflow-hidden { overflow: hidden; }
+.w-full { width: 100%; }
+.opacity-50 { opacity: .5; }
+</style>
+</head>
+<body>
+
+<!-- ══ NAV ══ -->
+<nav class="mockup-nav">
+  <span class="mockup-nav-title">☀️ Light Mode Mockup</span>
+  <a href="#dashboard">Dashboard</a>
+  <a href="#bots">Bots</a>
+  <a href="#positions">Positions</a>
+  <a href="#risk">Risk</a>
+  <a href="#performance">Performance</a>
+  <a href="#settings">Settings</a>
+  <a href="#logs">Logs</a>
+  <a href="#apikeys">Broker Accounts</a>
+  <a href="#backtesting">Backtesting</a>
+  <a href="#balances">Balances</a>
+  <a href="#modals">Modals & Forms</a>
+</nav>
+
+<!-- ════════════════════════════════════════ -->
+<!--  1. DASHBOARD                           -->
+<!-- ════════════════════════════════════════ -->
+<div class="page-section" id="dashboard">
+  <div class="page-label">1 — Dashboard (index.html)</div>
+  <div class="page-frame">
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <div class="logo">
+        <div class="logo-mark">
+          <svg width="18" height="18" viewBox="0 0 22 22" fill="none"><path d="M11 2L20 7.5V14.5L11 20L2 14.5V7.5L11 2Z" fill="#3B82F6"/></svg>
+        </div>
+        <span class="logo-text">TradeBot</span>
+      </div>
+      <nav class="nav">
+        <p class="nav-section">Overview</p>
+        <div class="nav-item active">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+          Dashboard
+        </div>
+        <p class="nav-section">Analysis</p>
+        <div class="nav-item">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          Performance
+        </div>
+        <div class="nav-item">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          Backtesting
+        </div>
+        <p class="nav-section">Portfolio</p>
+        <div class="nav-item">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/></svg>
+          Positions
+        </div>
+        <div class="nav-item">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+          Balances
+        </div>
+        <div class="nav-item">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="2" height="2"/><rect x="13" y="9" width="2" height="2"/><path d="M9 13a3 3 0 0 0 6 0"/></svg>
+          Bots &amp; Strategies
+        </div>
+        <p class="nav-section">System</p>
+        <div class="nav-item">Risk</div>
+        <div class="nav-item">Logs</div>
+        <div class="nav-item">Broker Accounts</div>
+        <div class="nav-item">Settings</div>
+      </nav>
+      <div class="sidebar-footer">
+        <div class="paper-card">
+          <div class="paper-label">Trading Mode</div>
+          <div style="font-size:12px;color:#0F172A;font-weight:600;">Paper Mode</div>
+          <a class="go-live">Go Live →</a>
+        </div>
+        <button class="logout-btn" style="font-size:12px;">
+          <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          Sign Out
+        </button>
+        <button class="theme-btn">
+          <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+          Dark Mode
+        </button>
+      </div>
+    </div>
+    <!-- Main -->
+    <div class="page-content">
+      <div class="page-header">
+        <div class="flex-1">
+          <div class="page-title">Dashboard</div>
+          <div class="page-sub">Real-time portfolio overview</div>
+        </div>
+        <div class="search-bar" style="font-size:12px;">
+          <svg width="13" height="13" fill="none" stroke="#94A3B8" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          Search…
+        </div>
+        <div class="market-chip">Market Open</div>
+        <div class="flex items-center gap-2">
+          <div class="avatar">JR</div>
+          <div class="online-dot"></div>
+        </div>
+      </div>
+      <div class="scrollable">
+        <div class="content-pad">
+          <div class="banner banner-paper">
+            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            Paper Trading Mode — orders are simulated, no real money at risk.
+          </div>
+          <!-- Metrics -->
+          <div class="metric-grid">
+            <div class="metric-card">
+              <div class="icon-circle icon-blue"><svg width="15" height="15" fill="none" stroke="#3B82F6" stroke-width="1.8" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg></div>
+              <div class="metric-label">Total Balance</div>
+              <div class="metric-value text-blue">$24,831</div>
+              <div class="metric-sub">+$312 today</div>
+              <div class="sparkline"></div>
+            </div>
+            <div class="metric-card">
+              <div class="icon-circle icon-green"><svg width="15" height="15" fill="none" stroke="#10B981" stroke-width="1.8" viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/></svg></div>
+              <div class="metric-label">Daily P&L</div>
+              <div class="metric-value text-green">+$312.40</div>
+              <div class="metric-sub">+1.27%</div>
+              <div class="sparkline green"></div>
+            </div>
+            <div class="metric-card">
+              <div class="icon-circle icon-cyan"><svg width="15" height="15" fill="none" stroke="#06B6D4" stroke-width="1.8" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
+              <div class="metric-label">Fill Rate</div>
+              <div class="metric-value text-blue" style="color:#06B6D4;">94.2%</div>
+              <div class="metric-sub">47/50 signals</div>
+              <div class="sparkline"></div>
+            </div>
+            <div class="metric-card">
+              <div class="icon-circle icon-purple"><svg width="15" height="15" fill="none" stroke="#8B5CF6" stroke-width="1.8" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="2" height="2"/><rect x="13" y="9" width="2" height="2"/><path d="M9 13a3 3 0 0 0 6 0"/></svg></div>
+              <div class="metric-label">Active Bots</div>
+              <div class="metric-value" style="color:#8B5CF6;">5</div>
+              <div class="metric-sub">of 7 strategies</div>
+              <div class="sparkline"></div>
+            </div>
+            <div class="metric-card">
+              <div class="icon-circle icon-orange"><svg width="15" height="15" fill="none" stroke="#F59E0B" stroke-width="1.8" viewBox="0 0 24 24"><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><path d="M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83"/></svg></div>
+              <div class="metric-label">Unrealized P&L</div>
+              <div class="metric-value text-green">+$891</div>
+              <div class="metric-sub">Open positions</div>
+              <div class="sparkline green"></div>
+            </div>
+            <div class="metric-card">
+              <div class="icon-circle icon-indigo"><svg width="15" height="15" fill="none" stroke="#6366F1" stroke-width="1.8" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></div>
+              <div class="metric-label">Open Positions</div>
+              <div class="metric-value" style="color:#6366F1;">8</div>
+              <div class="metric-sub">Across 2 accounts</div>
+              <div class="sparkline"></div>
+            </div>
+          </div>
+          <!-- Chart row -->
+          <div class="grid-2" style="grid-template-columns:2fr 1fr;">
+            <div class="card">
+              <div class="flex items-center justify-between mb-2">
+                <div>
+                  <div class="card-title">Portfolio Performance</div>
+                  <div style="font-size:22px;font-weight:800;color:#10B981;margin-top:.2rem;">$24,831.40</div>
+                </div>
+                <div class="range-tabs">
+                  <button class="range-tab">1H</button>
+                  <button class="range-tab active">24H</button>
+                  <button class="range-tab">7D</button>
+                  <button class="range-tab">30D</button>
+                </div>
+              </div>
+              <div style="height:160px;border-radius:10px;background:linear-gradient(180deg,rgba(59,130,246,.06) 0%,rgba(59,130,246,.01) 100%);border:1px solid rgba(59,130,246,.1);display:flex;align-items:flex-end;padding:.5rem;">
+                <svg viewBox="0 0 300 120" style="width:100%;height:100%;" preserveAspectRatio="none">
+                  <defs><linearGradient id="ag" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#3B82F6" stop-opacity=".2"/><stop offset="100%" stop-color="#3B82F6" stop-opacity="0"/></linearGradient></defs>
+                  <path d="M0,100 C30,90 50,70 80,60 C110,50 130,55 160,40 C190,25 210,20 240,15 C260,10 280,8 300,5 L300,120 L0,120Z" fill="url(#ag)"/>
+                  <path d="M0,100 C30,90 50,70 80,60 C110,50 130,55 160,40 C190,25 210,20 240,15 C260,10 280,8 300,5" fill="none" stroke="#3B82F6" stroke-width="2"/>
+                </svg>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-title mb-2">Bot Status</div>
+              <div style="display:flex;flex-direction:column;gap:.5rem;">
+                <div class="flex items-center justify-between" style="padding:.4rem .6rem;background:#F8FAFC;border-radius:8px;border:1px solid var(--border);">
+                  <span style="font-size:12px;font-weight:600;">Momentum</span>
+                  <span class="badge b-green"><span class="pdot"></span> Running</span>
+                </div>
+                <div class="flex items-center justify-between" style="padding:.4rem .6rem;background:#F8FAFC;border-radius:8px;border:1px solid var(--border);">
+                  <span style="font-size:12px;font-weight:600;">RSI MR</span>
+                  <span class="badge b-green"><span class="pdot"></span> Running</span>
+                </div>
+                <div class="flex items-center justify-between" style="padding:.4rem .6rem;background:#F8FAFC;border-radius:8px;border:1px solid var(--border);">
+                  <span style="font-size:12px;font-weight:600;">Bollinger</span>
+                  <span class="badge b-muted">Paused</span>
+                </div>
+                <div class="flex items-center justify-between" style="padding:.4rem .6rem;background:#F8FAFC;border-radius:8px;border:1px solid var(--border);">
+                  <span style="font-size:12px;font-weight:600;">Golden Cross</span>
+                  <span class="badge b-green"><span class="pdot"></span> Running</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- Recent trades row -->
+          <div class="card p-0" style="padding:0;">
+            <div class="flex items-center justify-between" style="padding:.8rem 1.25rem;border-bottom:1px solid var(--border);">
+              <div class="card-title">Recent Trades</div>
+              <button class="btn btn-ghost btn-sm">Export CSV</button>
+            </div>
+            <div style="overflow:auto;">
+              <table class="dtable">
+                <thead><tr><th>Time</th><th>Strategy</th><th>Symbol</th><th>Side</th><th>Qty</th><th>Status</th></tr></thead>
+                <tbody>
+                  <tr><td class="text-muted text-xs">8:52 PM</td><td>Momentum</td><td><strong>NVDA</strong></td><td><span class="badge b-green">Buy</span></td><td>5</td><td><span class="badge b-green">Filled</span></td></tr>
+                  <tr><td class="text-muted text-xs">8:45 PM</td><td>RSI MR</td><td><strong>AAPL</strong></td><td><span class="badge b-red">Sell</span></td><td>10</td><td><span class="badge b-green">Filled</span></td></tr>
+                  <tr><td class="text-muted text-xs">8:30 PM</td><td>SMA Cross</td><td><strong>SPY</strong></td><td><span class="badge b-green">Buy</span></td><td>3</td><td><span class="badge b-muted">Blocked</span></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        <!-- Sys bar -->
+        <div class="sys-bar">
+          <div class="sys-item"><div class="sys-dot"></div> Exchange: AccountStatus.ACTIVE</div>
+          <div class="sys-item"><div class="sys-dot"></div> API: Connected</div>
+          <div class="sys-item">🕐 Server: 8:53:25 PM</div>
+          <div class="sys-item">⟳ Last Engine Run: May 12, 8:52 PM</div>
+          <div class="sys-item">API Response: 538ms</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════ -->
+<!--  2. BOTS & STRATEGIES                   -->
+<!-- ════════════════════════════════════════ -->
+<div class="page-section" id="bots">
+  <div class="page-label">2 — Bots &amp; Strategies (bots.html)</div>
+  <div class="page-frame">
+    <div class="sidebar" style="display:flex;flex-direction:column;">
+      <div class="logo"><div class="logo-mark"><svg width="18" height="18" viewBox="0 0 22 22" fill="none"><path d="M11 2L20 7.5V14.5L11 20L2 14.5V7.5L11 2Z" fill="#3B82F6"/></svg></div><span class="logo-text">TradeBot</span></div>
+      <nav class="nav"><p class="nav-section">Portfolio</p><div class="nav-item active"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="2" height="2"/><rect x="13" y="9" width="2" height="2"/><path d="M9 13a3 3 0 0 0 6 0"/></svg> Bots &amp; Strategies</div></nav>
+      <div class="sidebar-footer"><div class="paper-card"><div class="paper-label">Trading Mode</div><div style="font-size:12px;color:#0F172A;font-weight:600;">Paper Mode</div><a class="go-live">Go Live →</a></div><button class="theme-btn"><svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg> Dark Mode</button></div>
+    </div>
+    <div class="page-content">
+      <div class="page-header">
+        <div class="flex-1"><div class="page-title">Bots &amp; Strategies</div><div class="page-sub">Assign strategies to broker accounts</div></div>
+        <div class="flex items-center gap-2"><button class="btn btn-primary btn-sm">▶ Run Now</button><div class="avatar">JR</div></div>
+      </div>
+      <div class="scrollable">
+        <div class="content-pad">
+          <div class="two-panel">
+            <!-- Left: accounts -->
+            <div class="panel">
+              <div class="panel-header">Broker Accounts</div>
+              <div class="acct-item active">
+                <div class="acct-dot" style="background:#10B981;"></div>
+                <div>
+                  <div style="font-size:13px;font-weight:500;">Paper Account</div>
+                  <div class="chip chip-paper" style="margin-top:2px;">Paper</div>
+                </div>
+              </div>
+              <div class="acct-item">
+                <div class="acct-dot" style="background:#F59E0B;"></div>
+                <div>
+                  <div style="font-size:13px;font-weight:500;">Live Account</div>
+                  <div class="chip chip-live" style="margin-top:2px;">Live</div>
+                </div>
+              </div>
+              <div style="padding:.65rem 1rem;border-top:1px solid var(--border);">
+                <button class="btn btn-ghost btn-sm w-full" style="justify-content:center;">+ Add Account</button>
+              </div>
+            </div>
+            <!-- Right: strategies -->
+            <div class="panel">
+              <div class="panel-header" style="display:flex;justify-content:space-between;align-items:center;padding:.7rem 1.25rem;">
+                <span>Paper Account</span>
+                <span class="text-muted text-xs">3 of 7 enabled</span>
+              </div>
+              <div class="section-divider">Auto-Trade Strategies</div>
+              <div class="strat-row">
+                <div class="strat-icon si-active"><svg width="14" height="14" fill="none" stroke="#8B5CF6" stroke-width="1.8" viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/></svg></div>
+                <div class="flex-1 overflow-hidden">
+                  <div style="font-size:13px;font-weight:500;">Momentum</div>
+                  <div class="text-muted text-xs">Trend-following with SMA + RSI</div>
+                </div>
+                <span class="badge b-green"><span class="pdot"></span> Running</span>
+                <div class="strat-toggle on"></div>
+              </div>
+              <div class="strat-row">
+                <div class="strat-icon si-active"><svg width="14" height="14" fill="none" stroke="#8B5CF6" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/></svg></div>
+                <div class="flex-1 overflow-hidden">
+                  <div style="font-size:13px;font-weight:500;">RSI Mean Reversion</div>
+                  <div class="text-muted text-xs">Buys oversold, sells overbought</div>
+                </div>
+                <span class="badge b-green"><span class="pdot"></span> Running</span>
+                <div class="strat-toggle on"></div>
+              </div>
+              <div class="strat-row opacity-50">
+                <div class="strat-icon si-inactive"><svg width="14" height="14" fill="none" stroke="#64748B" stroke-width="1.8" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="1"/><path d="M8 12h8"/></svg></div>
+                <div class="flex-1 overflow-hidden">
+                  <div style="font-size:13px;font-weight:500;">Bollinger Bands</div>
+                  <div class="text-muted text-xs">Mean reversion with BB + RSI</div>
+                </div>
+                <span class="badge b-muted">Paused</span>
+                <div class="strat-toggle"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════ -->
+<!--  3. POSITIONS & ORDERS                  -->
+<!-- ════════════════════════════════════════ -->
+<div class="page-section" id="positions">
+  <div class="page-label">3 — Positions &amp; Orders (positions.html)</div>
+  <div class="page-frame">
+    <div class="sidebar" style="display:flex;flex-direction:column;">
+      <div class="logo"><div class="logo-mark"><svg width="18" height="18" viewBox="0 0 22 22" fill="none"><path d="M11 2L20 7.5V14.5L11 20L2 14.5V7.5L11 2Z" fill="#3B82F6"/></svg></div><span class="logo-text">TradeBot</span></div>
+      <nav class="nav"><p class="nav-section">Portfolio</p><div class="nav-item active">Positions &amp; Orders</div></nav>
+      <div class="sidebar-footer"><div class="paper-card"><div class="paper-label">Trading Mode</div><div style="font-size:12px;font-weight:600;">Paper Mode</div><a class="go-live">Go Live →</a></div><button class="theme-btn">☀ Dark Mode</button></div>
+    </div>
+    <div class="page-content">
+      <div class="page-header">
+        <div class="flex-1"><div class="page-title">Positions &amp; Orders</div></div>
+        <select class="input" style="width:160px;font-size:12px;"><option>Paper Account</option></select>
+        <div class="avatar">JR</div>
+      </div>
+      <div class="scrollable">
+        <div class="content-pad" style="display:grid;grid-template-columns:1fr 280px;gap:1rem;align-items:start;">
+          <!-- Left -->
+          <div style="display:flex;flex-direction:column;gap:1rem;">
+            <div class="card p-0">
+              <div class="flex items-center justify-between" style="padding:.8rem 1.25rem;border-bottom:1px solid var(--border);">
+                <div class="card-title">Open Positions</div>
+                <button class="btn btn-danger btn-sm">Close All</button>
+              </div>
+              <div style="display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid var(--border);">
+                <div style="padding:.7rem 1.25rem;border-right:1px solid var(--border);"><div class="text-xs text-muted mb-1">Market Value</div><div style="font-size:16px;font-weight:700;">$12,480</div></div>
+                <div style="padding:.7rem 1.25rem;border-right:1px solid var(--border);"><div class="text-xs text-muted mb-1">Unrealized P&L</div><div style="font-size:16px;font-weight:700;color:var(--green);">+$891</div></div>
+                <div style="padding:.7rem 1.25rem;border-right:1px solid var(--border);"><div class="text-xs text-muted mb-1">Positions</div><div style="font-size:16px;font-weight:700;">8</div></div>
+                <div style="padding:.7rem 1.25rem;"><div class="text-xs text-muted mb-1">Day Trades</div><div style="font-size:16px;font-weight:700;">2 / 3</div></div>
+              </div>
+              <table class="dtable">
+                <thead><tr><th>Symbol</th><th>Side</th><th>Qty</th><th>Avg Entry</th><th>Price</th><th>Market Value</th><th>P&L</th></tr></thead>
+                <tbody>
+                  <tr><td><strong>NVDA</strong></td><td><span class="badge b-green">Long</span></td><td>5</td><td>$875.20</td><td>$892.40</td><td>$4,462</td><td class="text-green">+$86.00</td></tr>
+                  <tr><td><strong>AAPL</strong></td><td><span class="badge b-green">Long</span></td><td>10</td><td>$186.50</td><td>$189.30</td><td>$1,893</td><td class="text-green">+$28.00</td></tr>
+                  <tr><td><strong>MSFT</strong></td><td><span class="badge b-red">Short</span></td><td>3</td><td>$415.80</td><td>$412.10</td><td>$1,236</td><td class="text-green">+$11.10</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="card p-0">
+              <div class="flex items-center justify-between" style="padding:.8rem 1.25rem;border-bottom:1px solid var(--border);">
+                <div class="card-title">Orders</div>
+                <div class="flex gap-2">
+                  <button class="btn btn-ghost btn-sm">Export CSV</button>
+                  <button class="btn btn-danger btn-sm">Cancel All</button>
+                </div>
+              </div>
+              <table class="dtable">
+                <thead><tr><th>Submitted</th><th>Symbol</th><th>Side</th><th>Qty</th><th>Status</th><th>Filled At</th></tr></thead>
+                <tbody>
+                  <tr><td class="text-xs text-muted">8:52 PM</td><td><strong>NVDA</strong></td><td><span class="badge b-green">Buy</span></td><td>5</td><td><span class="badge b-green">Filled</span></td><td>$892.40</td></tr>
+                  <tr><td class="text-xs text-muted">8:45 PM</td><td><strong>AAPL</strong></td><td><span class="badge b-red">Sell</span></td><td>10</td><td><span class="badge b-green">Filled</span></td><td>$189.30</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <!-- Right: Manual Order Ticket -->
+          <div class="card" style="position:sticky;top:1rem;">
+            <div class="card-title mb-2">Manual Order</div>
+            <select class="input mb-2" style="font-size:12px;"><option>Paper Account — Alpaca</option></select>
+            <div class="flex gap-2 mb-2">
+              <button class="mot-tab buy flex-1">Buy</button>
+              <button class="mot-tab flex-1" style="background:#F8FAFC;">Sell</button>
+            </div>
+            <div class="form-group">
+              <label class="label">Symbol</label>
+              <input class="input" value="NVDA" />
+              <div style="background:#DBEAFE;border:1px solid #93C5FD;border-radius:8px;padding:.45rem .75rem;margin-top:.35rem;font-size:12px;color:#1D4ED8;font-weight:600;">Bid $892.20 · Ask $892.60 · Mid $892.40</div>
+            </div>
+            <div class="form-group">
+              <label class="label">Amount (USD)</label>
+              <input class="input" value="500" />
+            </div>
+            <div class="form-group">
+              <label class="label">Limit Price <span class="text-muted">(optional)</span></label>
+              <input class="input" placeholder="Market order if blank" />
+            </div>
+            <button class="btn btn-primary w-full" style="justify-content:center;background:#10B981;">Buy NVDA</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════ -->
+<!--  4. RISK                                -->
+<!-- ════════════════════════════════════════ -->
+<div class="page-section" id="risk">
+  <div class="page-label">4 — Risk Management (risk.html)</div>
+  <div class="page-frame">
+    <div class="sidebar" style="display:flex;flex-direction:column;">
+      <div class="logo"><div class="logo-mark"><svg width="18" height="18" viewBox="0 0 22 22" fill="none"><path d="M11 2L20 7.5V14.5L11 20L2 14.5V7.5L11 2Z" fill="#3B82F6"/></svg></div><span class="logo-text">TradeBot</span></div>
+      <nav class="nav"><p class="nav-section">System</p><div class="nav-item active">Risk</div></nav>
+      <div class="sidebar-footer"><div class="paper-card"><div class="paper-label">Trading Mode</div><div style="font-size:12px;font-weight:600;">Paper Mode</div></div><button class="theme-btn">☀ Dark Mode</button></div>
+    </div>
+    <div class="page-content">
+      <div class="page-header"><div class="flex-1"><div class="page-title">Risk Management</div><div class="page-sub">Guardrails, limits and kill switch</div></div></div>
+      <div class="scrollable">
+        <div class="content-pad">
+          <!-- Status strip -->
+          <div class="card p-0">
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);">
+              <div style="padding:.85rem 1.25rem;border-right:1px solid var(--border);">
+                <div class="text-xs text-muted mb-1" style="font-weight:700;text-transform:uppercase;letter-spacing:.06em;">Daily P&L</div>
+                <div style="font-size:22px;font-weight:800;color:var(--green);">+$312</div>
+                <div class="text-xs text-muted mt-1">of $490 limit</div>
+              </div>
+              <div style="padding:.85rem 1.25rem;border-right:1px solid var(--border);">
+                <div class="text-xs text-muted mb-1" style="font-weight:700;text-transform:uppercase;letter-spacing:.06em;">Drawdown</div>
+                <div style="font-size:22px;font-weight:800;">1.2%</div>
+                <div class="text-xs text-muted mt-1">of 5% max</div>
+              </div>
+              <div style="padding:.85rem 1.25rem;border-right:1px solid var(--border);">
+                <div class="text-xs text-muted mb-1" style="font-weight:700;text-transform:uppercase;letter-spacing:.06em;">Positions</div>
+                <div style="font-size:22px;font-weight:800;">8</div>
+                <div class="text-xs text-muted mt-1">of 10 max</div>
+              </div>
+              <div style="padding:.85rem 1.25rem;">
+                <div class="text-xs text-muted mb-1" style="font-weight:700;text-transform:uppercase;letter-spacing:.06em;">Consec. Losses</div>
+                <div style="font-size:22px;font-weight:800;">1</div>
+                <div class="text-xs text-muted mt-1">of 3 limit</div>
+              </div>
+            </div>
+          </div>
+          <!-- Kill switch -->
+          <div class="card ks-card">
+            <div class="flex items-center gap-3">
+              <div class="ks-icon">
+                <svg width="18" height="18" fill="none" stroke="#EF4444" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              </div>
+              <div class="flex-1">
+                <div style="font-size:14px;font-weight:700;">Global Kill Switch</div>
+                <div class="text-xs text-muted mt-1">Immediately halts ALL strategy execution across every account.</div>
+              </div>
+              <label class="toggle"><input type="checkbox"><div class="toggle-track"></div></label>
+            </div>
+          </div>
+          <!-- Risk limits -->
+          <div class="card">
+            <div class="card-title mb-1">Risk Limits</div>
+            <div class="card-sub mb-2">Automated guardrails applied to every order</div>
+            <div class="ri">
+              <div class="ri-icon ri-icon-orange"><svg width="14" height="14" fill="none" stroke="#F59E0B" stroke-width="2" viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
+              <div class="flex-1"><div class="ri-label">Max Daily Loss</div><div class="ri-sub">Stop all trading if daily loss exceeds this %</div></div>
+              <div class="ri-field"><input class="ri-input" value="2.0"><span class="ri-suffix">%</span><button class="btn btn-ghost btn-sm">Save</button></div>
+            </div>
+            <div class="ri">
+              <div class="ri-icon ri-icon-purple"><svg width="14" height="14" fill="none" stroke="#8B5CF6" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></div>
+              <div class="flex-1"><div class="ri-label">Max Position Size</div><div class="ri-sub">Cap each position as % of account equity</div></div>
+              <div class="ri-field"><input class="ri-input" value="10.0"><span class="ri-suffix">%</span><button class="btn btn-ghost btn-sm">Save</button></div>
+            </div>
+            <div class="ri">
+              <div class="ri-icon ri-icon-red"><svg width="14" height="14" fill="none" stroke="#EF4444" stroke-width="2" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-.73-9.27"/></svg></div>
+              <div class="flex-1"><div class="ri-label">Consecutive Loss Limit</div><div class="ri-sub">Pause trading after N consecutive losing trades</div></div>
+              <div class="ri-field"><input class="ri-input" value="3"><span class="ri-suffix">trades</span><button class="btn btn-ghost btn-sm">Save</button></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════ -->
+<!--  5. PERFORMANCE                         -->
+<!-- ════════════════════════════════════════ -->
+<div class="page-section" id="performance">
+  <div class="page-label">5 — Performance (performance.html)</div>
+  <div class="page-frame" style="min-height:480px;">
+    <div class="sidebar" style="display:flex;flex-direction:column;">
+      <div class="logo"><div class="logo-mark"><svg width="18" height="18" viewBox="0 0 22 22" fill="none"><path d="M11 2L20 7.5V14.5L11 20L2 14.5V7.5L11 2Z" fill="#3B82F6"/></svg></div><span class="logo-text">TradeBot</span></div>
+      <nav class="nav"><div class="nav-item active">Performance</div></nav>
+      <div class="sidebar-footer"><div class="paper-card"><div class="paper-label">Trading Mode</div><div style="font-size:12px;font-weight:600;">Paper Mode</div></div><button class="theme-btn">☀ Dark Mode</button></div>
+    </div>
+    <div class="page-content">
+      <div class="page-header"><div class="flex-1"><div class="page-title">Performance</div><div class="page-sub">Strategy analytics and signal history</div></div></div>
+      <div class="scrollable">
+        <div class="content-pad">
+          <!-- Strategy stats -->
+          <div class="card p-0">
+            <div style="padding:.8rem 1.25rem;border-bottom:1px solid var(--border);"><div class="card-title">Strategy Statistics</div></div>
+            <table class="dtable">
+              <thead><tr><th>Status</th><th>Strategy</th><th>Total</th><th>Buys</th><th>Sells</th><th>Blocked</th></tr></thead>
+              <tbody>
+                <tr><td><span class="badge b-green"><span class="pdot"></span> Active</span></td><td>Momentum</td><td>142</td><td>71</td><td>68</td><td>3</td></tr>
+                <tr><td><span class="badge b-green"><span class="pdot"></span> Active</span></td><td>RSI Mean Reversion</td><td>98</td><td>49</td><td>47</td><td>2</td></tr>
+                <tr><td><span class="badge b-muted">Paused</span></td><td>Bollinger Bands</td><td>54</td><td>28</td><td>26</td><td>0</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <!-- Attribution -->
+          <div class="card p-0">
+            <div style="padding:.8rem 1.25rem;border-bottom:1px solid var(--border);"><div class="card-title">Strategy × Account Attribution</div></div>
+            <table class="dtable">
+              <thead><tr><th>Strategy</th><th>Account</th><th>Total Signals</th><th>Executed</th><th>Blocked</th></tr></thead>
+              <tbody>
+                <tr><td>Momentum</td><td><span class="chip chip-paper">Paper Account</span></td><td>142</td><td>139</td><td>3</td></tr>
+                <tr><td>RSI MR</td><td><span class="chip chip-live">Live Account</span></td><td>98</td><td>96</td><td>2</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════ -->
+<!--  6. SETTINGS                            -->
+<!-- ════════════════════════════════════════ -->
+<div class="page-section" id="settings">
+  <div class="page-label">6 — Settings (settings.html)</div>
+  <div class="page-frame" style="min-height:520px;">
+    <div class="sidebar" style="display:flex;flex-direction:column;">
+      <div class="logo"><div class="logo-mark"><svg width="18" height="18" viewBox="0 0 22 22" fill="none"><path d="M11 2L20 7.5V14.5L11 20L2 14.5V7.5L11 2Z" fill="#3B82F6"/></svg></div><span class="logo-text">TradeBot</span></div>
+      <nav class="nav"><div class="nav-item active">Settings</div></nav>
+      <div class="sidebar-footer"><div class="paper-card"><div class="paper-label">Trading Mode</div><div style="font-size:12px;font-weight:600;">Paper Mode</div></div><button class="theme-btn">☀ Dark Mode</button></div>
+    </div>
+    <div class="page-content">
+      <div class="page-header"><div class="flex-1"><div class="page-title">Settings</div><div class="page-sub">Notifications, webhooks and alerts</div></div></div>
+      <div class="scrollable">
+        <div class="content-pad">
+          <!-- Email card -->
+          <div class="card">
+            <div class="flex items-center justify-between mb-2">
+              <div class="flex items-center gap-3">
+                <div class="icon-circle icon-blue" style="width:32px;height:32px;"><svg width="14" height="14" fill="none" stroke="#3B82F6" stroke-width="2" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg></div>
+                <div><div class="settings-label">Email Notifications</div><div class="settings-desc">Send trade alerts to your inbox</div></div>
+              </div>
+              <label class="toggle"><input type="checkbox" checked><div class="toggle-track"></div></label>
+            </div>
+            <div style="background:#F8FAFC;border:1px solid var(--border);border-radius:10px;padding:1rem;display:flex;flex-direction:column;gap:.75rem;">
+              <div class="form-group" style="margin-bottom:0;">
+                <label class="label">Recipient Email</label>
+                <input class="input" value="trader@example.com" />
+              </div>
+              <div class="grid-2" style="gap:.75rem;">
+                <div class="form-group" style="margin-bottom:0;"><label class="label">SMTP Host</label><input class="input" value="smtp.gmail.com" /></div>
+                <div class="form-group" style="margin-bottom:0;"><label class="label">SMTP Port</label><input class="input" value="587" type="number" /></div>
+              </div>
+              <div class="form-group" style="margin-bottom:0;"><label class="label">App Password</label><input class="input" type="password" value="••••••••••••" /></div>
+              <button class="btn btn-ghost btn-sm" style="align-self:flex-start;">Send Test Email</button>
+            </div>
+          </div>
+          <!-- Slack card -->
+          <div class="card">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <div class="icon-circle icon-purple" style="width:32px;height:32px;"><svg width="14" height="14" fill="none" stroke="#8B5CF6" stroke-width="2" viewBox="0 0 24 24"><path d="M14.5 10c-.83 0-1.5-.67-1.5-1.5v-5c0-.83.67-1.5 1.5-1.5s1.5.67 1.5 1.5v5c0 .83-.67 1.5-1.5 1.5z"/><path d="M20.5 10H19V8.5c0-.83.67-1.5 1.5-1.5s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/><path d="M9.5 14c.83 0 1.5.67 1.5 1.5v5c0 .83-.67 1.5-1.5 1.5S8 21.33 8 20.5v-5c0-.83.67-1.5 1.5-1.5z"/><path d="M3.5 14H5v1.5c0 .83-.67 1.5-1.5 1.5S2 16.33 2 15.5 2.67 14 3.5 14z"/><path d="M14 14.5c0-.83.67-1.5 1.5-1.5h5c.83 0 1.5.67 1.5 1.5s-.67 1.5-1.5 1.5h-5c-.83 0-1.5-.67-1.5-1.5z"/><path d="M15.5 19H14v1.5c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5-.67-1.5-1.5-1.5z"/><path d="M10 9.5C10 8.67 9.33 8 8.5 8h-5C2.67 8 2 8.67 2 9.5S2.67 11 3.5 11h5c.83 0 1.5-.67 1.5-1.5z"/><path d="M8.5 5H10V3.5C10 2.67 9.33 2 8.5 2S7 2.67 7 3.5 7.67 5 8.5 5z"/></svg></div>
+                <div><div class="settings-label">Slack Alerts</div><div class="settings-desc">Post signals to a Slack channel</div></div>
+              </div>
+              <label class="toggle"><input type="checkbox"><div class="toggle-track"></div></label>
+            </div>
+            <div class="form-group mt-2" style="margin-bottom:0;">
+              <label class="label">Webhook URL</label>
+              <input class="input" placeholder="https://hooks.slack.com/services/…" />
+              <div class="hint">Create a webhook at api.slack.com/apps then paste the URL here.</div>
+            </div>
+          </div>
+          <!-- Price alerts -->
+          <div class="card">
+            <div class="card-title mb-2">Price Alerts</div>
+            <div style="display:flex;gap:.5rem;margin-bottom:.75rem;">
+              <input class="input" placeholder="Symbol (e.g. BTC)" style="width:100px;" />
+              <select class="input" style="width:100px;"><option>Above</option><option>Below</option></select>
+              <input class="input" placeholder="$0.00" type="number" style="width:100px;" />
+              <button class="btn btn-primary btn-sm">+ Add Alert</button>
+            </div>
+            <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
+              <div style="display:flex;align-items:center;gap:.4rem;background:#F8FAFC;border:1px solid var(--border);border-radius:8px;padding:.35rem .7rem;font-size:12px;font-weight:600;">
+                BTC above $70,000 <span style="color:var(--muted);cursor:pointer;">✕</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:.4rem;background:#F8FAFC;border:1px solid var(--border);border-radius:8px;padding:.35rem .7rem;font-size:12px;font-weight:600;">
+                AAPL below $180 <span style="color:var(--muted);cursor:pointer;">✕</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════ -->
+<!--  7. LOGS                                -->
+<!-- ════════════════════════════════════════ -->
+<div class="page-section" id="logs">
+  <div class="page-label">7 — Logs &amp; Signals (logs.html)</div>
+  <div class="page-frame" style="min-height:420px;">
+    <div class="sidebar" style="display:flex;flex-direction:column;">
+      <div class="logo"><div class="logo-mark"><svg width="18" height="18" viewBox="0 0 22 22" fill="none"><path d="M11 2L20 7.5V14.5L11 20L2 14.5V7.5L11 2Z" fill="#3B82F6"/></svg></div><span class="logo-text">TradeBot</span></div>
+      <nav class="nav"><div class="nav-item active">Logs &amp; Signals</div></nav>
+      <div class="sidebar-footer"><div class="paper-card"><div class="paper-label">Trading Mode</div><div style="font-size:12px;font-weight:600;">Paper Mode</div></div><button class="theme-btn">☀ Dark Mode</button></div>
+    </div>
+    <div class="page-content">
+      <div class="page-header"><div class="flex-1"><div class="page-title">Logs &amp; Signals</div><div class="page-sub">Full signal history and execution log</div></div></div>
+      <div class="scrollable">
+        <div class="content-pad">
+          <div class="card p-0">
+            <div class="flex items-center justify-between" style="padding:.8rem 1.25rem;border-bottom:1px solid var(--border);gap:.5rem;flex-wrap:wrap;">
+              <div class="flex gap-2">
+                <button class="btn btn-primary btn-sm">All</button>
+                <button class="btn btn-ghost btn-sm">Filled</button>
+                <button class="btn btn-ghost btn-sm">Blocked</button>
+                <button class="btn btn-ghost btn-sm">Error</button>
+              </div>
+              <button class="btn btn-ghost btn-sm">Export CSV</button>
+            </div>
+            <table class="dtable">
+              <thead><tr><th>Time</th><th>Strategy</th><th>Symbol</th><th>Side</th><th>Qty</th><th>Reason</th><th>Status</th></tr></thead>
+              <tbody>
+                <tr><td class="text-xs text-muted">8:52 PM</td><td>Momentum</td><td><strong>NVDA</strong></td><td><span class="badge b-green">Buy</span></td><td>5</td><td class="text-xs">RSI oversold + SMA crossover</td><td><span class="badge b-green">Filled</span></td></tr>
+                <tr><td class="text-xs text-muted">8:45 PM</td><td>RSI MR</td><td><strong>AAPL</strong></td><td><span class="badge b-red">Sell</span></td><td>10</td><td class="text-xs">RSI overbought (82.4)</td><td><span class="badge b-green">Filled</span></td></tr>
+                <tr><td class="text-xs text-muted">8:30 PM</td><td>Bollinger</td><td><strong>SPY</strong></td><td><span class="badge b-green">Buy</span></td><td>3</td><td class="text-xs">RISK BLOCK: max daily loss</td><td><span class="badge b-muted">Blocked</span></td></tr>
+                <tr><td class="text-xs text-muted">8:15 PM</td><td>Golden Cross</td><td><strong>QQQ</strong></td><td><span class="badge b-green">Buy</span></td><td>2</td><td class="text-xs">SMA50 crossed above SMA200</td><td><span class="badge b-green">Filled</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════ -->
+<!--  8. BROKER ACCOUNTS                     -->
+<!-- ════════════════════════════════════════ -->
+<div class="page-section" id="apikeys">
+  <div class="page-label">8 — Broker Accounts (apikeys.html)</div>
+  <div class="page-frame" style="min-height:480px;">
+    <div class="sidebar" style="display:flex;flex-direction:column;">
+      <div class="logo"><div class="logo-mark"><svg width="18" height="18" viewBox="0 0 22 22" fill="none"><path d="M11 2L20 7.5V14.5L11 20L2 14.5V7.5L11 2Z" fill="#3B82F6"/></svg></div><span class="logo-text">TradeBot</span></div>
+      <nav class="nav"><div class="nav-item active">Broker Accounts</div></nav>
+      <div class="sidebar-footer"><div class="paper-card"><div class="paper-label">Trading Mode</div><div style="font-size:12px;font-weight:600;">Paper Mode</div></div><button class="theme-btn">☀ Dark Mode</button></div>
+    </div>
+    <div class="page-content">
+      <div class="page-header">
+        <div class="flex-1"><div class="page-title">Broker Accounts</div><div class="page-sub">Manage API credentials and account connections</div></div>
+        <button class="btn btn-primary btn-sm">+ Add Account</button>
+      </div>
+      <div class="scrollable">
+        <div class="content-pad">
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:1rem;">
+            <!-- Alpaca Paper -->
+            <div class="broker-card" style="flex-direction:column;align-items:flex-start;gap:.75rem;">
+              <div class="flex items-center justify-between w-full">
+                <div class="flex items-center gap-2">
+                  <span class="broker-tag broker-alpaca">Alpaca</span>
+                  <span class="chip chip-paper">Paper</span>
+                </div>
+                <div class="sys-dot"></div>
+              </div>
+              <div>
+                <div style="font-size:14px;font-weight:700;">My Paper Account</div>
+                <div class="text-xs text-muted mt-1">API Key: ****K3J9 · 3 strategies assigned</div>
+              </div>
+              <div class="flex gap-2">
+                <button class="btn btn-ghost btn-sm">Edit</button>
+                <button class="btn btn-ghost btn-sm" style="color:var(--red);">Delete</button>
+              </div>
+            </div>
+            <!-- Alpaca Live -->
+            <div class="broker-card" style="flex-direction:column;align-items:flex-start;gap:.75rem;">
+              <div class="flex items-center justify-between w-full">
+                <div class="flex items-center gap-2">
+                  <span class="broker-tag broker-alpaca">Alpaca</span>
+                  <span class="chip chip-live">Live</span>
+                </div>
+                <div class="sys-dot"></div>
+              </div>
+              <div>
+                <div style="font-size:14px;font-weight:700;">Live Trading</div>
+                <div class="text-xs text-muted mt-1">API Key: ****X8P2 · 2 strategies assigned</div>
+              </div>
+              <div class="flex gap-2">
+                <button class="btn btn-ghost btn-sm">Edit</button>
+                <button class="btn btn-ghost btn-sm" style="color:var(--red);">Delete</button>
+              </div>
+            </div>
+            <!-- Binance -->
+            <div class="broker-card" style="flex-direction:column;align-items:flex-start;gap:.75rem;border-color:rgba(245,158,11,.25)!important;background:rgba(245,158,11,.02)!important;">
+              <div class="flex items-center justify-between w-full">
+                <div class="flex items-center gap-2">
+                  <span class="broker-tag broker-binance">Binance</span>
+                  <span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:5px;background:rgba(245,158,11,.1);color:#D97706;border:1px solid rgba(245,158,11,.2);">Crypto</span>
+                  <span class="chip chip-live">Live</span>
+                </div>
+                <div class="sys-dot"></div>
+              </div>
+              <div>
+                <div style="font-size:14px;font-weight:700;">Binance Spot</div>
+                <div class="text-xs text-muted mt-1">API Key: ****B7T1 · 1 strategy assigned · 24/7</div>
+              </div>
+              <div class="flex gap-2">
+                <button class="btn btn-ghost btn-sm">Edit</button>
+                <button class="btn btn-ghost btn-sm" style="color:var(--red);">Delete</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════ -->
+<!--  9. BACKTESTING                         -->
+<!-- ════════════════════════════════════════ -->
+<div class="page-section" id="backtesting">
+  <div class="page-label">9 — Backtesting Studio (backtesting.html)</div>
+  <div class="page-frame" style="min-height:560px;">
+    <div class="sidebar" style="display:flex;flex-direction:column;">
+      <div class="logo"><div class="logo-mark"><svg width="18" height="18" viewBox="0 0 22 22" fill="none"><path d="M11 2L20 7.5V14.5L11 20L2 14.5V7.5L11 2Z" fill="#3B82F6"/></svg></div><span class="logo-text">TradeBot</span></div>
+      <nav class="nav"><div class="nav-item active">Backtesting</div></nav>
+      <div class="sidebar-footer"><div class="paper-card"><div class="paper-label">Trading Mode</div><div style="font-size:12px;font-weight:600;">Paper Mode</div></div><button class="theme-btn">☀ Dark Mode</button></div>
+    </div>
+    <div class="page-content">
+      <div class="page-header"><div class="flex-1"><div class="page-title">Backtesting Studio</div><div class="page-sub">Test strategies on historical data</div></div></div>
+      <div class="scrollable">
+        <div class="content-pad">
+          <div class="grid-2" style="grid-template-columns:340px 1fr;align-items:start;">
+            <!-- Config -->
+            <div class="card">
+              <div class="card-title mb-2">Configuration</div>
+              <div class="form-group"><label class="label">Strategy</label><select class="input"><option>Momentum</option><option>RSI Mean Reversion</option></select></div>
+              <div class="form-group"><label class="label">Symbols</label><input class="input" value="SPY, AAPL, NVDA, MSFT" /></div>
+              <div class="grid-2" style="gap:.75rem;">
+                <div class="form-group" style="margin-bottom:0;"><label class="label">Start Date</label><input class="input" type="date" value="2024-01-01" /></div>
+                <div class="form-group" style="margin-bottom:0;"><label class="label">End Date</label><input class="input" type="date" value="2024-12-31" /></div>
+              </div>
+              <div style="margin-top:.75rem;" class="grid-2" style="gap:.75rem;">
+                <div class="form-group" style="margin-bottom:0;"><label class="label">Initial Capital</label><input class="input" value="10000" /></div>
+                <div class="form-group" style="margin-bottom:0;"><label class="label">Position Size %</label><input class="input" value="10" /></div>
+              </div>
+              <div style="margin-top:1rem;"><button class="btn btn-primary w-full" style="justify-content:center;">▶ Run Backtest</button></div>
+            </div>
+            <!-- Results -->
+            <div style="display:flex;flex-direction:column;gap:1rem;">
+              <div class="grid-5">
+                <div class="stat-pill"><div class="stat-pill-label">Total Return</div><div class="stat-pill-value text-green">+24.8%</div></div>
+                <div class="stat-pill"><div class="stat-pill-label">Max Drawdown</div><div class="stat-pill-value text-red">-8.2%</div></div>
+                <div class="stat-pill"><div class="stat-pill-label">Win Rate</div><div class="stat-pill-value">62.4%</div></div>
+                <div class="stat-pill"><div class="stat-pill-label">Sharpe Ratio</div><div class="stat-pill-value">1.84</div></div>
+                <div class="stat-pill"><div class="stat-pill-label">Total Trades</div><div class="stat-pill-value">187</div></div>
+              </div>
+              <!-- Equity curve -->
+              <div class="card">
+                <div class="card-title mb-2">Equity Curve</div>
+                <div style="height:140px;border-radius:10px;background:rgba(59,130,246,.03);border:1px solid rgba(59,130,246,.1);padding:.5rem;">
+                  <svg viewBox="0 0 400 120" style="width:100%;height:100%;" preserveAspectRatio="none">
+                    <defs><linearGradient id="eg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#10B981" stop-opacity=".2"/><stop offset="100%" stop-color="#10B981" stop-opacity="0"/></linearGradient></defs>
+                    <path d="M0,100 C40,95 80,80 120,70 C160,60 180,65 220,50 C260,35 300,20 340,15 C360,12 380,8 400,5 L400,120 L0,120Z" fill="url(#eg)"/>
+                    <path d="M0,100 C40,95 80,80 120,70 C160,60 180,65 220,50 C260,35 300,20 340,15 C360,12 380,8 400,5" fill="none" stroke="#10B981" stroke-width="2"/>
+                  </svg>
+                </div>
+              </div>
+              <!-- Trade table -->
+              <div class="card p-0">
+                <div style="padding:.7rem 1.25rem;border-bottom:1px solid var(--border);"><div class="card-title">Per-Symbol Breakdown</div></div>
+                <table class="dtable">
+                  <thead><tr><th>Symbol</th><th>Trades</th><th>Wins</th><th>Win Rate</th><th>Total P&L</th></tr></thead>
+                  <tbody>
+                    <tr><td><strong>SPY</strong></td><td>48</td><td>31</td><td>64.6%</td><td class="text-green">+$1,240</td></tr>
+                    <tr><td><strong>NVDA</strong></td><td>35</td><td>22</td><td>62.9%</td><td class="text-green">+$980</td></tr>
+                    <tr><td><strong>AAPL</strong></td><td>42</td><td>25</td><td>59.5%</td><td class="text-green">+$620</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════ -->
+<!--  10. BALANCES                           -->
+<!-- ════════════════════════════════════════ -->
+<div class="page-section" id="balances">
+  <div class="page-label">10 — Balances (balances.html)</div>
+  <div class="page-frame" style="min-height:420px;">
+    <div class="sidebar" style="display:flex;flex-direction:column;">
+      <div class="logo"><div class="logo-mark"><svg width="18" height="18" viewBox="0 0 22 22" fill="none"><path d="M11 2L20 7.5V14.5L11 20L2 14.5V7.5L11 2Z" fill="#3B82F6"/></svg></div><span class="logo-text">TradeBot</span></div>
+      <nav class="nav"><div class="nav-item active">Balances</div></nav>
+      <div class="sidebar-footer"><div class="paper-card"><div class="paper-label">Trading Mode</div><div style="font-size:12px;font-weight:600;">Paper Mode</div></div><button class="theme-btn">☀ Dark Mode</button></div>
+    </div>
+    <div class="page-content">
+      <div class="page-header">
+        <div class="flex-1"><div class="page-title">Balances &amp; Assets</div></div>
+        <select class="input" style="width:160px;font-size:12px;"><option>Paper Account</option></select>
+      </div>
+      <div class="scrollable">
+        <div class="content-pad">
+          <div class="grid-4">
+            <div class="metric-card"><div class="metric-label">Equity</div><div class="metric-value">$24,831</div></div>
+            <div class="metric-card"><div class="metric-label">Cash</div><div class="metric-value">$12,351</div></div>
+            <div class="metric-card"><div class="metric-label">Buying Power</div><div class="metric-value">$49,702</div></div>
+            <div class="metric-card"><div class="metric-label">Portfolio Value</div><div class="metric-value">$24,831</div></div>
+          </div>
+          <div class="card p-0">
+            <div style="padding:.8rem 1.25rem;border-bottom:1px solid var(--border);"><div class="card-title">Holdings</div></div>
+            <table class="dtable">
+              <thead><tr><th>Symbol</th><th>Qty</th><th>Avg Entry</th><th>Current Price</th><th>Market Value</th><th>Unrealized P&L</th></tr></thead>
+              <tbody>
+                <tr><td><strong>NVDA</strong></td><td>5</td><td>$875.20</td><td>$892.40</td><td>$4,462</td><td class="text-green">+$86.00</td></tr>
+                <tr><td><strong>AAPL</strong></td><td>10</td><td>$186.50</td><td>$189.30</td><td>$1,893</td><td class="text-green">+$28.00</td></tr>
+                <tr><td><strong>BTC</strong></td><td>0.12</td><td>$62,400</td><td>$67,800</td><td>$8,136</td><td class="text-green">+$648</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════ -->
+<!--  11. MODALS & FORMS                     -->
+<!-- ════════════════════════════════════════ -->
+<div class="page-section" id="modals">
+  <div class="page-label">11 — Modals, Forms &amp; Components</div>
+
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:1.5rem;">
+
+    <!-- Confirm modal -->
+    <div>
+      <div class="text-xs text-muted mb-2 font-semibold" style="text-transform:uppercase;letter-spacing:.06em;">Confirm Dialog</div>
+      <div style="background:rgba(15,23,42,.35);border-radius:16px;padding:2rem;display:flex;align-items:center;justify-content:center;">
+        <div class="modal-box" style="position:static;width:100%;max-width:380px;box-shadow:0 8px 32px rgba(0,0,0,.12);">
+          <div class="modal-title">Run Engine Now</div>
+          <div class="modal-body">This will run one full engine tick. Enabled strategies may <strong style="color:var(--text);">generate and place orders</strong>.</div>
+          <div class="modal-actions">
+            <button class="btn btn-ghost">Cancel</button>
+            <button class="btn btn-primary">Run Now</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Kill switch modal -->
+    <div>
+      <div class="text-xs text-muted mb-2 font-semibold" style="text-transform:uppercase;letter-spacing:.06em;">Kill Switch Modal</div>
+      <div style="background:rgba(15,23,42,.35);border-radius:16px;padding:2rem;display:flex;align-items:center;justify-content:center;">
+        <div class="modal-box" style="position:static;width:100%;max-width:380px;box-shadow:0 8px 32px rgba(0,0,0,.12);">
+          <div class="modal-title" style="color:var(--red);">Activate Kill Switch</div>
+          <div class="modal-body">This will <strong style="color:var(--text);">block ALL engine ticks</strong>. No strategies will run until the kill switch is turned off.</div>
+          <div class="modal-actions">
+            <button class="btn btn-ghost">Cancel</button>
+            <button class="btn btn-danger">Activate Kill Switch</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Configure strategy modal -->
+    <div>
+      <div class="text-xs text-muted mb-2 font-semibold" style="text-transform:uppercase;letter-spacing:.06em;">Configure Strategy Modal</div>
+      <div style="background:rgba(15,23,42,.35);border-radius:16px;padding:2rem;display:flex;align-items:center;justify-content:center;">
+        <div class="modal-box" style="position:static;width:100%;max-width:400px;box-shadow:0 8px 32px rgba(0,0,0,.12);">
+          <div class="modal-title">Configure: RSI Mean Reversion</div>
+          <div style="display:flex;flex-direction:column;gap:.85rem;max-height:260px;overflow-y:auto;">
+            <div>
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.2rem;">
+                <div><div class="label" style="margin:0;">Auto-discover Stocks</div><div class="hint">Use scanner instead of fixed list</div></div>
+                <label class="toggle"><input type="checkbox"><div class="toggle-track"></div></label>
+              </div>
+            </div>
+            <div><label class="label">Symbols</label><input class="input" value="SPY, QQQ, AAPL, MSFT, NVDA" /><div class="hint">Comma-separated tickers to watch</div></div>
+            <div><label class="label">RSI Period (days)</label><input class="input" type="number" value="14" /><div class="hint">Lookback window for RSI calculation</div></div>
+            <div><label class="label">RSI Oversold Threshold</label><input class="input" type="number" value="30" /><div class="hint">Buy signal below this level</div></div>
+          </div>
+          <div class="modal-actions">
+            <button class="btn btn-ghost">Cancel</button>
+            <button class="btn btn-primary">Save</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Add broker account modal -->
+    <div>
+      <div class="text-xs text-muted mb-2 font-semibold" style="text-transform:uppercase;letter-spacing:.06em;">Add Broker Account Modal</div>
+      <div style="background:rgba(15,23,42,.35);border-radius:16px;padding:2rem;display:flex;align-items:center;justify-content:center;">
+        <div class="modal-box" style="position:static;width:100%;max-width:400px;box-shadow:0 8px 32px rgba(0,0,0,.12);">
+          <div class="modal-title">Add Broker Account</div>
+          <div style="display:flex;gap:.5rem;margin-bottom:1rem;background:#F8FAFC;border:1px solid var(--border);border-radius:10px;padding:.3rem;">
+            <button class="btn btn-primary btn-sm" style="flex:1;justify-content:center;font-size:11px;">Alpaca</button>
+            <button class="btn btn-ghost btn-sm" style="flex:1;justify-content:center;font-size:11px;border:none;">Tradier</button>
+            <button class="btn btn-ghost btn-sm" style="flex:1;justify-content:center;font-size:11px;border:none;color:#D97706;">Binance</button>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem;margin-bottom:.9rem;">
+            <div style="border:2px solid var(--blue);border-radius:10px;padding:.65rem;background:rgba(59,130,246,.05);">
+              <div style="font-size:13px;font-weight:700;">Paper</div>
+              <div class="text-xs text-muted">Simulated trading</div>
+            </div>
+            <div style="border:1px solid var(--border);border-radius:10px;padding:.65rem;background:#F8FAFC;">
+              <div style="font-size:13px;font-weight:600;">Live</div>
+              <div class="text-xs text-muted">Real money</div>
+            </div>
+          </div>
+          <div class="form-group"><label class="label">API Key</label><input class="input" placeholder="PK…" /></div>
+          <div class="form-group" style="margin-bottom:0;"><label class="label">API Secret</label><input class="input" type="password" placeholder="••••••••••" /></div>
+          <div class="banner banner-paper" style="margin-top:.75rem;margin-bottom:0;font-size:11px;border-radius:8px;">Use your Alpaca paper trading credentials. Never use production keys in sandbox.</div>
+          <div class="modal-actions">
+            <button class="btn btn-ghost">Cancel</button>
+            <button class="btn btn-primary">Connect Account</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- All banner types -->
+    <div>
+      <div class="text-xs text-muted mb-2 font-semibold" style="text-transform:uppercase;letter-spacing:.06em;">Banners</div>
+      <div style="display:flex;flex-direction:column;gap:.5rem;background:var(--bg);border:1px solid var(--border);border-radius:14px;padding:1.25rem;">
+        <div class="banner banner-paper" style="border-radius:8px;margin-bottom:0;">📄 Paper Trading Mode — orders are simulated, no real money at risk.</div>
+        <div class="banner banner-kill" style="border-radius:8px;margin-bottom:0;">🛑 Kill Switch Active — engine ticks are blocked. No strategies will run.</div>
+        <div class="banner banner-warn" style="border-radius:8px;margin-bottom:0;">⚠️ Warning — consecutive loss limit reached. Trading paused.</div>
+        <div class="banner banner-green" style="border-radius:8px;margin-bottom:0;">✓ Settings saved successfully.</div>
+      </div>
+    </div>
+
+    <!-- Badges & chips -->
+    <div>
+      <div class="text-xs text-muted mb-2 font-semibold" style="text-transform:uppercase;letter-spacing:.06em;">Badges &amp; Status Chips</div>
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:1.25rem;display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;">
+        <span class="badge b-green"><span class="pdot"></span> Running</span>
+        <span class="badge b-muted">Paused</span>
+        <span class="badge b-red">Error</span>
+        <span class="badge b-blue">Pending</span>
+        <span class="badge b-orange">Warning</span>
+        <span class="badge b-green">Filled</span>
+        <span class="badge b-muted">Blocked</span>
+        <span class="chip chip-paper">Paper</span>
+        <span class="chip chip-live">Live</span>
+        <span class="broker-tag broker-alpaca">Alpaca</span>
+        <span class="broker-tag broker-tradier">Tradier</span>
+        <span class="broker-tag broker-binance">Binance</span>
+      </div>
+    </div>
+
+    <!-- Form elements -->
+    <div>
+      <div class="text-xs text-muted mb-2 font-semibold" style="text-transform:uppercase;letter-spacing:.06em;">Form Elements</div>
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:1.25rem;display:flex;flex-direction:column;gap:.75rem;">
+        <div class="form-group" style="margin-bottom:0;"><label class="label">Text Input</label><input class="input" value="AAPL" /></div>
+        <div class="form-group" style="margin-bottom:0;"><label class="label">Focused Input</label><input class="input" value="BTC/USDT" style="border-color:var(--blue);box-shadow:0 0 0 3px rgba(59,130,246,.1);" /></div>
+        <div class="form-group" style="margin-bottom:0;"><label class="label">Select</label><select class="input"><option>Momentum</option><option>RSI MR</option></select></div>
+        <div class="form-group" style="margin-bottom:0;"><label class="label">Number Input with unit</label>
+          <div style="display:flex;align-items:center;gap:.4rem;">
+            <input class="input" type="number" value="2.0" style="width:80px;text-align:center;" /><span class="text-muted text-xs">%</span>
+            <button class="btn btn-ghost btn-sm">Save</button>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:.75rem;">
+          <label class="toggle"><input type="checkbox" checked><div class="toggle-track"></div></label><span style="font-size:13px;">Toggle (on)</span>
+          <label class="toggle"><input type="checkbox"><div class="toggle-track"></div></label><span style="font-size:13px;">Toggle (off)</span>
+        </div>
+        <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
+          <button class="btn btn-primary">Primary</button>
+          <button class="btn btn-danger">Danger</button>
+          <button class="btn btn-ghost">Ghost</button>
+          <button class="btn btn-primary btn-sm">Small</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Cards comparison -->
+    <div>
+      <div class="text-xs text-muted mb-2 font-semibold" style="text-transform:uppercase;letter-spacing:.06em;">Card Variants</div>
+      <div style="display:flex;flex-direction:column;gap:.75rem;">
+        <div class="card"><div class="card-title">Standard Card</div><div class="card-sub">White background, slate border, subtle shadow</div></div>
+        <div class="card ks-card"><div style="font-size:14px;font-weight:700;">Danger Card (Kill Switch)</div><div class="card-sub mt-1">Red-tinted border and gradient background</div></div>
+        <div style="background:#DBEAFE;border:1px solid #93C5FD;border-radius:14px;padding:1.25rem;"><div style="font-size:14px;font-weight:700;color:#1D4ED8;">Info Card</div><div style="font-size:12px;color:#3B82F6;margin-top:.25rem;">Blue tinted — for info/paper mode context</div></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div style="height:3rem;"></div>
+
+</body>
+</html>
