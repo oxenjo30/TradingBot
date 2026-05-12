@@ -404,16 +404,19 @@ def update_strategy(name: str, body: StrategyUpdate, request: Request):
         "active_start": None, "active_end": None,
     }
     enabled = body.enabled if body.enabled is not None else current["enabled"]
-    params  = current["params"]
+
+    # Build kwargs — only pass fields the caller actually sent so upsert_strategy
+    # uses its _UNSET sentinel to leave untouched columns alone.
+    kwargs: dict = {"enabled": enabled}
     if body.params is not None:
-        params = {**params, **body.params}
-    # "" means clear; None means keep existing
-    active_start = (body.active_start if body.active_start != ""
-                    else None) if body.active_start is not None else current.get("active_start")
-    active_end   = (body.active_end   if body.active_end   != ""
-                    else None) if body.active_end   is not None else current.get("active_end")
-    db.upsert_strategy(name, enabled=enabled, params=params,
-                       active_start=active_start, active_end=active_end)
+        kwargs["params"] = {**current["params"], **body.params}
+    if body.active_start is not None:
+        # "" means clear the schedule
+        kwargs["active_start"] = None if body.active_start == "" else body.active_start
+    if body.active_end is not None:
+        kwargs["active_end"]   = None if body.active_end   == "" else body.active_end
+
+    db.upsert_strategy(name, **kwargs)
     return db.get_strategy(name)
 
 
