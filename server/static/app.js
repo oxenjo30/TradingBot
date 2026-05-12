@@ -1258,11 +1258,15 @@ async function initPositions() {
     quoteDisplay.style.color = '#64748B';
     try {
       const q = await api(`/api/quote/${sym}`, { key: `quote-${sym}` });
-      const mid = q.ask_price && q.bid_price
-        ? ((parseFloat(q.ask_price) + parseFloat(q.bid_price)) / 2)
-        : parseFloat(q.ask_price || q.bid_price || 0);
+      const bid = parseFloat(q.bid_price) || 0;
+      const ask = parseFloat(q.ask_price) || 0;
+      const mid = bid && ask ? (bid + ask) / 2 : bid || ask;
       if (!mid) { quoteDisplay.textContent = 'No quote available'; return; }
-      quoteDisplay.innerHTML = `<span style="color:#E6EBF5;font-weight:700;">$${mid.toFixed(2)}</span> &nbsp;bid $${parseFloat(q.bid_price||0).toFixed(2)} &nbsp;ask $${parseFloat(q.ask_price||0).toFixed(2)}`;
+      const midStr = `$${mid.toFixed(2)}`;
+      const bidStr = bid ? `bid $${bid.toFixed(2)}` : '';
+      const askStr = ask ? `ask $${ask.toFixed(2)}` : '';
+      const detail = [bidStr, askStr].filter(Boolean).join(' &nbsp;');
+      quoteDisplay.innerHTML = `<span style="color:#E6EBF5;font-weight:700;">${midStr}</span>${detail ? ' &nbsp;' + detail : ''}`;
       quoteDisplay.style.color = '#64748B';
       if (priceInput && !priceInput.value) priceInput.value = mid.toFixed(2);
     } catch {
