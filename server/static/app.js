@@ -2008,6 +2008,27 @@ async function initApiKeys() {
 // initSettings — settings.html
 // ─────────────────────────────────────────
 async function initSettings() {
+  // License status
+  try {
+    const lic = await fetch('/api/license/status').then(r => r.json());
+    const statusEl = document.getElementById('lic-status');
+    const daysEl   = document.getElementById('lic-days');
+    const deactBtn = document.getElementById('lic-deactivate-btn');
+    if (statusEl) {
+      statusEl.textContent = lic.valid ? 'Active' : 'Inactive';
+      statusEl.style.color = lic.valid ? 'var(--green)' : 'var(--red)';
+    }
+    if (daysEl) daysEl.textContent = lic.valid ? lic.days_remaining + ' days' : '—';
+    if (deactBtn && lic.valid) {
+      deactBtn.style.display = 'block';
+      deactBtn.onclick = async () => {
+        if (!confirm('Deactivate license? The dashboard will become inaccessible.')) return;
+        await fetch('/api/license', { method: 'DELETE', headers: {'X-Token': document.cookie.match(/token=([^;]+)/)?.[1] || ''} });
+        location.href = '/static/license.html';
+      };
+    }
+  } catch {}
+
   // ── element refs ──
   const emailEnabled   = document.getElementById('email-enabled');
   const emailFields    = document.getElementById('email-fields');
