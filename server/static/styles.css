@@ -1115,73 +1115,168 @@ button { cursor: pointer; font-family: inherit; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* ── Manual order result ── */
-.mo-result { font-size:12px; text-align:center; min-height:16px; transition:color .15s; }
+.mo-result { font-size:12px; transition:color .15s; }
 .mo-result.ok  { color: var(--green); }
 .mo-result.err { color: var(--red); }
 
-/* ── Manual order ticket tabs ── */
-.mo-tab {
-  display: flex; align-items: center; justify-content: center; gap: .4rem;
-  padding: .85rem .5rem;
-  font-size: 13px; font-weight: 700; letter-spacing: .02em;
-  background: transparent; border: none; cursor: pointer;
-  font-family: inherit; transition: background .15s, color .15s;
-  border-bottom: 3px solid transparent;
-}
-.mo-tab-buy        { color: #64748B; }
-.mo-tab-sell       { color: #64748B; border-left: 1px solid var(--border); }
-.mo-tab-buy.mo-tab-active  { color: #10B981; background: rgba(16,185,129,.07); border-bottom-color: #10B981; }
-.mo-tab-sell.mo-tab-active { color: #EF4444; background: rgba(239,68,68,.07);  border-bottom-color: #EF4444; }
-.mo-tab:hover { background: rgba(255,255,255,.03); }
-
-/* ── Manual order mode segmented control ── */
-.mo-mode-btn {
-  flex: 1; padding: .5rem; font-size: 12px; font-weight: 600;
-  background: rgba(8,13,20,.5); color: #475569;
-  border: 1px solid rgba(30,45,69,1); cursor: pointer;
-  font-family: inherit; transition: background .12s, color .12s, border-color .12s;
-}
-.mo-mode-btn:first-child { border-radius: 7px 0 0 7px; }
-.mo-mode-btn:last-child  { border-radius: 0 7px 7px 0; border-left: none; }
-.mo-mode-btn.mo-mode-active {
-  background: rgba(59,130,246,.13); color: #60A5FA;
-  border-color: rgba(59,130,246,.35);
+/* ═══════════════════════════════════════════
+   Order Ticket (mot-*) — polished trading UI
+   ═══════════════════════════════════════════ */
+.mot-card {
+  padding: 0 !important;
+  overflow: hidden;
+  border-radius: 14px !important;
 }
 
-/* ── Manual order field labels ── */
-.mo-field-label {
-  font-size: 10px; font-weight: 700; color: #475569;
-  text-transform: uppercase; letter-spacing: .1em; margin-bottom: .4rem;
+/* Header row */
+.mot-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: .85rem 1.1rem .7rem;
+  border-bottom: 1px solid var(--border);
+}
+.mot-header-title {
+  font-size: 12px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .1em; color: #475569;
+}
+.mot-header-sub {
+  font-size: 11px; color: #334155;
+}
+.mot-header-sub select {
+  background: transparent; border: none; color: #60A5FA;
+  font-size: 11px; font-weight: 600; font-family: inherit; cursor: pointer;
+  outline: none;
 }
 
-/* ── Manual order inputs ── */
-.mo-input {
-  background: rgba(8,13,20,.7) !important;
-  border: 1px solid rgba(30,45,69,1) !important;
-  border-radius: 8px !important;
-  color: #E6EBF5 !important;
-  font-family: inherit !important;
-  padding: 10px 13px !important;
-  width: 100% !important;
-  transition: border-color .15s !important;
+/* Buy / Sell tabs */
+.mot-tabs {
+  display: grid; grid-template-columns: 1fr 1fr;
+  border-bottom: 1px solid var(--border);
 }
-.mo-input::placeholder { color: #334155 !important; }
-.mo-input:focus {
-  outline: none !important;
-  border-color: rgba(59,130,246,.5) !important;
-  box-shadow: 0 0 0 3px rgba(59,130,246,.08) !important;
+.mot-tab {
+  display: flex; align-items: center; justify-content: center; gap: .35rem;
+  padding: .9rem .5rem;
+  font-size: 13px; font-weight: 800; letter-spacing: .04em;
+  background: transparent; border: none; border-bottom: 3px solid transparent;
+  cursor: pointer; font-family: inherit;
+  transition: background .15s, color .15s, border-color .15s;
+  color: #94A3B8;
+}
+.mot-tab-sell { border-left: 1px solid var(--border); }
+.mot-tab:hover { background: rgba(255,255,255,.03); }
+.mot-tab-buy.mot-tab-active  { color: #10B981; background: rgba(16,185,129,.06); border-bottom-color: #10B981; }
+.mot-tab-sell.mot-tab-active { color: #EF4444; background: rgba(239,68,68,.06);  border-bottom-color: #EF4444; }
+
+/* Symbol row */
+.mot-sym-row {
+  padding: .85rem 1.1rem .65rem;
+  border-bottom: 1px solid var(--border);
+}
+.mot-sym-wrap {
+  position: relative;
+}
+.mot-sym-icon {
+  position: absolute; left: 11px; top: 50%; transform: translateY(-50%);
+  pointer-events: none;
+}
+.mot-sym-input {
+  width: 100%; background: rgba(8,13,20,.5);
+  border: 1px solid rgba(30,45,69,1); border-radius: 9px;
+  color: #E6EBF5; font-family: inherit;
+  font-size: 15px; font-weight: 800; letter-spacing: .08em;
+  text-transform: uppercase;
+  padding: 9px 12px 9px 32px;
+  transition: border-color .15s, box-shadow .15s;
+  outline: none;
+}
+.mot-sym-input::placeholder { color: #64748B; font-weight: 500; letter-spacing: 0; text-transform: none; }
+.mot-sym-input:focus {
+  border-color: rgba(59,130,246,.5);
+  box-shadow: 0 0 0 3px rgba(59,130,246,.08);
+}
+.mot-quote {
+  margin-top: .45rem; font-size: 12px; color: #64748B; padding: 0 2px; min-height: 16px;
 }
 
-/* ── Manual order submit button ── */
-.mo-submit-btn {
-  width: 100%; display: flex; align-items: center; justify-content: center;
-  gap: .5rem; padding: .7rem; font-size: 13px; font-weight: 700;
-  letter-spacing: .02em; border-radius: 9px; color: #fff;
-  transition: opacity .15s;
+/* Divider */
+.mot-divider {
+  height: 1px; background: var(--border); margin: 0;
 }
-.mo-submit-btn:hover { opacity: .88; }
-.mo-submit-buy  { background: #10B981; border-color: #10B981; }
-.mo-submit-sell { background: #EF4444; border-color: #EF4444; }
+
+/* Form sections */
+.mot-section {
+  padding: .75rem 1.1rem;
+  border-bottom: 1px solid var(--border);
+}
+.mot-section:last-of-type { border-bottom: none; }
+
+.mot-label {
+  font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .1em; color: #94A3B8; margin-bottom: .45rem;
+}
+
+/* In/USD toggle */
+.mot-toggle {
+  display: flex; background: rgba(8,13,20,.5);
+  border: 1px solid rgba(30,45,69,1); border-radius: 8px; overflow: hidden;
+}
+.mot-toggle-btn {
+  flex: 1; padding: .45rem .5rem; font-size: 12px; font-weight: 600;
+  background: transparent; border: none; color: #94A3B8;
+  cursor: pointer; font-family: inherit;
+  transition: background .12s, color .12s;
+}
+.mot-toggle-btn + .mot-toggle-btn { border-left: 1px solid rgba(30,45,69,1); }
+.mot-toggle-btn.mot-toggle-active {
+  background: rgba(59,130,246,.15); color: #60A5FA;
+}
+.mot-toggle-btn:hover:not(.mot-toggle-active) { background: rgba(255,255,255,.03); color: #94A3B8; }
+
+/* Qty / price inputs */
+.mot-qty-wrap {
+  position: relative; display: flex; align-items: center;
+}
+.mot-qty-prefix {
+  position: absolute; left: 13px;
+  font-size: 15px; font-weight: 700; color: #64748B; pointer-events: none;
+}
+.mot-qty-input {
+  width: 100%; background: rgba(8,13,20,.5);
+  border: 1px solid rgba(30,45,69,1); border-radius: 9px;
+  color: #E6EBF5; font-family: inherit;
+  font-size: 22px; font-weight: 800; letter-spacing: -.01em;
+  padding: 10px 13px;
+  transition: border-color .15s, box-shadow .15s;
+  outline: none;
+  -moz-appearance: textfield;
+}
+.mot-qty-input::-webkit-outer-spin-button,
+.mot-qty-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.mot-qty-input::placeholder { color: #475569; font-size: 22px; }
+.mot-qty-input:focus {
+  border-color: rgba(59,130,246,.5);
+  box-shadow: 0 0 0 3px rgba(59,130,246,.08);
+}
+.mot-qty-with-prefix { padding-left: 28px; font-size: 18px; }
+
+/* Estimated total */
+.mot-est-total {
+  font-size: 11px; font-weight: 600; color: #475569;
+}
+
+/* Submit button */
+.mot-submit {
+  display: flex; align-items: center; justify-content: center; gap: .45rem;
+  width: calc(100% - 2.2rem); margin: .85rem 1.1rem;
+  padding: .85rem 1rem; border-radius: 10px;
+  font-size: 13px; font-weight: 800; letter-spacing: .04em;
+  color: #fff; border: none; cursor: pointer; font-family: inherit;
+  transition: opacity .15s, transform .1s;
+}
+.mot-submit:hover  { opacity: .9; }
+.mot-submit:active { transform: scale(.98); }
+.mot-submit-buy  { background: linear-gradient(135deg, #059669, #10B981); }
+.mot-submit-sell { background: linear-gradient(135deg, #DC2626, #EF4444); }
+.mot-submit:disabled { opacity: .5; cursor: not-allowed; }
 
 /* ── Mode card — live trading state ── */
 .live-card {

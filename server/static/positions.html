@@ -173,66 +173,77 @@
 
     <!-- Right column: Manual Order Ticket -->
     <div style="position:sticky;top:1rem;">
-      <div class="card" style="padding:0;overflow:hidden;">
+      <div class="card mot-card">
+
+        <!-- Account selector (no header label) -->
+        <div style="padding:.6rem 1.1rem .3rem;font-size:11px;color:#64748B;" id="mo-account-wrap"></div>
 
         <!-- Buy / Sell tabs -->
-        <div style="display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid var(--border);">
-          <button id="mo-buy-btn" class="mo-tab mo-tab-buy mo-tab-active">
-            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+        <div class="mot-tabs">
+          <button id="mo-buy-btn" class="mot-tab mot-tab-buy mot-tab-active">
+            <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
             Buy
           </button>
-          <button id="mo-sell-btn" class="mo-tab mo-tab-sell">
-            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></svg>
+          <button id="mo-sell-btn" class="mot-tab mot-tab-sell">
+            <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></svg>
             Sell
           </button>
         </div>
 
-        <!-- Form body -->
-        <div style="padding:1.1rem 1.15rem 1.25rem;">
-
-          <!-- Account selector -->
-          <div style="margin-bottom:.75rem;" id="mo-account-wrap"></div>
-
-          <!-- Symbol input -->
-          <div style="margin-bottom:.75rem;">
-            <div class="mo-field-label">Symbol</div>
-            <input id="mo-sym-input" class="input-field mo-input" type="text" placeholder="e.g. AAPL" autocomplete="off"
-              style="text-transform:uppercase;font-weight:700;letter-spacing:.08em;">
-            <div id="mo-quote-display" style="display:none;margin-top:.4rem;font-size:12px;color:#64748B;padding:0 2px;"></div>
+        <!-- Symbol row -->
+        <div class="mot-sym-row">
+          <div class="mot-sym-wrap">
+            <input id="mo-sym-input" class="mot-sym-input" type="text" placeholder="Ticker…" autocomplete="off" spellcheck="false">
+            <svg class="mot-sym-icon" width="14" height="14" fill="none" stroke="#475569" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
           </div>
-
-          <!-- Shares / USD Value segmented control -->
-          <div style="margin-bottom:.6rem;">
-            <div class="mo-field-label">Amount Type</div>
-            <div style="display:flex;">
-              <button id="mo-mode-qty"      class="mo-mode-btn mo-mode-active">Shares</button>
-              <button id="mo-mode-notional" class="mo-mode-btn">USD Value</button>
-            </div>
-          </div>
-
-          <!-- Amount input -->
-          <div style="margin-bottom:.75rem;">
-            <div class="mo-field-label" id="mo-qty-label">Number of Shares</div>
-            <input id="mo-qty-input" class="input-field mo-input" type="number" min="0" step="any" placeholder="0"
-              style="font-size:18px;font-weight:700;">
-          </div>
-
-          <!-- Limit price (shares mode only) -->
-          <div id="mo-price-wrap" style="margin-bottom:1rem;">
-            <div class="mo-field-label">Limit Price $ <span style="color:#475569;font-weight:500;text-transform:none;letter-spacing:0;">(optional — blank = market)</span></div>
-            <input id="mo-price-input" class="input-field mo-input" type="number" min="0" step="0.01" placeholder="0.00"
-              style="font-size:15px;font-weight:600;">
-          </div>
-
-          <!-- Submit button -->
-          <button id="mo-submit" class="btn mo-submit-btn mo-submit-buy">
-            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
-            Place Buy Order
-          </button>
-
-          <!-- Result message -->
-          <div id="mo-result" class="mo-result" style="margin-top:.6rem;"></div>
+          <div id="mo-quote-display" class="mot-quote"></div>
         </div>
+
+        <div class="mot-divider"></div>
+
+        <!-- Amount type toggle -->
+        <div class="mot-section">
+          <div class="mot-label">In</div>
+          <div class="mot-toggle">
+            <button id="mo-mode-qty"      class="mot-toggle-btn mot-toggle-active">Shares</button>
+            <button id="mo-mode-notional" class="mot-toggle-btn">USD Value</button>
+          </div>
+        </div>
+
+        <!-- Quantity input -->
+        <div class="mot-section">
+          <div style="display:flex;align-items:center;justify-content:space-between;">
+            <div class="mot-label" id="mo-qty-label">Shares</div>
+            <div id="mo-est-total" class="mot-est-total"></div>
+          </div>
+          <div class="mot-qty-wrap">
+            <input id="mo-qty-input" class="mot-qty-input" type="number" min="0" step="any" placeholder="0" autocomplete="off">
+          </div>
+        </div>
+
+        <!-- Limit price -->
+        <div id="mo-price-wrap" class="mot-section">
+          <div style="display:flex;align-items:center;justify-content:space-between;">
+            <div class="mot-label">Limit Price</div>
+            <span class="mot-label" style="font-weight:400;text-transform:none;letter-spacing:0;color:#64748B;">optional</span>
+          </div>
+          <div class="mot-qty-wrap">
+            <span class="mot-qty-prefix">$</span>
+            <input id="mo-price-input" class="mot-qty-input mot-qty-with-prefix" type="number" min="0" step="0.01" placeholder="Market">
+          </div>
+        </div>
+
+        <div class="mot-divider"></div>
+
+        <!-- Submit -->
+        <button id="mo-submit" class="mot-submit mot-submit-buy">
+          <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+          Place Buy Order
+        </button>
+
+        <!-- Result message -->
+        <div id="mo-result" class="mo-result" style="margin-top:.5rem;text-align:center;font-size:12px;min-height:16px;"></div>
+
       </div>
     </div>
 
