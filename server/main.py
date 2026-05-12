@@ -87,6 +87,7 @@ class OrderIn(BaseModel):
     symbol: str = Field(min_length=1)
     qty: float | None = Field(default=None, gt=0)
     notional: float | None = Field(default=None, gt=0)
+    limit_price: float | None = Field(default=None, gt=0)
     side: Literal["buy", "sell"]
 
 class StrategyUpdate(BaseModel):
@@ -278,8 +279,12 @@ def submit_order(o: OrderIn, request: Request):
     _require_auth(request)
     try:
         sym = o.symbol.upper()
-        result = alpaca_client.submit_market_order(sym, o.side, qty=o.qty, notional=o.notional)
-        label = f"manual ${o.notional:.2f}" if o.notional else "manual order"
+        if o.limit_price and o.qty:
+            result = alpaca_client.submit_limit_order(sym, o.side, o.qty, o.limit_price)
+            label = f"manual limit @${o.limit_price:.2f}"
+        else:
+            result = alpaca_client.submit_market_order(sym, o.side, qty=o.qty, notional=o.notional)
+            label = f"manual ${o.notional:.2f}" if o.notional else "manual order"
         display = o.notional if o.notional else o.qty
         db.log_signal("manual", sym, o.side, display, label, result["id"], result["status"])
         if o.notional:

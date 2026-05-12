@@ -3,7 +3,7 @@ import threading
 from typing import Literal
 
 from alpaca.trading.client import TradingClient
-from alpaca.trading.requests import MarketOrderRequest, GetOrdersRequest
+from alpaca.trading.requests import MarketOrderRequest, LimitOrderRequest, GetOrdersRequest
 from alpaca.trading.enums import OrderSide, TimeInForce, QueryOrderStatus
 from alpaca.data.historical import StockHistoricalDataClient
 from alpaca.data.requests import StockBarsRequest, StockLatestQuoteRequest
@@ -115,6 +115,29 @@ def submit_market_order(symbol: str, side: Literal["buy", "sell"],
         "side": str(o.side).lower().replace("orderside.", ""),
         "qty": float(o.qty) if o.qty else None,
         "notional": float(o.notional) if o.notional else None,
+        "status": str(o.status).lower().replace("orderstatus.", ""),
+    }
+
+
+def submit_limit_order(symbol: str, side: Literal["buy", "sell"],
+                       qty: float, limit_price: float,
+                       client_order_id: str | None = None) -> dict:
+    order_side = OrderSide.BUY if side == "buy" else OrderSide.SELL
+    req = LimitOrderRequest(
+        symbol=symbol.upper(),
+        qty=qty,
+        limit_price=round(limit_price, 2),
+        side=order_side,
+        time_in_force=TimeInForce.DAY,
+        client_order_id=client_order_id,
+    )
+    o = trading().submit_order(req)
+    return {
+        "id": str(o.id),
+        "symbol": o.symbol,
+        "side": str(o.side).lower().replace("orderside.", ""),
+        "qty": float(o.qty) if o.qty else None,
+        "limit_price": float(o.limit_price) if o.limit_price else None,
         "status": str(o.status).lower().replace("orderstatus.", ""),
     }
 
