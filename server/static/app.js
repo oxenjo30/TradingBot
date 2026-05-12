@@ -1570,8 +1570,7 @@ async function initPositions() {
         const wrap = document.getElementById(wrapId);
         if (!wrap) return;
         const sel = document.createElement('select');
-        sel.className = 'form-input';
-        sel.style.cssText = 'font-size:12px;padding:.3rem .6rem;height:auto;';
+        sel.className = 'acct-sel';
         const all = document.createElement('option');
         all.value = ''; all.textContent = 'All accounts';
         sel.appendChild(all);
@@ -2526,8 +2525,7 @@ async function initBalances() {
       const wrap = document.getElementById('bal-account-wrap');
       if (wrap) {
         const sel = document.createElement('select');
-        sel.className = 'form-input';
-        sel.style.cssText = 'font-size:12px;padding:.3rem .6rem;height:auto;';
+        sel.className = 'acct-sel';
         const all = document.createElement('option');
         all.value = ''; all.textContent = 'All accounts';
         sel.appendChild(all);
