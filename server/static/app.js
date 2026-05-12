@@ -983,6 +983,9 @@ async function initBots() {
   }
 
   function buildStratRow(acct, s) {
+    const wrap = document.createElement('div');
+
+    // ── Main row ──
     const row = document.createElement('div');
     row.className = 'strat-row';
 
@@ -992,7 +995,11 @@ async function initBots() {
 
     const info = document.createElement('div');
     info.className = 'strat-info';
-    info.innerHTML = `<div class="strat-name">${escHtml(s.label)}</div>` +
+    const hasWindow = s.active_start && s.active_end;
+    const schedLabel = hasWindow
+      ? `<span style="color:#3B82F6;font-size:10px;margin-left:.4rem;">&#x23F0; ${s.active_start}–${s.active_end} ET</span>`
+      : '';
+    info.innerHTML = `<div class="strat-name">${escHtml(s.label)}${schedLabel}</div>` +
       `<div class="strat-desc">${escHtml(s.description)}</div>`;
 
     const actions = document.createElement('div');
@@ -1006,6 +1013,12 @@ async function initBots() {
       statusBadge.className = 'badge b-paused';
       statusBadge.textContent = 'Paused';
     }
+
+    // Schedule expand button
+    const schedBtn = document.createElement('button');
+    schedBtn.className = 'btn-remove';
+    schedBtn.title = 'Set active hours';
+    schedBtn.innerHTML = `<svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`;
 
     const toggle = document.createElement('div');
     toggle.className = 'strat-toggle' + (s.enabled ? ' on' : '');
@@ -1023,9 +1036,72 @@ async function initBots() {
       } catch { toggle.classList.remove('disabled'); }
     };
 
-    actions.append(statusBadge, toggle);
+    actions.append(statusBadge, schedBtn, toggle);
     row.append(icon, info, actions);
-    return row;
+
+    // ── Schedule sub-row (hidden by default) ──
+    const schedRow = document.createElement('div');
+    schedRow.style.cssText = 'display:none;padding:.5rem 1.25rem .65rem 3.5rem;border-bottom:1px solid rgba(30,45,69,.5);background:rgba(0,0,0,.12);';
+    schedRow.innerHTML = `
+      <div style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;">
+        <span style="font-size:11px;color:#64748B;white-space:nowrap;">Active hours (ET):</span>
+        <input type="time" class="input" id="sched-start-${s.name}" value="${s.active_start || ''}"
+          style="width:110px;padding:.25rem .5rem;font-size:12px;height:28px;">
+        <span style="font-size:11px;color:#64748B;">to</span>
+        <input type="time" class="input" id="sched-end-${s.name}" value="${s.active_end || ''}"
+          style="width:110px;padding:.25rem .5rem;font-size:12px;height:28px;">
+        <button class="btn btn-primary" id="sched-save-${s.name}"
+          style="font-size:11px;padding:.25rem .65rem;height:28px;">Save</button>
+        <button class="btn btn-ghost" id="sched-clear-${s.name}"
+          style="font-size:11px;padding:.25rem .65rem;height:28px;">Clear</button>
+        <span id="sched-msg-${s.name}" style="font-size:11px;color:#10B981;display:none;">Saved</span>
+      </div>`;
+
+    schedBtn.onclick = () => {
+      const visible = schedRow.style.display !== 'none';
+      schedRow.style.display = visible ? 'none' : 'block';
+    };
+
+    const saveSchedule = async (start, end) => {
+      const msgEl = document.getElementById(`sched-msg-${s.name}`);
+      try {
+        await api(`/api/strategies/${s.name}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ active_start: start, active_end: end }),
+          key: `sched-${s.name}`,
+        });
+        // Update inline label
+        const newLabel = (start && end)
+          ? `<span style="color:#3B82F6;font-size:10px;margin-left:.4rem;">&#x23F0; ${start}–${end} ET</span>`
+          : '';
+        info.querySelector('.strat-name').innerHTML = `${escHtml(s.label)}${newLabel}`;
+        s.active_start = start || null;
+        s.active_end   = end   || null;
+        if (msgEl) { msgEl.style.display = 'inline'; setTimeout(() => { msgEl.style.display = 'none'; }, 2000); }
+      } catch {
+        if (msgEl) { msgEl.style.color = '#EF4444'; msgEl.textContent = 'Failed'; msgEl.style.display = 'inline';
+          setTimeout(() => { msgEl.style.display = 'none'; msgEl.style.color = '#10B981'; msgEl.textContent = 'Saved'; }, 2500); }
+      }
+    };
+
+    // Wire save/clear after DOM is appended (buttons exist in schedRow)
+    setTimeout(() => {
+      document.getElementById(`sched-save-${s.name}`)?.addEventListener('click', () => {
+        const start = document.getElementById(`sched-start-${s.name}`)?.value;
+        const end   = document.getElementById(`sched-end-${s.name}`)?.value;
+        if (!start || !end) return;
+        saveSchedule(start, end);
+      });
+      document.getElementById(`sched-clear-${s.name}`)?.addEventListener('click', () => {
+        document.getElementById(`sched-start-${s.name}`).value = '';
+        document.getElementById(`sched-end-${s.name}`).value   = '';
+        saveSchedule('', '');
+      });
+    }, 0);
+
+    wrap.append(row, schedRow);
+    return wrap;
   }
 
   // ── Engine controls ────────────────────────────────────────────────────────
