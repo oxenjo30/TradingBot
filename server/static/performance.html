@@ -150,6 +150,58 @@
       </div>
     </div>
 
+    <!-- Strategy Health -->
+    <div class="card" id="strategy-health-card" style="position:relative;overflow:hidden;">
+      <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,#3B82F6,#8B5CF6);opacity:.7;"></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;margin-top:.25rem;">
+        <div>
+          <div class="sh-title-row">
+            <div style="width:32px;height:32px;border-radius:8px;background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.2);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+              <svg width="16" height="16" fill="none" stroke="#3B82F6" stroke-width="1.8" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+            </div>
+            <div>
+              <div class="sh-title">Strategy Health</div>
+              <div class="sh-subtitle">Live performance vs your designated backtest benchmark</div>
+            </div>
+            <span class="info-icon" title="Set a benchmark in Backtesting. Health turns yellow above 15% divergence, red above 30%.">?</span>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:.5rem;" id="sh-summary-badges"></div>
+      </div>
+      <div class="dtable-wrap">
+        <table class="dtable" id="sh-table">
+          <colgroup>
+            <col style="width:28px">
+            <col>
+            <col style="width:130px">
+            <col style="width:130px">
+            <col style="width:110px">
+            <col style="width:120px">
+          </colgroup>
+          <thead>
+            <tr>
+              <th></th>
+              <th>Strategy</th>
+              <th>Win Rate</th>
+              <th>Avg Return / Trade</th>
+              <th>Live Trades</th>
+              <th>Health</th>
+            </tr>
+          </thead>
+          <tbody id="sh-tbody">
+            <tr><td colspan="6" class="state-empty">Loading&hellip;</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div style="margin-top:.875rem;padding-top:.875rem;border-top:1px solid rgba(30,45,69,.6);display:flex;align-items:center;gap:.5rem;">
+        <svg width="13" height="13" fill="none" stroke="#475569" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        <span style="font-size:11px;color:#475569;">Set a backtest run as the benchmark for each strategy in the
+          <a href="/static/backtesting.html" style="color:#3B82F6;font-weight:500;">Backtesting page</a>.
+          Health turns yellow above 15% divergence and red above 30%.
+        </span>
+      </div>
+    </div>
+
     <!-- Daily signal counts chart -->
     <div class="card">
       <div style="font-size:14px;font-weight:600;margin-bottom:.75rem;">Daily Signal Activity (30 days)</div>
