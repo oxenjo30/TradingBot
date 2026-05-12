@@ -80,7 +80,7 @@
   <div class="sidebar-footer">
     <div class="paper-card" id="mode-card">
       <p class="paper-label">Paper Trading Mode</p>
-      <p style="font-size:12px;color:#E6EBF5;margin-top:2px;">Safe sandbox environment</p>
+      <p style="font-size:12px;color:var(--muted);margin-top:2px;">Safe sandbox environment</p>
       <a href="/static/apikeys.html" class="go-live">Go Live &rarr;</a>
     </div>
     <button class="nav-item logout-btn" onclick="doLogout()">
@@ -175,8 +175,13 @@
     <div style="position:sticky;top:1rem;">
       <div class="card mot-card">
 
-        <!-- Account selector (no header label) -->
-        <div style="padding:.6rem 1.1rem .3rem;font-size:11px;color:#64748B;" id="mo-account-wrap"></div>
+        <!-- Title -->
+        <div class="mot-header">
+          <div class="mot-header-title">Manual Order</div>
+        </div>
+
+        <!-- Account selector -->
+        <div id="mo-account-wrap"></div>
 
         <!-- Buy / Sell tabs -->
         <div class="mot-tabs">
@@ -192,18 +197,17 @@
 
         <!-- Symbol row -->
         <div class="mot-sym-row">
+          <div class="mot-label">Symbol</div>
           <div class="mot-sym-wrap">
             <input id="mo-sym-input" class="mot-sym-input" type="text" placeholder="Ticker…" autocomplete="off" spellcheck="false">
-            <svg class="mot-sym-icon" width="14" height="14" fill="none" stroke="#475569" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <svg class="mot-sym-icon" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
           </div>
           <div id="mo-quote-display" class="mot-quote"></div>
         </div>
 
-        <div class="mot-divider"></div>
-
         <!-- Amount type toggle -->
         <div class="mot-section">
-          <div class="mot-label">In</div>
+          <div class="mot-label">Amount in</div>
           <div class="mot-toggle">
             <button id="mo-mode-qty"      class="mot-toggle-btn mot-toggle-active">Shares</button>
             <button id="mo-mode-notional" class="mot-toggle-btn">USD Value</button>
@@ -225,15 +229,13 @@
         <div id="mo-price-wrap" class="mot-section">
           <div style="display:flex;align-items:center;justify-content:space-between;">
             <div class="mot-label">Limit Price</div>
-            <span class="mot-label" style="font-weight:400;text-transform:none;letter-spacing:0;color:#64748B;">optional</span>
+            <span style="font-size:11px;color:var(--muted);">optional</span>
           </div>
           <div class="mot-qty-wrap">
             <span class="mot-qty-prefix">$</span>
-            <input id="mo-price-input" class="mot-qty-input mot-qty-with-prefix" type="number" min="0" step="0.01" placeholder="Market">
+            <input id="mo-price-input" class="mot-qty-input mot-qty-with-prefix" type="number" min="0" step="0.01" placeholder="Market order if blank">
           </div>
         </div>
-
-        <div class="mot-divider"></div>
 
         <!-- Submit -->
         <button id="mo-submit" class="mot-submit mot-submit-buy">
@@ -242,7 +244,7 @@
         </button>
 
         <!-- Result message -->
-        <div id="mo-result" class="mo-result" style="margin-top:.5rem;text-align:center;font-size:12px;min-height:16px;"></div>
+        <div id="mo-result" class="mo-result" style="text-align:center;font-size:12px;min-height:16px;"></div>
 
       </div>
     </div>
@@ -256,7 +258,7 @@
   <div class="modal-box" style="max-width:380px;">
     <div class="modal-title" id="modal-mo-title">Confirm Order</div>
     <div class="modal-body">
-      <p id="modal-mo-body" style="line-height:1.7;color:#C8D6E8;"></p>
+      <p id="modal-mo-body" style="line-height:1.7;color:var(--muted);font-size:14px;"></p>
     </div>
     <div class="modal-actions">
       <button class="btn btn-ghost" data-action="cancel">Cancel</button>
