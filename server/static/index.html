@@ -282,7 +282,8 @@
       </div>
     </div>
 
-    <!-- Row 4: Watchlist -->
+    <!-- Row 4: Watchlist (constrained width) -->
+    <div style="display:grid;grid-template-columns:minmax(0,480px);gap:1rem;">
     <div class="card" style="padding:1.1rem 1.25rem;">
 
       <!-- Header -->
@@ -311,6 +312,7 @@
       <div id="wl-rows" style="display:flex;flex-direction:column;gap:0;"></div>
       <div id="wl-empty" class="state-empty" style="font-size:12px;padding:.5rem 0;display:none;">Add symbols above to start tracking.</div>
     </div>
+    </div><!-- /watchlist grid wrapper -->
 
     <!-- Row 5: System Bar -->
     <div class="sys-bar">
