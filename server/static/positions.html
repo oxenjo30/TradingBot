@@ -196,7 +196,7 @@
           <!-- Symbol input -->
           <div style="margin-bottom:.75rem;">
             <div class="mo-field-label">Symbol</div>
-            <input id="mo-sym-input" class="form-input" type="text" placeholder="e.g. AAPL" autocomplete="off"
+            <input id="mo-sym-input" class="input-field mo-input" type="text" placeholder="e.g. AAPL" autocomplete="off"
               style="text-transform:uppercase;font-weight:700;letter-spacing:.08em;">
           </div>
 
@@ -210,10 +210,20 @@
           </div>
 
           <!-- Amount input -->
-          <div style="margin-bottom:1rem;">
+          <div style="margin-bottom:.75rem;">
             <div class="mo-field-label" id="mo-qty-label">Number of Shares</div>
-            <input id="mo-qty-input" class="form-input" type="number" min="0" step="any" placeholder="0"
-              style="font-size:16px;font-weight:700;">
+            <input id="mo-qty-input" class="input-field mo-input" type="number" min="0" step="any" placeholder="0"
+              style="font-size:18px;font-weight:700;">
+          </div>
+
+          <!-- Limit price (shares mode only) -->
+          <div id="mo-price-wrap" style="margin-bottom:1rem;">
+            <div class="mo-field-label">Limit Price <span style="color:#475569;font-weight:500;text-transform:none;letter-spacing:0;">(optional — blank = market)</span></div>
+            <div style="position:relative;">
+              <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#475569;font-size:14px;font-weight:600;">$</span>
+              <input id="mo-price-input" class="input-field mo-input" type="number" min="0" step="0.01" placeholder="0.00"
+                style="padding-left:26px;font-size:15px;font-weight:600;">
+            </div>
           </div>
 
           <!-- Submit button -->

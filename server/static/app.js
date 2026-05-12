@@ -1198,15 +1198,17 @@ async function initPositions() {
 
   // ── Manual order ticket ──────────────────────────────────────────────
   let moSide = 'buy';
-  const buyBtn  = document.getElementById('mo-buy-btn');
-  const sellBtn = document.getElementById('mo-sell-btn');
-  const submitBtn = document.getElementById('mo-submit');
-  const modeQtyBtn = document.getElementById('mo-mode-qty');
+  const buyBtn       = document.getElementById('mo-buy-btn');
+  const sellBtn      = document.getElementById('mo-sell-btn');
+  const submitBtn    = document.getElementById('mo-submit');
+  const modeQtyBtn   = document.getElementById('mo-mode-qty');
   const modeNotionalBtn = document.getElementById('mo-mode-notional');
-  const qtyLabel = document.getElementById('mo-qty-label');
-  const symInput = document.getElementById('mo-sym-input');
-  const qtyInput = document.getElementById('mo-qty-input');
-  const resultEl = document.getElementById('mo-result');
+  const qtyLabel     = document.getElementById('mo-qty-label');
+  const symInput     = document.getElementById('mo-sym-input');
+  const qtyInput     = document.getElementById('mo-qty-input');
+  const priceInput   = document.getElementById('mo-price-input');
+  const priceWrap    = document.getElementById('mo-price-wrap');
+  const resultEl     = document.getElementById('mo-result');
 
   function setMoSide(side) {
     moSide = side;
@@ -1234,10 +1236,13 @@ async function initPositions() {
       qtyLabel.textContent = 'Number of Shares';
       qtyInput.placeholder = '0';
       qtyInput.step = 'any';
+      if (priceWrap) priceWrap.style.display = '';
     } else {
       qtyLabel.textContent = 'USD Value';
       qtyInput.placeholder = '0.00';
       qtyInput.step = '0.01';
+      if (priceWrap) priceWrap.style.display = 'none';
+      if (priceInput) priceInput.value = '';
     }
   }
   modeQtyBtn?.addEventListener('click',      () => setMoMode(true));
@@ -1248,19 +1253,22 @@ async function initPositions() {
   });
 
   submitBtn?.addEventListener('click', () => {
-    const sym    = symInput?.value.trim().toUpperCase();
-    const rawVal = qtyInput?.value.trim();
+    const sym      = symInput?.value.trim().toUpperCase();
+    const rawVal   = qtyInput?.value.trim();
+    const rawPrice = priceInput?.value.trim();
     if (!sym || !rawVal) { resultEl.textContent = 'Enter a symbol and amount.'; resultEl.className = 'mo-result err'; return; }
 
-    const qty      = modeIsQty ? parseFloat(rawVal) : null;
-    const notional = !modeIsQty ? parseFloat(rawVal) : null;
-    const unitLabel = modeIsQty ? 'shares' : 'USD';
-    const sideLabel = moSide === 'buy' ? 'BUY' : 'SELL';
+    const qty        = modeIsQty ? parseFloat(rawVal) : null;
+    const notional   = !modeIsQty ? parseFloat(rawVal) : null;
+    const limitPrice = modeIsQty && rawPrice ? parseFloat(rawPrice) : null;
+    const unitLabel  = modeIsQty ? 'shares' : 'USD';
+    const sideLabel  = moSide === 'buy' ? 'BUY' : 'SELL';
+    const priceLabel = limitPrice ? ` @ $${limitPrice.toFixed(2)} limit` : ' at market price';
 
     const bodyEl  = document.getElementById('modal-mo-body');
     const titleEl = document.getElementById('modal-mo-title');
     const confBtn = document.getElementById('modal-mo-confirm-btn');
-    if (bodyEl) bodyEl.textContent = `${sideLabel} ${rawVal} ${unitLabel} of ${sym} at market price.`;
+    if (bodyEl) bodyEl.textContent = `${sideLabel} ${rawVal} ${unitLabel} of ${sym}${priceLabel}.`;
     if (titleEl) titleEl.textContent = `Confirm ${sideLabel} Order`;
     if (confBtn) {
       confBtn.style.background = moSide === 'buy' ? 'var(--green)' : 'var(--red)';
@@ -1273,8 +1281,9 @@ async function initPositions() {
       resultEl.className = 'mo-result';
       try {
         const body = { symbol: sym, side: moSide, account_id: moAccountId ?? null };
-        if (qty)      body.qty      = qty;
-        if (notional) body.notional = notional;
+        if (qty)         body.qty         = qty;
+        if (notional)    body.notional    = notional;
+        if (limitPrice)  body.limit_price = limitPrice;
         const res = await api('/api/orders', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
         resultEl.textContent = `✓ Order placed: ${(res.id || '').slice(0,8) || 'OK'}`;
         resultEl.className = 'mo-result ok';

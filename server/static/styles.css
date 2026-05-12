@@ -1020,19 +1020,40 @@ button { cursor: pointer; font-family: inherit; }
 
 /* ── Manual order mode segmented control ── */
 .mo-mode-btn {
-  padding: .4rem .5rem; font-size: 12px; font-weight: 600;
-  background: transparent; color: #64748B;
-  border: 1px solid var(--border); cursor: pointer;
-  font-family: inherit; transition: background .12s, color .12s;
+  flex: 1; padding: .5rem; font-size: 12px; font-weight: 600;
+  background: rgba(8,13,20,.5); color: #475569;
+  border: 1px solid rgba(30,45,69,1); cursor: pointer;
+  font-family: inherit; transition: background .12s, color .12s, border-color .12s;
 }
 .mo-mode-btn:first-child { border-radius: 7px 0 0 7px; }
 .mo-mode-btn:last-child  { border-radius: 0 7px 7px 0; border-left: none; }
-.mo-mode-btn.mo-mode-active { background: rgba(59,130,246,.12); color: var(--blue); border-color: rgba(59,130,246,.3); }
+.mo-mode-btn.mo-mode-active {
+  background: rgba(59,130,246,.13); color: #60A5FA;
+  border-color: rgba(59,130,246,.35);
+}
 
 /* ── Manual order field labels ── */
 .mo-field-label {
-  font-size: 10.5px; font-weight: 700; color: var(--muted);
-  text-transform: uppercase; letter-spacing: .07em; margin-bottom: .3rem;
+  font-size: 10px; font-weight: 700; color: #475569;
+  text-transform: uppercase; letter-spacing: .1em; margin-bottom: .4rem;
+}
+
+/* ── Manual order inputs ── */
+.mo-input {
+  background: rgba(8,13,20,.7) !important;
+  border: 1px solid rgba(30,45,69,1) !important;
+  border-radius: 8px !important;
+  color: #E6EBF5 !important;
+  font-family: inherit !important;
+  padding: 10px 13px !important;
+  width: 100% !important;
+  transition: border-color .15s !important;
+}
+.mo-input::placeholder { color: #334155 !important; }
+.mo-input:focus {
+  outline: none !important;
+  border-color: rgba(59,130,246,.5) !important;
+  box-shadow: 0 0 0 3px rgba(59,130,246,.08) !important;
 }
 
 /* ── Manual order submit button ── */
