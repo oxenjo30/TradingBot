@@ -22,19 +22,21 @@ def run_tick():
     _last_run = {"ts": datetime.now(timezone.utc).isoformat(),
                  "ran": [], "signals": [], "error": None, "risk": None}
 
-    try:
-        clock = alpaca_client.get_clock()
-    except Exception as e:
-        _last_run["error"] = f"clock: {e}"
-        log.exception("clock fetch failed")
-        return
-
     active_mode = db.get_risk_settings().get("trading_mode", "paper")
 
-    if not clock["is_open"]:
-        _last_run["error"] = "market closed"
-        log.info("market closed; skipping strategy tick")
-        return
+    # Fetch US market clock once — used to gate stock brokers only.
+    # Crypto brokers (Binance) trade 24/7 and bypass this gate.
+    _us_market_open: bool | None = None
+    def is_us_market_open() -> bool:
+        nonlocal _us_market_open
+        if _us_market_open is None:
+            try:
+                _us_market_open = alpaca_client.get_clock()["is_open"]
+            except Exception:
+                _us_market_open = False
+        return _us_market_open
+
+    CRYPTO_BROKERS = {"binance"}
 
     if risk.is_killed():
         _last_run["error"] = "kill switch active"
@@ -75,6 +77,13 @@ def run_tick():
             if acct["account_type"] != active_mode:
                 continue
             acct_id = acct["id"]
+            broker  = (acct.get("broker") or "alpaca").lower()
+
+            # Stock brokers only trade during US market hours.
+            # Crypto brokers (Binance) run 24/7 — skip the clock gate.
+            if broker not in CRYPTO_BROKERS and not is_us_market_open():
+                log.info("market closed; skipping acct %d (%s)", acct_id, broker)
+                continue
 
             if acct_id not in client_cache:
                 try:
@@ -151,7 +160,7 @@ def run_tick():
                     final_qty = None
                 else:
                     try:
-                        quote = alpaca_client.get_latest_quote(sig.symbol)
+                        quote = acct_client.get_latest_quote(sig.symbol)
                         price = (quote["bid"] + quote["ask"]) / 2
                     except Exception:
                         price = None
@@ -216,10 +225,11 @@ def run_tick():
         })
         quote_prices = {}
         for acct_data in client_cache.values():
+            acct_client_q = acct_data["client"]
             for sym in list(acct_data.get("positions", {}).keys()):
                 if sym not in quote_prices:
                     try:
-                        q = alpaca_client.get_latest_quote(sym)
+                        q = acct_client_q.get_latest_quote(sym)
                         mid = (q["bid"] + q["ask"]) / 2 if q["bid"] and q["ask"] else q["bid"] or q["ask"]
                         if mid:
                             quote_prices[sym] = mid
