@@ -920,6 +920,11 @@ button { cursor: pointer; font-family: inherit; }
 .blacklist-chip button:hover { opacity: 1; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
+/* ── Manual order result ── */
+.mo-result { font-size:12px; text-align:center; min-height:16px; transition:color .15s; }
+.mo-result.ok  { color: var(--green); }
+.mo-result.err { color: var(--red); }
+
 /* ── Mode card — live trading state ── */
 .live-card {
   background: rgba(16,185,129,.08);
