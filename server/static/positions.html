@@ -242,14 +242,14 @@
 
 <!-- Manual order confirm modal -->
 <div id="modal-mo-confirm" class="modal-overlay hidden" role="dialog" aria-modal="true">
-  <div class="modal-box" style="max-width:360px;">
+  <div class="modal-box" style="max-width:380px;">
     <div class="modal-title" id="modal-mo-title">Confirm Order</div>
     <div class="modal-body">
-      <p id="modal-mo-body" style="font-size:14px;color:#C8D6E8;margin-bottom:1rem;line-height:1.6;"></p>
-      <div style="display:flex;gap:.75rem;">
-        <button class="modal-cancel" data-action="cancel">Cancel</button>
-        <button class="modal-confirm" id="modal-mo-confirm-btn" data-action="confirm">Place Order</button>
-      </div>
+      <p id="modal-mo-body" style="line-height:1.7;color:#C8D6E8;"></p>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" data-action="cancel">Cancel</button>
+      <button class="btn btn-primary" id="modal-mo-confirm-btn" data-action="confirm">Place Order</button>
     </div>
   </div>
 </div>
