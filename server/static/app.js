@@ -694,12 +694,34 @@ async function initDashboard() {
   // ── Fetch strategies → active bots + bot status panel ──
   async function fetchStrategies() {
     try {
-      const strats = await api('/api/strategies', { key: 'idx-strategies' });
+      // Use per-account strategy status (same source as Bots page) so enabled state is always in sync.
+      // Fall back to global /api/strategies if no account is connected yet.
+      const [allStrats, accounts, engine] = await Promise.all([
+        fetch('/api/strategies?_=' + Date.now()).then(r => r.json()),
+        fetch('/api/broker-accounts?_=' + Date.now()).then(r => r.json()),
+        api('/api/engine', { key: 'idx-engine' }),
+      ]);
+
+      // Build enabled map from per-account data (any account having a strategy enabled = enabled)
+      let enabledMap = {};
+      if (accounts && accounts.length) {
+        // fetch per-account strategies for first account to get per-account status
+        try {
+          const acctStrats = await fetch(`/api/broker-accounts/${accounts[0].id}/strategies?_=` + Date.now()).then(r => r.json());
+          acctStrats.forEach(s => { enabledMap[s.name] = s.enabled; });
+        } catch { /* fall back to global */ }
+      }
+
+      // Merge: use per-account enabled if available, else global
+      const strats = allStrats.map(s => ({
+        ...s,
+        enabled: (s.name in enabledMap) ? enabledMap[s.name] : s.enabled,
+      }));
+
       const botsEl = document.getElementById('bots-val');
       clearState(botsEl);
       botsEl.textContent = strats.filter(s => s.enabled).length;
 
-      const engine = await api('/api/engine', { key: 'idx-engine' });
       const ranMap = {};
       (engine.ran || []).forEach(r => { ranMap[r.strategy] = r; });
       const listEl = document.getElementById('bot-status-list');
@@ -729,8 +751,7 @@ async function initDashboard() {
         } else if (ranMap[s.name] && ranMap[s.name].error) {
           badgeClass = 'b-error'; badgeText = 'Last Run Error';
         } else if (ranMap[s.name]) {
-          badgeClass = 'b-enabled';
-          badgeText = '';
+          badgeClass = 'b-enabled'; badgeText = '';
         } else {
           badgeClass = 'b-notrun'; badgeText = 'Not Run Yet';
         }
