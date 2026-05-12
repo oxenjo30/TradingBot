@@ -347,13 +347,16 @@ async function _wlLoad() {
 async function _wlRefreshPrices() {
   if (!_wlSymbols.length) return;
   try {
-    const snaps = await api(`/api/quotes/snapshot?symbols=${_wlSymbols.join(',')}`, { key: 'wl-snaps' });
+    const res = await fetch(`/api/quotes/snapshot?symbols=${_wlSymbols.map(encodeURIComponent).join(',')}`);
+    if (!res.ok) return;
+    const snaps = await res.json();
     snaps.forEach(s => {
       const row = document.getElementById(`wl-row-${s.symbol}`);
       if (!row) return;
       const priceEl  = row.querySelector('.wl-price');
       const changeEl = row.querySelector('.wl-change');
-      if (priceEl && s.price != null) priceEl.textContent = '$' + s.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      if (priceEl && s.price != null)
+        priceEl.textContent = '$' + s.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       if (changeEl && s.change_pct != null) {
         const up = s.change_pct >= 0;
         changeEl.textContent = (up ? '+' : '') + s.change_pct.toFixed(2) + '%';
