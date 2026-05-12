@@ -250,20 +250,23 @@ def license_status():
 
 @app.post("/api/license/activate")
 def license_activate(body: LicenseActivate):
-    from .license import verify_key, _get_seller_secret, LicenseError
+    from .license import verify_key, _get_seller_secret, LicenseError, invalidate_cache
     from .db import set_license_key
     try:
         result = verify_key(body.key, _get_seller_secret())
     except LicenseError as e:
         raise HTTPException(422, str(e))
     set_license_key(body.key)
+    invalidate_cache()
     return result
 
 @app.delete("/api/license")
 def license_deactivate(request: Request):
     _require_auth(request)
+    from .license import invalidate_cache
     from .db import set_license_key
     set_license_key("")
+    invalidate_cache()
     return {"ok": True}
 
 
