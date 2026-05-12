@@ -694,10 +694,12 @@ async function initDashboard() {
   // ── Fetch strategies → active bots + bot status panel ──
   async function fetchStrategies() {
     try {
+      console.log('[dashboard] fetchStrategies called');
       const [strats, engine] = await Promise.all([
         api('/api/strategies', { key: 'idx-strategies' }),
         api('/api/engine',     { key: 'idx-engine' }),
       ]);
+      console.log('[dashboard] strats received:', strats.map(s => s.name + ':' + s.enabled));
       const botsEl = document.getElementById('bots-val');
       clearState(botsEl);
       botsEl.textContent = strats.filter(s => s.enabled).length;
@@ -757,6 +759,7 @@ async function initDashboard() {
 
     } catch (e) {
       if (e.name === 'AbortError') return;
+      console.error('[dashboard] fetchStrategies error:', e.message, e);
       showError(document.getElementById('bots-val'));
       throw e;
     }
