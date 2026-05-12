@@ -1182,7 +1182,6 @@ button { cursor: pointer; font-family: inherit; }
 #mo-account-wrap .acct-sel {
   width: 100%;
 }
-#mo-account-wrap select:focus { border-color: var(--blue); }
 
 /* Buy / Sell tabs — pill style */
 .mot-tabs {
@@ -1669,7 +1668,6 @@ button { cursor: pointer; font-family: inherit; }
 [data-theme="light"] .mot-tab-sell.mot-tab-active { color: var(--red);   background: rgba(239,68,68,.08);  border-color: rgba(239,68,68,.4);  }
 [data-theme="light"] .acct-sel { background: #F8FAFC; border-color: var(--border); color: var(--text); }
 [data-theme="light"] .acct-sel option { background: #FFFFFF; }
-[data-theme="light"] #mo-account-wrap select { background: #F8FAFC; }
 
 /* broker picker (step 1) */
 [data-theme="light"] .modal-head { border-bottom-color: var(--border); }
