@@ -262,6 +262,9 @@ function sparkConfig(data) {
 }
 
 function perfChartConfig(timestamps, equities, baseValue) {
+  const isLight = _chartTheme() === 'light';
+  const labelClr = isLight ? '#64748B' : '#94A3B8';
+  const gridClr  = isLight ? '#E2E8F0' : '#1E2D45';
   return {
     series: [{ name: 'Equity', data: timestamps.map((t, i) => ({ x: new Date(t * 1000), y: equities[i] })) }],
     chart: { type: 'area', height: 220, toolbar: { show: false }, background: 'transparent', animations: { enabled: false } },
@@ -270,22 +273,24 @@ function perfChartConfig(timestamps, equities, baseValue) {
     fill: { type: 'gradient', gradient: { shade: 'dark', opacityFrom: 0.3, opacityTo: 0, stops: [0, 100] } },
     colors: ['#3B82F6'],
     annotations: { yaxis: [{ y: baseValue, borderColor: '#EF4444', strokeDashArray: 4, label: { text: 'Base', style: { color: '#EF4444', background: 'transparent' } } }] },
-    xaxis: { type: 'datetime', labels: { style: { colors: '#64748B', fontSize: '11px' } }, axisBorder: { show: false }, axisTicks: { show: false } },
-    yaxis: { labels: { style: { colors: '#64748B', fontSize: '11px' }, formatter: v => '$' + (v/1000).toFixed(0) + 'k' } },
-    grid: { borderColor: '#1E2D45', strokeDashArray: 3 },
+    xaxis: { type: 'datetime', labels: { style: { colors: labelClr, fontSize: '11px' } }, axisBorder: { show: false }, axisTicks: { show: false } },
+    yaxis: { labels: { style: { colors: labelClr, fontSize: '11px' }, formatter: v => '$' + (v/1000).toFixed(0) + 'k' } },
+    grid: { borderColor: gridClr, strokeDashArray: 3 },
     theme: { mode: _chartTheme() },
     tooltip: { theme: _chartTheme(), x: { format: 'HH:mm MMM dd' } }
   };
 }
 
 function donutConfig(labels, series) {
+  const isLight = _chartTheme() === 'light';
+  const labelClr = isLight ? '#64748B' : '#94A3B8';
   return {
     series,
     labels,
     chart: { type: 'donut', height: 155, background: 'transparent' },
     colors: ['#3B82F6', '#10B981', '#8B5CF6', '#F59E0B', '#06B6D4', '#6366F1'],
     dataLabels: { enabled: false },
-    legend: { position: 'bottom', labels: { colors: '#64748B' }, fontSize: '11px' },
+    legend: { position: 'bottom', labels: { colors: labelClr }, fontSize: '11px' },
     plotOptions: { pie: { donut: { size: '62%' } } },
     theme: { mode: _chartTheme() },
     tooltip: { theme: _chartTheme() }
@@ -1894,6 +1899,10 @@ async function initPerformance() {
       } else {
         chartEl.innerHTML = '';
         if (dailyChart) dailyChart.destroy();
+        const _isLight = _chartTheme() === 'light';
+        const _labelClr = _isLight ? '#64748B' : '#94A3B8';
+        const _gridClr  = _isLight ? '#E2E8F0' : '#1E2D45';
+        const _legClr   = _isLight ? '#0F172A' : '#E6EBF5';
         dailyChart = safeMakeChart(chartEl, {
           series: [
             { name: 'Buys',  data: daily.map(d => ({ x: d.date, y: d.buys  })) },
@@ -1902,10 +1911,10 @@ async function initPerformance() {
           ],
           chart: { type: 'bar', height: 200, toolbar: { show: false }, background: 'transparent', stacked: true },
           colors: ['#10B981', '#EF4444', '#F59E0B'],
-          xaxis: { type: 'category', labels: { style: { colors: '#64748B', fontSize: '11px' } }, axisBorder: { show: false } },
-          yaxis: { labels: { style: { colors: '#64748B', fontSize: '11px' } }, min: 0, forceNiceScale: true },
-          grid: { borderColor: '#1E2D45', strokeDashArray: 3 },
-          legend: { labels: { colors: '#E6EBF5' } },
+          xaxis: { type: 'category', labels: { style: { colors: _labelClr, fontSize: '11px' } }, axisBorder: { show: false } },
+          yaxis: { labels: { style: { colors: _labelClr, fontSize: '11px' } }, min: 0, forceNiceScale: true },
+          grid: { borderColor: _gridClr, strokeDashArray: 3 },
+          legend: { labels: { colors: _legClr } },
           theme: { mode: _chartTheme() },
           tooltip: { theme: _chartTheme() }
         });
@@ -3498,21 +3507,24 @@ function renderResults(data) {
   const chartDates  = (data.equity_curve || []).map(p => p.date);
   const chartValues = (data.equity_curve || []).map(p => p.equity);
 
+  const _btIsLight = _chartTheme() === 'light';
+  const _btLabelClr = _btIsLight ? '#64748B' : '#94A3B8';
+  const _btGridClr  = _btIsLight ? '#E2E8F0' : 'rgba(30,45,69,.6)';
   _btEquityChart = new ApexCharts(document.getElementById('bt-chart'), {
     chart:  { type: 'area', height: 280, background: 'transparent',
               toolbar: { show: false }, animations: { enabled: false },
               sparkline: { enabled: false } },
     series: [{ name: 'Equity', data: chartValues }],
     xaxis:  { categories: chartDates,
-              labels: { style: { colors: '#64748B', fontSize: '11px' },
+              labels: { style: { colors: _btLabelClr, fontSize: '11px' },
                         rotate: -30, hideOverlappingLabels: true },
               axisBorder: { show: false }, axisTicks: { show: false } },
-    yaxis:  { labels: { style: { colors: '#64748B', fontSize: '11px' },
+    yaxis:  { labels: { style: { colors: _btLabelClr, fontSize: '11px' },
                         formatter: v => '$' + Math.round(v).toLocaleString() } },
     fill:   { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: 0.3, opacityTo: 0.02 } },
     stroke: { width: 2, curve: 'smooth' },
     colors: ['#3B82F6'],
-    grid:   { borderColor: 'rgba(30,45,69,.6)', strokeDashArray: 3 },
+    grid:   { borderColor: _btGridClr, strokeDashArray: 3 },
     tooltip: { theme: _chartTheme(), y: { formatter: v => '$' + v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) } },
     theme:  { mode: _chartTheme() },
     dataLabels: { enabled: false },
