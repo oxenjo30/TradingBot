@@ -535,7 +535,7 @@ def broker_account_strategy_view(account_id: int, request: Request):
     if not db.get_broker_account(account_id):
         raise HTTPException(404, "account not found")
     assignments = db.get_account_strategy_assignments(account_id)
-    global_strats = {s["name"]: s for s in db.list_strategies()}
+    global_strats = {s["name"]: s for s in db.get_strategies()}
     return [
         {
             "name": name,
