@@ -239,6 +239,19 @@ def init_db():
                   created_at TEXT NOT NULL DEFAULT (datetime('now'))
                 );
             """)
+    # Migration: add symbol_breakdown column to backtest_runs if missing
+    with get_conn() as c:
+        cols = [r[1] for r in c.execute("PRAGMA table_info(backtest_runs)")]
+        if "symbol_breakdown" not in cols:
+            c.execute("ALTER TABLE backtest_runs ADD COLUMN symbol_breakdown TEXT DEFAULT NULL")
+
+    # Migration: add is_benchmark column to backtest_runs if missing
+    with get_conn() as c:
+        cols = [r[1] for r in c.execute("PRAGMA table_info(backtest_runs)")]
+        if "is_benchmark" not in cols:
+            c.execute(
+                "ALTER TABLE backtest_runs ADD COLUMN is_benchmark INTEGER NOT NULL DEFAULT 0"
+            )
 
 
 
@@ -778,8 +791,8 @@ def save_backtest_run(params: dict, results: dict) -> int:
                 created_at, name, strategy, symbols, start_date, end_date,
                 initial_capital, position_size_pct, commission_pct, slippage_pct,
                 total_return_pct, max_drawdown_pct, win_rate_pct, sharpe_ratio,
-                total_trades, equity_curve, trades
-            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                total_trades, equity_curve, trades, symbol_breakdown
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (
                 now_iso(),
                 None,
@@ -798,6 +811,7 @@ def save_backtest_run(params: dict, results: dict) -> int:
                 results.get("total_trades"),
                 json.dumps(results.get("equity_curve", [])),
                 json.dumps(results.get("trades", [])),
+                json.dumps(results.get("symbol_breakdown", [])),
             ),
         )
         return cur.lastrowid
@@ -825,7 +839,7 @@ def get_backtest_run(run_id: int) -> dict | None:
             """SELECT id, created_at, name, strategy, symbols, start_date, end_date,
                       initial_capital, position_size_pct, commission_pct, slippage_pct,
                       total_return_pct, max_drawdown_pct, win_rate_pct, sharpe_ratio,
-                      total_trades, equity_curve, trades
+                      total_trades, equity_curve, trades, symbol_breakdown
                FROM backtest_runs WHERE id=?""",
             (run_id,)
         ).fetchone()
@@ -835,6 +849,7 @@ def get_backtest_run(run_id: int) -> dict | None:
     d["symbols"] = json.loads(d["symbols"])
     d["equity_curve"] = json.loads(d["equity_curve"]) if d["equity_curve"] else []
     d["trades"] = json.loads(d["trades"]) if d["trades"] else []
+    d["symbol_breakdown"] = json.loads(d["symbol_breakdown"]) if d.get("symbol_breakdown") else []
     return d
 
 
@@ -908,3 +923,75 @@ def rename_watchlist(wl_id: int, name: str) -> dict | None:
         c.execute("UPDATE watchlists SET name=?, updated_at=? WHERE id=?",
                   (name, now_iso(), wl_id))
     return get_watchlist(wl_id)
+
+
+def set_benchmark(run_id: int) -> bool:
+    with get_conn() as c:
+        row = c.execute(
+            "SELECT strategy FROM backtest_runs WHERE id=?", (run_id,)
+        ).fetchone()
+        if row is None:
+            return False
+        strategy = row["strategy"]
+        c.execute(
+            "UPDATE backtest_runs SET is_benchmark=0 WHERE strategy=?", (strategy,)
+        )
+        c.execute(
+            "UPDATE backtest_runs SET is_benchmark=1 WHERE id=?", (run_id,)
+        )
+    return True
+
+
+def get_benchmark(strategy: str) -> dict | None:
+    with get_conn() as c:
+        row = c.execute(
+            """SELECT id, name, win_rate_pct, total_return_pct, total_trades,
+                      start_date, end_date
+               FROM backtest_runs WHERE strategy=? AND is_benchmark=1""",
+            (strategy,)
+        ).fetchone()
+    if row is None:
+        return None
+    d = dict(row)
+    total_trades = d.get("total_trades") or 0
+    total_return = d.pop("total_return_pct") or 0.0
+    d["avg_return_pct"] = total_return / total_trades if total_trades else 0.0
+    return d
+
+
+def get_live_health_stats(strategy: str) -> dict:
+    with get_conn() as c:
+        row = c.execute(
+            """SELECT
+                COUNT(*)                          AS total_trades,
+                SUM(CASE WHEN pnl > 0 THEN 1 ELSE 0 END) AS winning_trades,
+                COALESCE(AVG(pnl_pct), 0.0)       AS live_avg_return_pct,
+                MAX(date)                          AS last_trade_at
+               FROM strategy_perf WHERE strategy=?""",
+            (strategy,)
+        ).fetchone()
+    total    = row["total_trades"] or 0
+    winning  = row["winning_trades"] or 0
+    return {
+        "total_trades":        total,
+        "live_win_rate":       winning / total if total else 0.0,
+        "live_avg_return_pct": row["live_avg_return_pct"],
+        "last_trade_at":       row["last_trade_at"],
+    }
+
+
+def list_backtest_runs_with_benchmark() -> list[dict]:
+    with get_conn() as c:
+        rows = c.execute(
+            """SELECT id, created_at, name, strategy, symbols, start_date, end_date,
+                      initial_capital, position_size_pct, commission_pct, slippage_pct,
+                      total_return_pct, max_drawdown_pct, win_rate_pct, sharpe_ratio,
+                      total_trades, is_benchmark
+               FROM backtest_runs ORDER BY id DESC"""
+        ).fetchall()
+    result = []
+    for r in rows:
+        d = dict(r)
+        d["symbols"] = json.loads(d["symbols"])
+        result.append(d)
+    return result
