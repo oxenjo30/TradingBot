@@ -152,3 +152,117 @@ def test_list_backtest_runs_with_benchmark_includes_is_benchmark(db):
     assert len(runs) == 1
     assert "is_benchmark" in runs[0]
     assert runs[0]["is_benchmark"] == 1
+
+
+# ── API tests ─────────────────────────────────────────────────────────────────
+
+def test_strategy_health_endpoint_returns_all_strategies(client):
+    """GET /api/strategy-health returns one entry per registered strategy."""
+    from server.strategies import REGISTRY
+    r = client.get("/api/strategy-health")
+    assert r.status_code == 200
+    data = r.json()
+    assert isinstance(data, list)
+    assert len(data) == len(REGISTRY)
+    names = {item["strategy"] for item in data}
+    assert names == set(REGISTRY.keys())
+
+
+def test_strategy_health_no_benchmark_state(client):
+    """Strategies with no benchmark → drift_status='no_benchmark', benchmark fields null."""
+    r = client.get("/api/strategy-health")
+    assert r.status_code == 200
+    for item in r.json():
+        assert item["drift_status"] == "no_benchmark"
+        assert item["benchmark_run_id"] is None
+
+
+def test_strategy_health_no_data_state(client):
+    """Benchmark set but fewer than 10 live trades → drift_status='no_data'."""
+    import server.db as db_mod
+    from server.strategies import REGISTRY
+    strategy_name = next(iter(REGISTRY))
+    # Insert a benchmark run
+    params = {
+        "strategy": strategy_name, "symbols": ["AAPL"],
+        "start_date": "2025-01-01", "end_date": "2025-04-30",
+        "initial_capital": 10000, "position_size_pct": 10,
+        "commission_pct": 0.1, "slippage_pct": 0.05,
+    }
+    results = {
+        "total_return_pct": 18.4, "max_drawdown_pct": -5.0,
+        "win_rate_pct": 0.62, "sharpe_ratio": 1.2,
+        "total_trades": 183, "equity_curve": [], "trades": [], "symbol_breakdown": [],
+    }
+    run_id = db_mod.save_backtest_run(params, results)
+    db_mod.set_benchmark(run_id)
+    # Insert only 5 live trades (< 10 threshold)
+    with db_mod.get_conn() as c:
+        for i in range(5):
+            c.execute(
+                "INSERT INTO strategy_perf (date, strategy, symbol, side, qty, "
+                "notional, entry_price, exit_price, pnl, pnl_pct) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?)",
+                (f"2025-05-0{i+1}", strategy_name, "AAPL", "sell",
+                 10, 1000, 150.0, 155.0, 50.0, 1.5)
+            )
+    r = client.get("/api/strategy-health")
+    assert r.status_code == 200
+    item = next(x for x in r.json() if x["strategy"] == strategy_name)
+    assert item["drift_status"] == "no_data"
+    assert item["benchmark_run_id"] == run_id  # benchmark fields still populated
+    assert item["benchmark_win_rate"] == pytest.approx(0.62)
+
+
+def test_set_benchmark_endpoint_returns_ok(client):
+    import server.db as db_mod
+    from server.strategies import REGISTRY
+    strategy_name = next(iter(REGISTRY))
+    params = {
+        "strategy": strategy_name, "symbols": ["AAPL"],
+        "start_date": "2025-01-01", "end_date": "2025-04-30",
+        "initial_capital": 10000, "position_size_pct": 10,
+        "commission_pct": 0.1, "slippage_pct": 0.05,
+    }
+    results = {
+        "total_return_pct": 18.4, "max_drawdown_pct": -5.0,
+        "win_rate_pct": 0.62, "sharpe_ratio": 1.2,
+        "total_trades": 183, "equity_curve": [], "trades": [], "symbol_breakdown": [],
+    }
+    run_id = db_mod.save_backtest_run(params, results)
+    r = client.post(f"/api/backtest/runs/{run_id}/set-benchmark")
+    assert r.status_code == 200
+    assert r.json() == {"ok": True}
+    # Verify DB state
+    bm = db_mod.get_benchmark(strategy_name)
+    assert bm is not None
+    assert bm["id"] == run_id
+
+
+def test_set_benchmark_endpoint_404(client):
+    r = client.post("/api/backtest/runs/99999/set-benchmark")
+    assert r.status_code == 404
+
+
+def test_backtest_runs_list_includes_is_benchmark(client):
+    import server.db as db_mod
+    from server.strategies import REGISTRY
+    strategy_name = next(iter(REGISTRY))
+    params = {
+        "strategy": strategy_name, "symbols": ["AAPL"],
+        "start_date": "2025-01-01", "end_date": "2025-04-30",
+        "initial_capital": 10000, "position_size_pct": 10,
+        "commission_pct": 0.1, "slippage_pct": 0.05,
+    }
+    results = {
+        "total_return_pct": 18.4, "max_drawdown_pct": -5.0,
+        "win_rate_pct": 0.62, "sharpe_ratio": 1.2,
+        "total_trades": 183, "equity_curve": [], "trades": [], "symbol_breakdown": [],
+    }
+    db_mod.save_backtest_run(params, results)
+    r = client.get("/api/backtest/runs")
+    assert r.status_code == 200
+    runs = r.json()
+    assert len(runs) == 1
+    assert "is_benchmark" in runs[0]
+    assert runs[0]["is_benchmark"] == 0

@@ -1043,6 +1043,7 @@ class BacktestRequest(BaseModel):
     position_size_pct: float = 2.0
     commission_pct:    float = 0.1
     slippage_pct:      float = 0.05
+    strategy_params:   dict   = {}
 
     @field_validator("end_date", mode="after")
     @classmethod
@@ -1071,6 +1072,7 @@ async def run_backtest(req: BacktestRequest, request: Request):
             req.position_size_pct,
             req.commission_pct,
             req.slippage_pct,
+            req.strategy_params,
         )
     except ValueError as e:
         raise HTTPException(400, str(e))
@@ -1080,7 +1082,7 @@ async def run_backtest(req: BacktestRequest, request: Request):
 @app.get("/api/backtest/runs")
 async def list_backtest_runs(request: Request):
     _require_auth(request)
-    return db.list_backtest_runs()
+    return db.list_backtest_runs_with_benchmark()
 
 
 @app.get("/api/backtest/runs/{run_id}")
@@ -1106,3 +1108,62 @@ async def delete_backtest_run(run_id: int, request: Request):
     if not db.delete_backtest_run(run_id):
         raise HTTPException(404, f"Run {run_id} not found")
     return {"status": "ok"}
+
+
+def _compute_drift_status(live_wr: float, live_ar: float,
+                           bench_wr: float, bench_ar: float,
+                           live_trades: int) -> str:
+    if live_trades < 10:
+        return "no_data"
+    wr_div = abs(live_wr - bench_wr) / max(bench_wr, 0.001)
+    ar_div = abs(live_ar - bench_ar) / max(abs(bench_ar), 0.001)
+    worst = max(wr_div, ar_div)
+    if worst <= 0.15:
+        return "green"
+    if worst <= 0.30:
+        return "yellow"
+    return "red"
+
+
+@app.get("/api/strategy-health")
+async def strategy_health(request: Request):
+    _require_auth(request)
+    from server.strategies import REGISTRY
+    result = []
+    for name in REGISTRY:
+        live   = db.get_live_health_stats(name)
+        bench  = db.get_benchmark(name)
+        if bench is None:
+            drift_status = "no_benchmark"
+        else:
+            drift_status = _compute_drift_status(
+                live["live_win_rate"],
+                live["live_avg_return_pct"],
+                bench["win_rate_pct"],
+                bench["avg_return_pct"],
+                live["total_trades"],
+            )
+        result.append({
+            "strategy":              name,
+            "live_trades":           live["total_trades"],
+            "live_win_rate":         live["live_win_rate"],
+            "live_avg_return_pct":   live["live_avg_return_pct"],
+            "last_trade_at":         live["last_trade_at"],
+            "benchmark_run_id":      bench["id"]            if bench else None,
+            "benchmark_run_name":    bench["name"]          if bench else None,
+            "benchmark_start_date":  bench["start_date"]    if bench else None,
+            "benchmark_end_date":    bench["end_date"]      if bench else None,
+            "benchmark_total_trades":bench["total_trades"]  if bench else None,
+            "benchmark_win_rate":    bench["win_rate_pct"]  if bench else None,
+            "benchmark_avg_return_pct": bench["avg_return_pct"] if bench else None,
+            "drift_status":          drift_status,
+        })
+    return result
+
+
+@app.post("/api/backtest/runs/{run_id}/set-benchmark")
+async def set_benchmark(run_id: int, request: Request):
+    _require_auth(request)
+    if not db.set_benchmark(run_id):
+        raise HTTPException(404, f"Run {run_id} not found")
+    return {"ok": True}
