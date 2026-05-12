@@ -67,11 +67,16 @@ def run_tick():
             if not (s["active_start"] <= now_time <= s["active_end"]):
                 log.debug("strategy %s skipped — outside window %s–%s (now %s ET)",
                           s["name"], s["active_start"], s["active_end"], now_time)
+                _last_run["ran"].append({"strategy": s["name"], "skipped": "window"})
                 continue
 
         accounts = db.get_strategy_accounts(s["name"])
         if not accounts:
+            _last_run["ran"].append({"strategy": s["name"], "skipped": "no_accounts"})
             continue
+
+        # Track whether any account actually ran for this strategy this tick.
+        _strategy_ran = False
 
         for acct in accounts:
             if acct["account_type"] != active_mode:
@@ -128,9 +133,11 @@ def run_tick():
                 log.exception("strategy %s acct %d failed", s["name"], acct_id)
                 db.log_signal(s["name"], "-", "-", 0, f"error: {e}", None, "error")
                 _last_run["ran"].append({"strategy": s["name"], "error": str(e)})
+                _strategy_ran = True
                 continue
 
             _last_run["ran"].append({"strategy": s["name"], "signals": len(signals)})
+            _strategy_ran = True
 
             for sig in signals:
                 # ── risk check ──────────────────────────────────────────────
@@ -214,6 +221,11 @@ def run_tick():
                     db.log_signal(s["name"], sig.symbol, sig.side, final_qty,
                                   f"{sig.reason} | submit error: {e}", None, "error",
                                   account_id=acct_id)
+
+        # If no account ran (e.g. all stock accounts skipped because market is closed),
+        # record the strategy as market-closed so the UI can show "Waiting" vs "Idle".
+        if not _strategy_ran:
+            _last_run["ran"].append({"strategy": s["name"], "skipped": "market_closed"})
 
     # Check price alerts using quotes fetched during this tick
     try:
