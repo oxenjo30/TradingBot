@@ -37,10 +37,16 @@ def _get_token(request: Request) -> str | None:
     return request.cookies.get("tb_session")
 
 def _require_auth(request: Request):
+    # License check first — returns 402 if no valid license
+    from .license import check_stored_license
+    lic = check_stored_license()
+    if not lic["valid"]:
+        raise HTTPException(402, f"License required: {lic['reason']}")
+    # Existing auth check below (keep as-is)
     if not auth.password_is_set():
-        return  # no password set yet — allow (setup mode)
+        return
     if not auth.validate_session(_get_token(request)):
-        raise HTTPException(401, "unauthorized")
+        raise HTTPException(401, "Unauthorized")
 
 
 def _read_env_key(name: str) -> str:
@@ -205,6 +211,35 @@ def health():
         "setup_complete": auth.setup_complete(),
         "has_password": auth.password_is_set(),
     }
+
+
+# ── License ───────────────────────────────────────────────────────────────────
+
+class LicenseActivate(BaseModel):
+    key: str
+
+@app.get("/api/license/status")
+def license_status():
+    from .license import check_stored_license
+    return check_stored_license()
+
+@app.post("/api/license/activate")
+def license_activate(body: LicenseActivate):
+    from .license import verify_key, _get_seller_secret, LicenseError
+    from .db import set_license_key
+    try:
+        result = verify_key(body.key, _get_seller_secret())
+    except LicenseError as e:
+        raise HTTPException(422, str(e))
+    set_license_key(body.key)
+    return result
+
+@app.delete("/api/license")
+def license_deactivate(request: Request):
+    _require_auth(request)
+    from .db import set_license_key
+    set_license_key("")
+    return {"ok": True}
 
 
 # ── Account & market ───────────────────────────────────────────────────────────

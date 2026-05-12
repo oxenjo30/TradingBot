@@ -4,6 +4,9 @@ from cryptography.fernet import Fernet
 from unittest.mock import patch
 from fastapi.testclient import TestClient
 
+# Ensure license secret is set before any server module imports it
+os.environ.setdefault("TRADEBOT_LICENSE_SECRET", "test-secret-32-chars-seller-key!!")
+
 
 @pytest.fixture(scope="session", autouse=True)
 def fernet_key():
@@ -26,4 +29,10 @@ def client(tmp_path, monkeypatch):
     with patch("server.engine.start"), patch("server.engine.shutdown"):
         from server.main import app
         with TestClient(app, raise_server_exceptions=True) as tc:
+            # Store a valid license key so _require_auth license check passes
+            import server.license as lic_mod
+            key = lic_mod.mint_key(
+                os.environ["TRADEBOT_LICENSE_SECRET"], "ANY", 365
+            )
+            db_mod.set_license_key(key)
             yield tc
