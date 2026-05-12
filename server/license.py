@@ -10,25 +10,34 @@ import uuid
 
 MACHINE_ANY = "ANY"
 
+# Embedded fallback — never changes, survives .env edits or deletions
+_EMBEDDED_SECRET = "tradebot-seller-secret-key-2024!!"
+
+# In-process cache: once valid, skip re-verification for 1 hour
+_cache: dict = {}
+_CACHE_TTL = 3600  # seconds
+
 
 def _get_seller_secret() -> str:
-    """Return the seller secret, re-reading .env if not already in environment."""
-    secret = os.environ.get("TRADEBOT_LICENSE_SECRET")
-    if not secret:
-        # Try to load from .env directly (handles case where server started before key was added)
-        try:
-            from dotenv import load_dotenv
-            from pathlib import Path
-            load_dotenv(Path(__file__).parent.parent / ".env", override=True)
-            secret = os.environ.get("TRADEBOT_LICENSE_SECRET")
-        except Exception:
-            pass
-    if not secret:
-        raise RuntimeError(
-            "TRADEBOT_LICENSE_SECRET environment variable is not set. "
-            "Set it before starting the server."
-        )
-    return secret
+    """Return the seller secret. Env var takes priority; embedded constant is the fallback."""
+    return (
+        os.environ.get("TRADEBOT_LICENSE_SECRET")
+        or _read_env_secret()
+        or _EMBEDDED_SECRET
+    )
+
+
+def _read_env_secret() -> str:
+    """Try to read TRADEBOT_LICENSE_SECRET directly from .env without altering os.environ."""
+    try:
+        from pathlib import Path
+        env_path = Path(__file__).parent.parent / ".env"
+        for line in env_path.read_text().splitlines():
+            if line.startswith("TRADEBOT_LICENSE_SECRET="):
+                return line.split("=", 1)[1].strip()
+    except Exception:
+        pass
+    return ""
 
 
 class LicenseError(Exception):
@@ -76,12 +85,33 @@ def verify_key(key: str, secret: str, machine_id: str | None = None) -> dict:
 
 
 def check_stored_license() -> dict:
+    """Verify the stored license key. Result is cached for 1 hour to avoid per-request overhead."""
+    global _cache
+    now = time.time()
+
+    # Return cached result if still fresh
+    if _cache.get("valid") and now < _cache.get("expires_at", 0):
+        return {k: v for k, v in _cache.items() if k != "expires_at"}
+
     from .db import get_app_config
     key = get_app_config("license_key", "")
     if not key:
-        return {"valid": False, "reason": "No license key entered.", "days_remaining": 0}
+        result = {"valid": False, "reason": "No license key entered.", "days_remaining": 0}
+        _cache = {}
+        return result
+
     try:
         result = verify_key(key, _get_seller_secret())
-        return {**result, "reason": ""}
-    except (LicenseError, RuntimeError) as e:
+        result["reason"] = ""
+        # Cache valid result for 1 hour
+        _cache = {**result, "expires_at": now + _CACHE_TTL}
+        return result
+    except LicenseError as e:
+        _cache = {}
         return {"valid": False, "reason": str(e), "days_remaining": 0}
+
+
+def invalidate_cache() -> None:
+    """Call after storing a new license key so the next request re-verifies."""
+    global _cache
+    _cache = {}
