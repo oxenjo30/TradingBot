@@ -269,8 +269,8 @@ function perfChartConfig(timestamps, equities, baseValue) {
     xaxis: { type: 'datetime', labels: { style: { colors: '#64748B', fontSize: '11px' } }, axisBorder: { show: false }, axisTicks: { show: false } },
     yaxis: { labels: { style: { colors: '#64748B', fontSize: '11px' }, formatter: v => '$' + (v/1000).toFixed(0) + 'k' } },
     grid: { borderColor: '#1E2D45', strokeDashArray: 3 },
-    theme: { mode: 'dark' },
-    tooltip: { theme: 'dark', x: { format: 'HH:mm MMM dd' } }
+    theme: { mode: _chartTheme() },
+    tooltip: { theme: _chartTheme(), x: { format: 'HH:mm MMM dd' } }
   };
 }
 
@@ -283,8 +283,8 @@ function donutConfig(labels, series) {
     dataLabels: { enabled: false },
     legend: { position: 'bottom', labels: { colors: '#64748B' }, fontSize: '11px' },
     plotOptions: { pie: { donut: { size: '62%' } } },
-    theme: { mode: 'dark' },
-    tooltip: { theme: 'dark' }
+    theme: { mode: _chartTheme() },
+    tooltip: { theme: _chartTheme() }
   };
 }
 
@@ -302,7 +302,7 @@ function radialConfig(pct, label) {
     }},
     colors: [pct >= 0 ? '#10B981' : '#EF4444'],
     labels: [label],
-    theme: { mode: 'dark' }
+    theme: { mode: _chartTheme() }
   };
 }
 
@@ -1030,6 +1030,43 @@ async function initDashboard() {
 
 // ─────────────────────────────────────────
 // ── Logout ──────────────────────────────────────────────────────────────────
+// ── Theme toggle ─────────────────────────────────────────────────────────────
+(function initTheme() {
+  const saved = localStorage.getItem('tb_theme') || 'dark';
+  document.documentElement.setAttribute('data-theme', saved);
+
+  // Inject toggle button into every sidebar footer, after the logout button
+  document.addEventListener('DOMContentLoaded', () => {
+    const footer = document.querySelector('.sidebar-footer');
+    if (!footer) return;
+
+    const btn = document.createElement('button');
+    btn.className = 'theme-toggle-btn';
+    btn.id = 'theme-toggle';
+    _updateThemeBtn(btn, saved);
+    btn.addEventListener('click', () => {
+      const current = document.documentElement.getAttribute('data-theme') || 'dark';
+      const next = current === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      localStorage.setItem('tb_theme', next);
+      _updateThemeBtn(btn, next);
+    });
+    footer.appendChild(btn);
+  });
+})();
+
+function _chartTheme() {
+  return document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+}
+
+function _updateThemeBtn(btn, theme) {
+  if (theme === 'light') {
+    btn.innerHTML = `<svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg> Dark Mode`;
+  } else {
+    btn.innerHTML = `<svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg> Light Mode`;
+  }
+}
+
 async function doLogout() {
   try { await fetch('/api/auth/logout', { method: 'POST' }); } catch {}
   window.location.href = '/static/login.html';
@@ -1853,8 +1890,8 @@ async function initPerformance() {
           yaxis: { labels: { style: { colors: '#64748B', fontSize: '11px' } }, min: 0, forceNiceScale: true },
           grid: { borderColor: '#1E2D45', strokeDashArray: 3 },
           legend: { labels: { colors: '#E6EBF5' } },
-          theme: { mode: 'dark' },
-          tooltip: { theme: 'dark' }
+          theme: { mode: _chartTheme() },
+          tooltip: { theme: _chartTheme() }
         });
       }
 
@@ -3091,16 +3128,19 @@ async function initSettings() {
 
 let _btCurrentRunId = null;
 let _btEquityChart  = null;
+let _btStrategies   = [];
 
 async function initBacktesting() {
   // Populate strategy dropdown from /api/strategies
   try {
-    const strats = await api('/api/strategies');
+    _btStrategies = await api('/api/strategies');
     const sel = document.getElementById('bt-strategy');
-    sel.innerHTML = strats
+    sel.innerHTML = _btStrategies
       .filter(s => !s.hidden)
       .map(s => `<option value="${s.name}">${s.label}</option>`)
       .join('');
+    sel.addEventListener('change', () => renderAdvancedParams(sel.value));
+    renderAdvancedParams(sel.value);
   } catch (e) {
     console.error('initBacktesting: failed to load strategies', e);
   }
@@ -3111,6 +3151,17 @@ async function initBacktesting() {
   document.getElementById('bt-end').value   = today;
   document.getElementById('bt-start').value = yearAgo;
 
+  // Symbol field: uppercase and clean on blur
+  const symField = document.getElementById('bt-symbols');
+  symField?.addEventListener('blur', () => {
+    const cleaned = symField.value
+      .split(',')
+      .map(s => s.trim().toUpperCase())
+      .filter(Boolean)
+      .join(', ');
+    if (cleaned) symField.value = cleaned;
+  });
+
   // Load history
   try {
     const runs = await api('/api/backtest/runs');
@@ -3118,6 +3169,57 @@ async function initBacktesting() {
   } catch (e) {
     console.error('initBacktesting: failed to load history', e);
   }
+}
+
+function renderAdvancedParams(stratName) {
+  const grid = document.getElementById('bt-params-grid');
+  const adv  = document.getElementById('bt-advanced');
+  if (!grid || !adv) return;
+  const strat = _btStrategies.find(s => s.name === stratName);
+  const skipKeys = new Set(['symbols', 'use_scanner', 'scanner_min_price', 'scanner_max_price',
+    'scanner_top_actives', 'scanner_top_gainers', 'notional', 'qty']);
+  const schema = (strat?.params_schema || []).filter(p => !skipKeys.has(p.key) && (p.type === 'number' || p.type === 'bool'));
+  if (!schema.length) {
+    adv.style.display = 'none';
+    grid.innerHTML = '';
+    return;
+  }
+  adv.style.display = '';
+  const defaults = strat?.default_params || {};
+  grid.innerHTML = schema.map(p => {
+    if (p.type === 'bool') {
+      const checked = defaults[p.key] ? 'checked' : '';
+      return `<div class="form-group" style="display:flex;flex-direction:column;justify-content:flex-end;">
+        <label class="form-label" title="${p.hint || ''}">${p.label}</label>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;padding:.45rem 0;">
+          <input type="checkbox" id="bt-param-${p.key}" ${checked} style="width:16px;height:16px;accent-color:#3B82F6;">
+          <span style="font-size:12px;color:#94A3B8;">Enabled</span>
+        </label>
+      </div>`;
+    }
+    const val = defaults[p.key] ?? '';
+    const min = p.min != null ? `min="${p.min}"` : '';
+    const max = p.max != null ? `max="${p.max}"` : '';
+    return `<div class="form-group">
+      <label class="form-label" title="${p.hint || ''}">${p.label}</label>
+      <input id="bt-param-${p.key}" type="number" class="input-field" value="${val}" ${min} ${max} step="any">
+    </div>`;
+  }).join('');
+}
+
+function collectAdvancedParams() {
+  const grid = document.getElementById('bt-params-grid');
+  if (!grid) return {};
+  const params = {};
+  grid.querySelectorAll('[id^="bt-param-"]').forEach(el => {
+    const key = el.id.replace('bt-param-', '');
+    if (el.type === 'checkbox') {
+      params[key] = el.checked;
+    } else if (el.value !== '') {
+      params[key] = parseFloat(el.value);
+    }
+  });
+  return params;
 }
 
 let _btLastData = null;
@@ -3146,6 +3248,7 @@ async function runBacktest() {
     position_size_pct: parseFloat(document.getElementById('bt-possize').value),
     commission_pct:    parseFloat(document.getElementById('bt-commission').value),
     slippage_pct:      parseFloat(document.getElementById('bt-slippage').value),
+    strategy_params:   collectAdvancedParams(),
   };
 
   btn.disabled = true;
@@ -3213,14 +3316,35 @@ function renderResults(data) {
     stroke: { width: 2, curve: 'smooth' },
     colors: ['#3B82F6'],
     grid:   { borderColor: 'rgba(30,45,69,.6)', strokeDashArray: 3 },
-    tooltip: { theme: 'dark', y: { formatter: v => '$' + v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) } },
-    theme:  { mode: 'dark' },
+    tooltip: { theme: _chartTheme(), y: { formatter: v => '$' + v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) } },
+    theme:  { mode: _chartTheme() },
     dataLabels: { enabled: false },
   });
   _btEquityChart.render();
 
   // Reset name input
   document.getElementById('bt-run-name').value = data.name || '';
+
+  // Per-symbol breakdown
+  const breakdownCard = document.getElementById('bt-breakdown-card');
+  const breakdownBody = document.getElementById('bt-breakdown-body');
+  const breakdown = data.symbol_breakdown || [];
+  if (breakdown.length > 1 && breakdownCard && breakdownBody) {
+    breakdownCard.style.display = '';
+    breakdownBody.innerHTML = breakdown.map(b => {
+      const pnlColor = b.total_pnl >= 0 ? 'var(--green)' : 'var(--red)';
+      const pnlSign  = b.total_pnl >= 0 ? '+' : '';
+      return `<tr>
+        <td style="font-weight:600;">${b.symbol}</td>
+        <td>${b.trades}</td>
+        <td>${b.wins}</td>
+        <td>${fmt.pct(b.win_rate_pct)}</td>
+        <td style="color:${pnlColor};">${pnlSign}${fmt.usd(Math.abs(b.total_pnl))}</td>
+      </tr>`;
+    }).join('');
+  } else if (breakdownCard) {
+    breakdownCard.style.display = 'none';
+  }
 
   // Trades table
   const tbody = document.getElementById('bt-trades-body');
@@ -3250,13 +3374,14 @@ function renderHistory(runs) {
     return;
   }
   el.innerHTML = runs.map(r => {
-    const syms  = Array.isArray(r.symbols) ? r.symbols.join(', ') : r.symbols;
-    const label = r.name || fmt.time(r.created_at);
+    const syms     = Array.isArray(r.symbols) ? r.symbols.join(', ') : r.symbols;
+    const label    = r.name || fmt.time(r.created_at);
     const retColor = r.total_return_pct >= 0 ? 'var(--green)' : 'var(--red)';
+    const dateRange = (r.start_date && r.end_date) ? ` &middot; ${r.start_date} &rarr; ${r.end_date}` : '';
     return `<div style="display:flex;align-items:center;gap:10px;padding:.55rem 0;border-bottom:1px solid rgba(30,45,69,.7);">
       <div style="flex:1;min-width:0;">
         <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${label}</div>
-        <div class="text-muted" style="font-size:11px;">${r.strategy} &middot; ${syms}</div>
+        <div class="text-muted" style="font-size:11px;">${r.strategy} &middot; ${syms}${dateRange}</div>
       </div>
       <div style="font-size:13px;color:${retColor};min-width:52px;text-align:right;">${fmt.pct(r.total_return_pct)}</div>
       <div style="font-size:12px;color:#EF4444;min-width:52px;text-align:right;">${fmt.pct(r.max_drawdown_pct)}</div>
