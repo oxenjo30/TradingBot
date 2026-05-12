@@ -473,6 +473,23 @@ class BrokerCredentialsTest(BaseModel):
     account_type: Literal["paper", "live"] = "paper"
     broker: str = "alpaca"
 
+@app.post("/api/setup/test-credentials")
+def setup_test_credentials(body: BrokerCredentialsTest):
+    """Validate broker credentials during setup (no auth required — setup runs before login)."""
+    try:
+        from .broker_factory import get_account_client
+        client = get_account_client(
+            broker=body.broker,
+            api_key=body.api_key,
+            api_secret=body.api_secret,
+            paper=(body.account_type == "paper"),
+        )
+        summary = client.get_account_summary()
+        return {"ok": True, "status": summary.get("status", "active"),
+                "equity": summary.get("equity", 0)}
+    except Exception as e:
+        raise HTTPException(400, f"Connection failed: {e}")
+
 @app.post("/api/broker-accounts/test-credentials")
 def test_broker_credentials(body: BrokerCredentialsTest, request: Request):
     """Validate API credentials without saving them."""
