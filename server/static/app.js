@@ -1003,63 +1003,91 @@ async function initBots() {
 async function initPositions() {
   initClockChip(document.getElementById('market-chip'));
 
+  // Account selector for positions/orders
+  let posAccountId = null;
+  let moAccountId  = null;
+
+  async function buildAccountSelectors() {
+    try {
+      const accounts = await api('/api/broker-accounts', { key: 'pos-acct-list' });
+      if (!accounts || accounts.length < 2) return;
+
+      function makeSelect(wrapId, onChange) {
+        const wrap = document.getElementById(wrapId);
+        if (!wrap) return;
+        const sel = document.createElement('select');
+        sel.className = 'form-input';
+        sel.style.cssText = 'font-size:12px;padding:.3rem .6rem;height:auto;';
+        const all = document.createElement('option');
+        all.value = ''; all.textContent = 'All accounts';
+        sel.appendChild(all);
+        accounts.forEach(a => {
+          const opt = document.createElement('option');
+          opt.value = a.id; opt.textContent = a.label || `Account ${a.id}`;
+          sel.appendChild(opt);
+        });
+        sel.addEventListener('change', () => onChange(sel.value ? parseInt(sel.value) : null));
+        wrap.appendChild(sel);
+      }
+
+      makeSelect('pos-account-wrap', id => { posAccountId = id; fetchPositions(); fetchOrders(); });
+      makeSelect('mo-account-wrap',  id => { moAccountId  = id; });
+    } catch {}
+  }
+  buildAccountSelectors();
+
   async function fetchPositions() {
     const tbody = document.getElementById('pos-body');
+    const qs = posAccountId ? `?account_id=${posAccountId}` : '';
     try {
-      const positions = await api('/api/positions', { key: 'pos-positions' });
+      const positions = await api(`/api/positions${qs}`, { key: 'pos-positions' });
       tbody.innerHTML = '';
       if (!positions.length) {
-        const tr = document.createElement('tr');
-        const td = document.createElement('td');
-        td.colSpan = 7; td.className = 'state-empty'; td.textContent = 'No open positions.';
-        tr.appendChild(td); tbody.appendChild(tr); return;
+        tbody.innerHTML = '<tr><td colspan="7" class="state-empty">No open positions.</td></tr>';
+        return;
       }
       positions.forEach(p => {
         const tr = document.createElement('tr');
-        const pnl = p.unrealized_pl || 0;
+        const pnl = parseFloat(p.unrealized_pl) || 0;
         const vals = [
           p.symbol,
           p.side,
-          (p.qty || 0).toFixed(2),
+          (parseFloat(p.qty) || 0).toFixed(4).replace(/\.?0+$/, ''),
           fmt.usd(p.avg_entry_price),
           fmt.usd(p.current_price),
           fmt.usd(p.market_value),
-          '' // P&L with glow — set below
+          ''
         ];
         vals.forEach((v, i) => {
           const td = document.createElement('td');
           if (i === 6) {
-            td.textContent = fmt.usdSigned(pnl, '—');
+            td.textContent = fmt.usdSigned(pnl, '&mdash;');
             td.className = 'text-tabular ' + (pnl >= 0 ? 'glow-green' : 'glow-red');
-          } else {
-            td.textContent = v;
-          }
+          } else { td.textContent = v; }
           tr.appendChild(td);
         });
         tbody.appendChild(tr);
       });
     } catch (e) {
       if (e.name === 'AbortError') return;
-      tbody.innerHTML = '<tr><td colspan="7" class="state-error">Failed to load — retrying in 30s</td></tr>';
-      throw e;
+      tbody.innerHTML = '<tr><td colspan="7" class="state-error">Failed to load &mdash; retrying in 30s</td></tr>';
     }
   }
 
   let currentStatus = 'all';
   async function fetchOrders() {
     const tbody = document.getElementById('orders-body');
+    const qs = posAccountId ? `&account_id=${posAccountId}` : '';
     try {
-      const orders = await api(`/api/orders?status=${currentStatus}&limit=50`, { key: 'pos-orders' });
+      const orders = await api(`/api/orders?status=${currentStatus}&limit=50${qs}`, { key: 'pos-orders' });
       tbody.innerHTML = '';
       if (!orders.length) {
-        const tr = document.createElement('tr');
-        const td = document.createElement('td');
-        td.colSpan = 6; td.className = 'state-empty'; td.textContent = 'No orders.';
-        tr.appendChild(td); tbody.appendChild(tr); return;
+        tbody.innerHTML = '<tr><td colspan="6" class="state-empty">No orders.</td></tr>';
+        return;
       }
       orders.forEach(o => {
         const tr = document.createElement('tr');
-        const fields = [fmt.time(o.submitted_at), o.symbol, '', (o.qty || o.filled_qty || 0).toFixed(2), o.status, fmt.time(o.filled_at)];
+        const fields = [fmt.time(o.submitted_at), o.symbol, '', (o.qty || o.filled_qty || 0), o.status, fmt.time(o.filled_at)];
         fields.forEach((v, i) => {
           const td = document.createElement('td');
           if (i === 2) {
@@ -1074,8 +1102,7 @@ async function initPositions() {
       });
     } catch (e) {
       if (e.name === 'AbortError') return;
-      tbody.innerHTML = '<tr><td colspan="6" class="state-error">Failed to load — retrying in 30s</td></tr>';
-      throw e;
+      tbody.innerHTML = '<tr><td colspan="6" class="state-error">Failed to load &mdash; retrying in 30s</td></tr>';
     }
   }
 
@@ -1085,6 +1112,113 @@ async function initPositions() {
       btn.classList.add('active');
       currentStatus = btn.dataset.status;
       fetchOrders();
+    });
+  });
+
+  // Positions CSV export
+  const exportPosBtn = document.getElementById('export-positions-btn');
+  if (exportPosBtn) {
+    exportPosBtn.addEventListener('click', () => {
+      const qs = posAccountId ? `?account_id=${posAccountId}` : '';
+      const a = document.createElement('a');
+      a.href = `/api/export/positions${qs}`;
+      a.download = 'tradebot_positions.csv';
+      a.click();
+    });
+  }
+
+  // ── Manual order ticket ──────────────────────────────────────────────
+  let moSide = 'buy';
+  const buyBtn  = document.getElementById('mo-buy-btn');
+  const sellBtn = document.getElementById('mo-sell-btn');
+  const submitBtn = document.getElementById('mo-submit');
+  const modeQtyBtn = document.getElementById('mo-mode-qty');
+  const modeNotionalBtn = document.getElementById('mo-mode-notional');
+  const qtyLabel = document.getElementById('mo-qty-label');
+  const symInput = document.getElementById('mo-sym-input');
+  const qtyInput = document.getElementById('mo-qty-input');
+  const resultEl = document.getElementById('mo-result');
+
+  function setMoSide(side) {
+    moSide = side;
+    if (side === 'buy') {
+      buyBtn.style.cssText  = 'background:rgba(16,185,129,.15);color:#10B981;border-color:rgba(16,185,129,.3);font-weight:600;';
+      sellBtn.style.cssText = 'background:transparent;color:#64748B;border-color:#1E2D45;font-weight:600;';
+      submitBtn.style.cssText = 'width:100%;background:#10B981;color:#fff;border-color:#10B981;font-weight:600;padding:.65rem;';
+      submitBtn.textContent = 'Place Buy Order';
+    } else {
+      sellBtn.style.cssText  = 'background:rgba(239,68,68,.15);color:#EF4444;border-color:rgba(239,68,68,.3);font-weight:600;';
+      buyBtn.style.cssText   = 'background:transparent;color:#64748B;border-color:#1E2D45;font-weight:600;';
+      submitBtn.style.cssText = 'width:100%;background:#EF4444;color:#fff;border-color:#EF4444;font-weight:600;padding:.65rem;';
+      submitBtn.textContent = 'Place Sell Order';
+    }
+  }
+
+  buyBtn?.addEventListener('click',  () => setMoSide('buy'));
+  sellBtn?.addEventListener('click', () => setMoSide('sell'));
+
+  let modeIsQty = true;
+  function setMoMode(isQty) {
+    modeIsQty = isQty;
+    if (isQty) {
+      modeQtyBtn.classList.add('active');
+      modeNotionalBtn.classList.remove('active');
+      qtyLabel.textContent = 'Number of Shares';
+      qtyInput.placeholder = '0';
+      qtyInput.step = 'any';
+    } else {
+      modeNotionalBtn.classList.add('active');
+      modeQtyBtn.classList.remove('active');
+      qtyLabel.textContent = 'USD Value';
+      qtyInput.placeholder = '0.00';
+      qtyInput.step = '0.01';
+    }
+  }
+  modeQtyBtn?.addEventListener('click',      () => setMoMode(true));
+  modeNotionalBtn?.addEventListener('click', () => setMoMode(false));
+
+  symInput?.addEventListener('input', () => {
+    symInput.value = symInput.value.toUpperCase();
+  });
+
+  submitBtn?.addEventListener('click', () => {
+    const sym    = symInput?.value.trim().toUpperCase();
+    const rawVal = qtyInput?.value.trim();
+    if (!sym || !rawVal) { resultEl.textContent = 'Enter a symbol and amount.'; resultEl.className = 'mo-result err'; return; }
+
+    const qty      = modeIsQty ? parseFloat(rawVal) : null;
+    const notional = !modeIsQty ? parseFloat(rawVal) : null;
+    const unitLabel = modeIsQty ? 'shares' : 'USD';
+    const sideLabel = moSide === 'buy' ? 'BUY' : 'SELL';
+
+    const bodyEl  = document.getElementById('modal-mo-body');
+    const titleEl = document.getElementById('modal-mo-title');
+    const confBtn = document.getElementById('modal-mo-confirm-btn');
+    if (bodyEl) bodyEl.textContent = `${sideLabel} ${rawVal} ${unitLabel} of ${sym} at market price.`;
+    if (titleEl) titleEl.textContent = `Confirm ${sideLabel} Order`;
+    if (confBtn) {
+      confBtn.style.background = moSide === 'buy' ? 'var(--green)' : 'var(--red)';
+      confBtn.textContent = moSide === 'buy' ? 'Buy Now' : 'Sell Now';
+    }
+
+    openModal(document.getElementById('modal-mo-confirm'), async () => {
+      submitBtn.disabled = true;
+      resultEl.textContent = 'Submitting&hellip;';
+      resultEl.className = 'mo-result';
+      try {
+        const body = { symbol: sym, side: moSide, account_id: moAccountId ?? null };
+        if (qty)      body.qty      = qty;
+        if (notional) body.notional = notional;
+        const res = await api('/api/orders', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+        resultEl.textContent = `✓ Order placed: ${(res.id || '').slice(0,8) || 'OK'}`;
+        resultEl.className = 'mo-result ok';
+        setTimeout(() => fetchOrders(), 1000);
+      } catch (err) {
+        resultEl.textContent = `✕ ${err.message}`;
+        resultEl.className = 'mo-result err';
+      } finally {
+        submitBtn.disabled = false;
+      }
     });
   });
 

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Dashboard â€&rdquo; TradeBot</title>
+  <title>Dashboard &rdquo;&rdquo; TradeBot</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
@@ -12,7 +12,7 @@
 </head>
 <body data-page="index">
 
-<!-- â&rdquo;€â&rdquo;€ Sidebar â&rdquo;€â&rdquo;€ -->
+<!-- -€-€ Sidebar -€-€ -->
 <aside class="sidebar">
   <div class="logo">
     <div class="logo-mark icon-blue">
@@ -74,10 +74,10 @@
   </nav>
 
   <div class="sidebar-footer">
-    <div class="paper-card">
+    <div class="paper-card" id="mode-card">
       <p class="paper-label">Paper Trading Mode</p>
       <p style="font-size:12px;color:#E6EBF5;margin-top:2px;">Safe sandbox environment</p>
-      <a href="#" class="go-live">Go Live â†&rsquo;</a>
+      <a href="/static/apikeys.html" class="go-live">Go Live †&rsquo;</a>
     </div>
     <button class="nav-item logout-btn" onclick="doLogout()">
       <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
@@ -86,7 +86,7 @@
   </div>
 </aside>
 
-<!-- â&rdquo;€â&rdquo;€ Main â&rdquo;€â&rdquo;€ -->
+<!-- -€-€ Main -€-€ -->
 <div class="main">
 
   <!-- Header -->
@@ -97,13 +97,13 @@
     </div>
     <div class="search-bar">
       <svg width="14" height="14" fill="none" stroke="#64748B" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-      <span class="search-text">Searchâ€¦</span>
+      <span class="search-text">Search&hellip;</span>
     </div>
     <div class="bell-wrap">
       <svg width="18" height="18" fill="none" stroke="#64748B" stroke-width="1.8" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
       
     </div>
-    <div id="market-chip" class="market-chip">US Equitiesâ€¦</div>
+    <div id="market-chip" class="market-chip">US Equities&hellip;</div>
     <span id="paper-badge" class="plan-badge hidden">Paper Mode</span>
     <div class="flex items-center gap-2">
       <div class="avatar">JR</div>
@@ -129,7 +129,7 @@
           </div>
           <span class="text-muted truncate" style="font-size:12px;">Total Balance</span>
         </div>
-        <div id="balance-val" class="text-tabular truncate" style="font-size:20px;font-weight:700;">â€&rdquo;</div>
+        <div id="balance-val" class="text-tabular truncate" style="font-size:20px;font-weight:700;">&rdquo;&rdquo;</div>
         <div id="balance-sub" class="text-muted truncate" style="font-size:11px;margin-top:2px;">Equity</div>
         <div id="spark-balance" style="margin-top:6px;"></div>
         <div class="text-muted" style="font-size:10px;margin-top:2px;">Signal activity trend</div>
@@ -143,7 +143,7 @@
           </div>
           <span class="text-muted truncate" style="font-size:12px;">Daily P&amp;L</span>
         </div>
-        <div id="daypnl-val" class="text-tabular truncate" style="font-size:20px;font-weight:700;">â€&rdquo;</div>
+        <div id="daypnl-val" class="text-tabular truncate" style="font-size:20px;font-weight:700;">&rdquo;&rdquo;</div>
         <div id="daypnl-sub" class="text-muted truncate" style="font-size:11px;margin-top:2px;">Today</div>
         <div id="spark-daypnl" style="margin-top:6px;"></div>
         <div class="text-muted" style="font-size:10px;margin-top:2px;">Signal activity trend</div>
@@ -157,7 +157,7 @@
           </div>
           <span class="text-muted truncate" style="font-size:12px;">Fill Rate</span>
         </div>
-        <div id="fillrate-val" class="text-tabular truncate" style="font-size:20px;font-weight:700;">â€&rdquo;</div>
+        <div id="fillrate-val" class="text-tabular truncate" style="font-size:20px;font-weight:700;">&rdquo;&rdquo;</div>
         <div class="text-muted truncate" style="font-size:11px;margin-top:2px;">Signals filled Ã· resolved</div>
         <div id="spark-fillrate" style="margin-top:6px;"></div>
         <div class="text-muted" style="font-size:10px;margin-top:2px;">Signal activity trend</div>
@@ -171,7 +171,7 @@
           </div>
           <span class="text-muted truncate" style="font-size:12px;">Active Bots</span>
         </div>
-        <div id="bots-val" class="text-tabular truncate" style="font-size:20px;font-weight:700;">â€&rdquo;</div>
+        <div id="bots-val" class="text-tabular truncate" style="font-size:20px;font-weight:700;">&rdquo;&rdquo;</div>
         <div class="text-muted truncate" style="font-size:11px;margin-top:2px;">Strategies enabled</div>
         <div id="spark-bots" style="margin-top:6px;"></div>
         <div class="text-muted" style="font-size:10px;margin-top:2px;">Signal activity trend</div>
@@ -185,7 +185,7 @@
           </div>
           <span class="text-muted truncate" style="font-size:12px;">Unrealized P&amp;L</span>
         </div>
-        <div id="upnl-val" class="text-tabular truncate" style="font-size:20px;font-weight:700;">â€&rdquo;</div>
+        <div id="upnl-val" class="text-tabular truncate" style="font-size:20px;font-weight:700;">&rdquo;&rdquo;</div>
         <div class="text-muted truncate" style="font-size:11px;margin-top:2px;">Open positions</div>
         <div id="spark-upnl" style="margin-top:6px;"></div>
         <div class="text-muted" style="font-size:10px;margin-top:2px;">Signal activity trend</div>
@@ -199,7 +199,7 @@
           </div>
           <span class="text-muted truncate" style="font-size:12px;">Open Positions</span>
         </div>
-        <div id="openpos-val" class="text-tabular truncate" style="font-size:20px;font-weight:700;">â€&rdquo;</div>
+        <div id="openpos-val" class="text-tabular truncate" style="font-size:20px;font-weight:700;">&rdquo;&rdquo;</div>
         <div class="text-muted truncate" style="font-size:11px;margin-top:2px;">Current holdings</div>
         <div id="spark-openpos" style="margin-top:6px;"></div>
         <div class="text-muted" style="font-size:10px;margin-top:2px;">Signal activity trend</div>
@@ -214,7 +214,7 @@
         <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
           <div>
             <div style="font-size:13px;font-weight:600;">Portfolio Performance</div>
-            <div id="perf-headline" class="text-tabular glow-green" style="font-size:22px;font-weight:700;margin-top:2px;">â€&rdquo;</div>
+            <div id="perf-headline" class="text-tabular glow-green" style="font-size:22px;font-weight:700;margin-top:2px;">&rdquo;&rdquo;</div>
           </div>
           <div class="range-tabs">
             <button class="range-tab active" data-period="1D" data-timeframe="5Min">1H</button>
@@ -254,9 +254,9 @@
         <div style="font-size:13px;font-weight:600;margin-bottom:.5rem;">P&amp;L Breakdown</div>
         <div id="radial-chart" style="min-height:160px;"></div>
         <div style="display:flex;flex-direction:column;gap:.4rem;margin-top:.5rem;">
-          <div class="flex justify-between"><span class="text-muted" style="font-size:12px;">Daily P&amp;L</span><span id="pnl-daypnl" class="text-tabular" style="font-size:12px;font-weight:600;">â€&rdquo;</span></div>
-          <div class="flex justify-between"><span class="text-muted" style="font-size:12px;">Unrealized P&amp;L</span><span id="pnl-upnl" class="text-tabular" style="font-size:12px;font-weight:600;">â€&rdquo;</span></div>
-          <div class="flex justify-between"><span class="text-muted" style="font-size:12px;">Open Positions</span><span id="pnl-openpos" class="text-tabular" style="font-size:12px;font-weight:600;">â€&rdquo;</span></div>
+          <div class="flex justify-between"><span class="text-muted" style="font-size:12px;">Daily P&amp;L</span><span id="pnl-daypnl" class="text-tabular" style="font-size:12px;font-weight:600;">&rdquo;&rdquo;</span></div>
+          <div class="flex justify-between"><span class="text-muted" style="font-size:12px;">Unrealized P&amp;L</span><span id="pnl-upnl" class="text-tabular" style="font-size:12px;font-weight:600;">&rdquo;&rdquo;</span></div>
+          <div class="flex justify-between"><span class="text-muted" style="font-size:12px;">Open Positions</span><span id="pnl-openpos" class="text-tabular" style="font-size:12px;font-weight:600;">&rdquo;&rdquo;</span></div>
         </div>
       </div>
 
@@ -270,7 +270,7 @@
               <th>Time</th><th>Symbol</th><th>Side</th><th>Size</th><th>P&amp;L</th>
             </tr></thead>
             <tbody id="trades-body">
-              <tr><td colspan="5" class="state-empty">Loadingâ€¦</td></tr>
+              <tr><td colspan="5" class="state-empty">Loading&hellip;</td></tr>
             </tbody>
           </table>
         </div>
@@ -279,11 +279,11 @@
 
     <!-- Row 4: System Bar -->
     <div class="sys-bar">
-      <div class="sys-item"><div id="sys-exchange-dot" class="sys-dot off"></div><span>Exchange: <span id="sys-exchange">â€&rdquo;</span></span></div>
-      <div class="sys-item"><div id="sys-api-dot" class="sys-dot off"></div><span>API: <span id="sys-api">â€&rdquo;</span></span></div>
-      <div class="sys-item"><svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><span>Server: <span id="sys-time">â€&rdquo;</span></span></div>
-      <div class="sys-item"><svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-.73-9.27"/></svg><span>Last Engine Run: <span id="sys-lastrun">â€&rdquo;</span></span></div>
-      <div class="sys-item"><svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg><span>API Response: <span id="sys-latency">â€&rdquo;</span></span></div>
+      <div class="sys-item"><div id="sys-exchange-dot" class="sys-dot off"></div><span>Exchange: <span id="sys-exchange">&rdquo;&rdquo;</span></span></div>
+      <div class="sys-item"><div id="sys-api-dot" class="sys-dot off"></div><span>API: <span id="sys-api">&rdquo;&rdquo;</span></span></div>
+      <div class="sys-item"><svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><span>Server: <span id="sys-time">&rdquo;&rdquo;</span></span></div>
+      <div class="sys-item"><svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-.73-9.27"/></svg><span>Last Engine Run: <span id="sys-lastrun">&rdquo;&rdquo;</span></span></div>
+      <div class="sys-item"><svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg><span>API Response: <span id="sys-latency">&rdquo;&rdquo;</span></span></div>
     </div>
 
   </main>

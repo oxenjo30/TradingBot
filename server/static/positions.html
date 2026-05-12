@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Positions &amp; Orders â€&rdquo; TradeBot</title>
+  <title>Positions &amp; Orders &mdash; TradeBot</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="icon" href="data:,">
@@ -11,7 +11,7 @@
 </head>
 <body data-page="positions">
 
-<!-- â&rdquo;€â&rdquo;€ Sidebar â&rdquo;€â&rdquo;€ -->
+<!-- Sidebar -->
 <aside class="sidebar">
   <div class="logo">
     <div class="logo-mark icon-blue">
@@ -73,10 +73,10 @@
   </nav>
 
   <div class="sidebar-footer">
-    <div class="paper-card">
+    <div class="paper-card" id="mode-card">
       <p class="paper-label">Paper Trading Mode</p>
       <p style="font-size:12px;color:#E6EBF5;margin-top:2px;">Safe sandbox environment</p>
-      <a href="#" class="go-live">Go Live â†&rsquo;</a>
+      <a href="/static/apikeys.html" class="go-live">Go Live &rarr;</a>
     </div>
     <button class="nav-item logout-btn" onclick="doLogout()">
       <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
@@ -85,24 +85,24 @@
   </div>
 </aside>
 
-<!-- â&rdquo;€â&rdquo;€ Page wrapper â&rdquo;€â&rdquo;€ -->
+<!-- Page wrapper -->
 <div class="main">
 
-  <!-- â&rdquo;€â&rdquo;€ Header â&rdquo;€â&rdquo;€ -->
+  <!-- Header -->
   <header class="page-header">
     <div class="title-wrap flex-1 min-w-0">
       <div class="page-title">Positions &amp; Orders</div>
-      <div class="page-sub">Open holdings and order history</div>
+      <div class="page-sub">Open holdings, order history &amp; manual trading</div>
     </div>
-    <div class="search-bar">
+    <div class="search-bar" id="global-search-bar" style="cursor:pointer;">
       <svg width="14" height="14" fill="none" stroke="#64748B" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-      <span class="search-text">Searchâ€¦</span>
+      <span class="search-text">Search&hellip;</span>
     </div>
-    <div class="bell-wrap">
+    <div class="bell-wrap" id="bell-btn" style="cursor:pointer;position:relative;">
       <svg width="18" height="18" fill="none" stroke="#64748B" stroke-width="1.8" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-      
+      <span id="bell-badge" class="hidden" style="position:absolute;top:2px;right:2px;width:8px;height:8px;background:#EF4444;border-radius:50%;"></span>
     </div>
-    <div id="market-chip" class="market-chip">US Equitiesâ€¦</div>
+    <div id="market-chip" class="market-chip">US Equities&hellip;</div>
     <span id="paper-badge" class="plan-badge hidden">Paper Mode</span>
     <div class="flex items-center gap-2">
       <div class="avatar">JR</div>
@@ -114,35 +114,102 @@
     </div>
   </header>
 
-  <!-- â&rdquo;€â&rdquo;€ Main â&rdquo;€â&rdquo;€ -->
-  <main class="content flex flex-col gap-4">
+  <!-- Main content: two-column layout -->
+  <main class="content" style="display:grid;grid-template-columns:1fr 300px;gap:1rem;align-items:start;">
 
-    <div class="card">
-      <div style="font-size:14px;font-weight:600;margin-bottom:1rem;">Open Positions</div>
-      <div id="positions-wrap">
-        <table class="dtable">
-          <colgroup><col style="width:70px"><col style="width:50px"><col><col><col><col><col style="width:90px"></colgroup>
-          <thead><tr><th>Symbol</th><th>Side</th><th>Qty</th><th>Avg Entry</th><th>Price</th><th>Market Value</th><th>Unrealized P&amp;L</th></tr></thead>
-          <tbody id="pos-body"><tr><td colspan="7" class="state-empty">Loadingâ€¦</td></tr></tbody>
-        </table>
-      </div>
-    </div>
+    <!-- Left column: Positions + Orders -->
+    <div style="display:flex;flex-direction:column;gap:1rem;min-width:0;">
 
-    <div class="card">
-      <div class="flex items-center justify-between mb-3">
-        <div style="font-size:14px;font-weight:600;">Orders</div>
-        <div class="flex gap-2">
-          <button class="range-tab active" data-status="all">All</button>
-          <button class="range-tab" data-status="open">Open</button>
-          <button class="range-tab" data-status="closed">Closed</button>
+      <!-- Open Positions card -->
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem;">
+          <div style="font-size:14px;font-weight:600;">Open Positions</div>
+          <div id="pos-account-wrap"></div>
+        </div>
+        <!-- Summary strip -->
+        <div id="pos-summary" style="display:grid;grid-template-columns:repeat(4,1fr);gap:.5rem;margin-bottom:.75rem;"></div>
+        <div class="pos-table-wrap" style="overflow-x:auto;">
+          <table class="dtable pos-table">
+            <colgroup><col style="width:70px"><col style="width:50px"><col><col><col><col><col style="width:100px"></colgroup>
+            <thead>
+              <tr>
+                <th>Symbol</th><th>Side</th><th>Qty</th><th>Avg Entry</th>
+                <th>Price</th><th>Market Value</th><th>Unrealized P&amp;L</th>
+              </tr>
+            </thead>
+            <tbody id="pos-body"><tr><td colspan="7" class="state-empty">Loading&hellip;</td></tr></tbody>
+          </table>
         </div>
       </div>
-      <div id="orders-wrap">
-        <table class="dtable">
-          <colgroup><col style="width:90px"><col style="width:70px"><col style="width:50px"><col><col><col style="width:90px"></colgroup>
-          <thead><tr><th>Submitted</th><th>Symbol</th><th>Side</th><th>Qty</th><th>Status</th><th>Filled At</th></tr></thead>
-          <tbody id="orders-body"><tr><td colspan="6" class="state-empty">Loadingâ€¦</td></tr></tbody>
-        </table>
+
+      <!-- Orders card -->
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem;">
+          <div style="font-size:14px;font-weight:600;">Orders</div>
+          <div style="display:flex;align-items:center;gap:.5rem;">
+            <button class="btn btn-sm" id="export-positions-btn" style="font-size:11px;padding:.25rem .6rem;">&darr; Positions CSV</button>
+            <button class="range-tab active" data-status="all">All</button>
+            <button class="range-tab" data-status="open">Open</button>
+            <button class="range-tab" data-status="closed">Closed</button>
+          </div>
+        </div>
+        <div class="dtable-wrap" style="overflow-x:auto;">
+          <table class="dtable">
+            <colgroup><col style="width:90px"><col style="width:70px"><col style="width:50px"><col><col><col style="width:90px"></colgroup>
+            <thead>
+              <tr><th>Submitted</th><th>Symbol</th><th>Side</th><th>Qty</th><th>Status</th><th>Filled At</th></tr>
+            </thead>
+            <tbody id="orders-body"><tr><td colspan="6" class="state-empty">Loading&hellip;</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Right column: Manual Order Ticket -->
+    <div style="position:sticky;top:1rem;">
+      <div class="card" style="padding:1.25rem;">
+        <div style="font-size:14px;font-weight:600;margin-bottom:1rem;">Manual Order</div>
+
+        <!-- Account selector -->
+        <div style="margin-bottom:.75rem;" id="mo-account-wrap"></div>
+
+        <!-- Symbol input -->
+        <div style="margin-bottom:.75rem;">
+          <div style="font-size:11px;color:#64748B;margin-bottom:.3rem;">Symbol</div>
+          <input id="mo-sym-input" class="form-input" type="text" placeholder="e.g. AAPL" autocomplete="off"
+            style="text-transform:uppercase;font-weight:600;letter-spacing:.05em;">
+        </div>
+
+        <!-- Buy / Sell toggle -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-bottom:.75rem;">
+          <button id="mo-buy-btn" class="btn" style="background:rgba(16,185,129,.15);color:#10B981;border-color:rgba(16,185,129,.3);font-weight:600;">
+            Buy
+          </button>
+          <button id="mo-sell-btn" class="btn" style="background:transparent;color:#64748B;border-color:#1E2D45;font-weight:600;">
+            Sell
+          </button>
+        </div>
+
+        <!-- Qty / Notional toggle -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-bottom:.5rem;">
+          <button id="mo-mode-qty" class="btn btn-sm active" style="font-size:11px;">Shares</button>
+          <button id="mo-mode-notional" class="btn btn-sm" style="font-size:11px;">USD Value</button>
+        </div>
+
+        <!-- Amount input -->
+        <div style="margin-bottom:1rem;">
+          <div style="font-size:11px;color:#64748B;margin-bottom:.3rem;" id="mo-qty-label">Number of Shares</div>
+          <input id="mo-qty-input" class="form-input" type="number" min="0" step="any" placeholder="0">
+        </div>
+
+        <!-- Submit button -->
+        <button id="mo-submit" class="btn" style="width:100%;background:#10B981;color:#fff;border-color:#10B981;font-weight:600;padding:.65rem;">
+          Place Buy Order
+        </button>
+
+        <!-- Result message -->
+        <div id="mo-result" class="mo-result" style="margin-top:.5rem;font-size:12px;text-align:center;min-height:16px;"></div>
       </div>
     </div>
 
@@ -150,7 +217,20 @@
 
 </div>
 
+<!-- Manual order confirm modal -->
+<div id="modal-mo-confirm" class="modal-overlay hidden" role="dialog" aria-modal="true">
+  <div class="modal-box" style="max-width:360px;">
+    <div class="modal-title" id="modal-mo-title">Confirm Order</div>
+    <div class="modal-body">
+      <p id="modal-mo-body" style="font-size:14px;color:#C8D6E8;margin-bottom:1rem;line-height:1.6;"></p>
+      <div style="display:flex;gap:.75rem;">
+        <button class="modal-cancel" data-action="cancel">Cancel</button>
+        <button class="modal-confirm" id="modal-mo-confirm-btn" data-action="confirm">Place Order</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script src="/static/app.js"></script>
 </body>
 </html>
-
