@@ -1,4 +1,6 @@
 import asyncio
+import csv
+import io
 import logging
 import os
 from contextlib import asynccontextmanager
@@ -6,7 +8,7 @@ from datetime import date
 from typing import Literal
 
 from fastapi import FastAPI, HTTPException, Request, Response
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -561,6 +563,60 @@ def engine_run_now(request: Request):
     _require_auth(request)
     engine.run_tick()
     return engine.last_run()
+
+
+# ── Export ─────────────────────────────────────────────────────────────────────
+
+@app.get("/api/export/trades")
+def export_trades(request: Request, limit: int = 5000):
+    _require_auth(request)
+    rows = db.recent_signals(limit=limit)
+    output = io.StringIO()
+    writer = csv.DictWriter(output, fieldnames=[
+        "timestamp", "strategy", "symbol", "side", "qty", "reason",
+        "blocked", "account_id"
+    ], extrasaction="ignore")
+    writer.writeheader()
+    for r in rows:
+        writer.writerow({
+            "timestamp":  r.get("ts", ""),
+            "strategy":   r.get("strategy", ""),
+            "symbol":     r.get("symbol", ""),
+            "side":       r.get("side", ""),
+            "qty":        r.get("qty", ""),
+            "reason":     r.get("reason", ""),
+            "blocked":    r.get("blocked", ""),
+            "account_id": r.get("account_id", ""),
+        })
+    output.seek(0)
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=tradebot_trades.csv"},
+    )
+
+@app.get("/api/export/positions")
+def export_positions(request: Request, account_id: int | None = None):
+    _require_auth(request)
+    try:
+        raw = alpaca_client.get_positions()
+    except Exception as e:
+        raise HTTPException(502, f"Broker error: {e}")
+    output = io.StringIO()
+    if raw:
+        fields = ["symbol", "qty", "side", "avg_entry_price",
+                  "current_price", "market_value", "unrealized_pl", "unrealized_plpc"]
+        writer = csv.DictWriter(output, fieldnames=fields, extrasaction="ignore")
+        writer.writeheader()
+        for p in raw:
+            d = p if isinstance(p, dict) else vars(p)
+            writer.writerow({f: d.get(f, getattr(p, f, "")) for f in fields})
+    output.seek(0)
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=tradebot_positions.csv"},
+    )
 
 
 # ── Scanner ────────────────────────────────────────────────────────────────────
