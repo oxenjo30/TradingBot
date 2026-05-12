@@ -735,15 +735,22 @@ async function initDashboard() {
         name.appendChild(nameSpan);
 
         const badge = document.createElement('span');
+        const ranEntry = ranMap[s.name];
         let badgeClass, badgeText;
         if (!s.enabled) {
           badgeClass = 'b-disabled'; badgeText = 'Disabled';
-        } else if (ranMap[s.name] && ranMap[s.name].error) {
+        } else if (ranEntry && ranEntry.error) {
           badgeClass = 'b-error'; badgeText = 'Error';
-        } else if (ranMap[s.name]) {
+        } else if (ranEntry && !ranEntry.skipped) {
           badgeClass = 'b-enabled'; badgeText = '';  // ran this cycle → Running
+        } else if (ranEntry && ranEntry.skipped === 'market_closed') {
+          badgeClass = 'b-notrun'; badgeText = 'Mkt Closed';
+        } else if (ranEntry && ranEntry.skipped === 'window') {
+          badgeClass = 'b-notrun'; badgeText = 'Off Hours';
+        } else if (ranEntry && ranEntry.skipped === 'no_accounts') {
+          badgeClass = 'b-disabled'; badgeText = 'No Accounts';
         } else {
-          badgeClass = 'b-notrun'; badgeText = 'Idle'; // enabled but engine hasn't run it yet
+          badgeClass = 'b-notrun'; badgeText = 'Idle'; // engine hasn't run yet
         }
         badge.className = 'badge ' + badgeClass;
         if (badgeClass === 'b-enabled') {
@@ -3450,8 +3457,9 @@ function collectAdvancedParams() {
     const key = el.id.replace('bt-param-', '');
     if (el.type === 'checkbox') {
       params[key] = el.checked;
-    } else if (el.value !== '') {
-      params[key] = parseFloat(el.value);
+    } else if (el.value.trim() !== '') {
+      const n = parseFloat(el.value);
+      if (!isNaN(n)) params[key] = n;
     }
   });
   return params;
@@ -3573,10 +3581,10 @@ function renderResults(data) {
       const pnlColor = b.total_pnl >= 0 ? 'var(--green)' : 'var(--red)';
       const pnlSign  = b.total_pnl >= 0 ? '+' : '';
       return `<tr>
-        <td style="font-weight:600;">${b.symbol}</td>
+        <td style="font-weight:600;">${escHtml(b.symbol)}</td>
         <td>${b.trades}</td>
         <td>${b.wins}</td>
-        <td>${fmt.pct(b.win_rate_pct)}</td>
+        <td>${Number(b.win_rate_pct).toFixed(1)}%</td>
         <td style="color:${pnlColor};">${pnlSign}${fmt.usd(Math.abs(b.total_pnl))}</td>
       </tr>`;
     }).join('');
@@ -3595,7 +3603,7 @@ function renderResults(data) {
       const pnlSign  = t.pnl >= 0 ? '+' : '';
       return `<tr>
         <td>${t.date}</td>
-        <td>${t.symbol}</td>
+        <td>${escHtml(t.symbol)}</td>
         <td><span class="badge b-${t.side === 'buy' ? 'buy' : 'sell'}">${t.side.toUpperCase()}</span></td>
         <td>${t.qty}</td>
         <td>${fmt.usd(t.price)}</td>
