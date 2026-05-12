@@ -1813,3 +1813,74 @@ button { cursor: pointer; font-family: inherit; }
 }
 .bench-star-btn:hover { background:rgba(245,158,11,.12); color:#FCD34D; border-color:rgba(245,158,11,.3); }
 .bench-star-btn.is-bench { background:rgba(245,158,11,.12); color:#FCD34D; border-color:rgba(245,158,11,.3); }
+
+/* ── Risk page — light mode overrides ── */
+[data-theme="light"] .risk-pl-bar-wrap2 { background: #E2E8F0; }
+
+[data-theme="light"] .ri {
+  background: #F8FAFC;
+  border-color: var(--border);
+}
+[data-theme="light"] .ri-field {
+  background: #FFFFFF;
+  border-color: var(--border);
+}
+[data-theme="light"] .ri-field:focus-within { border-color: rgba(59,130,246,.5); }
+[data-theme="light"] .ri-field input { color: var(--text); }
+[data-theme="light"] .ri-suffix {
+  background: #F1F5F9;
+  border-left-color: var(--border);
+  color: var(--muted);
+}
+
+[data-theme="light"] .sizing-opt2 {
+  background: #F8FAFC;
+  border-color: var(--border);
+}
+[data-theme="light"] .sizing-opt2.active {
+  background: rgba(59,130,246,.06);
+  border-color: rgba(59,130,246,.4);
+}
+
+[data-theme="light"] .time-input2 {
+  background: #FFFFFF;
+  border-color: var(--border);
+  color: var(--text);
+}
+[data-theme="light"] .time-input2:focus { border-color: rgba(59,130,246,.5); }
+
+[data-theme="light"] .ntl-input2 {
+  background: #FFFFFF;
+  border-color: var(--border);
+  color: var(--text);
+}
+[data-theme="light"] .ntl-input2:focus { border-color: rgba(59,130,246,.5); }
+
+[data-theme="light"] .ntl-chip2 {
+  background: #EEF2FF;
+  border-color: #C7D2FE;
+  color: #4F46E5;
+}
+[data-theme="light"] .ntl-chip2 button { color: #94A3B8; }
+[data-theme="light"] .ntl-chip2 button:hover { color: #EF4444; }
+
+[data-theme="light"] .tog-track {
+  background: #E2E8F0;
+  border-color: var(--border);
+}
+[data-theme="light"] .tog-thumb { background: #94A3B8; }
+[data-theme="light"] .tog input:checked ~ .tog-track { background: rgba(239,68,68,.15); border-color: rgba(239,68,68,.4); }
+[data-theme="light"] .tog input:checked ~ .tog-thumb { background: #EF4444; }
+
+[data-theme="light"] .risk-warn-item {
+  background: #FEF3C7;
+  border-color: #FDE68A;
+  color: #92400E;
+}
+
+[data-theme="light"] .btn-risksave {
+  background: rgba(59,130,246,.08);
+  color: #2563EB;
+  border-color: rgba(59,130,246,.25);
+}
+[data-theme="light"] .btn-risksave:hover { background: rgba(59,130,246,.15); }
