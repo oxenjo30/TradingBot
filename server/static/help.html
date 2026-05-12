@@ -1,0 +1,959 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>User Guide &mdash; TradeBot</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/static/styles.css">
+  <style>
+    /* ── Help page specific ── */
+    .help-layout {
+      display: grid;
+      grid-template-columns: 220px 1fr;
+      gap: 0;
+      height: calc(100vh - 64px);
+      overflow: hidden;
+    }
+    .help-nav {
+      border-right: 1px solid var(--border);
+      overflow-y: auto;
+      padding: 1.25rem 0;
+      background: rgba(8,13,20,.5);
+      scrollbar-width: thin;
+      scrollbar-color: var(--border) transparent;
+    }
+    .help-nav::-webkit-scrollbar { width: 3px; }
+    .help-nav::-webkit-scrollbar-thumb { background: var(--border); }
+    .help-nav-section {
+      font-size: 9.5px; font-weight: 700; color: var(--muted);
+      text-transform: uppercase; letter-spacing: .1em;
+      padding: .9rem 1.1rem .3rem;
+    }
+    .help-nav-item {
+      display: flex; align-items: center; gap: .5rem;
+      padding: .45rem 1.1rem;
+      font-size: 12.5px; font-weight: 500; color: var(--muted);
+      cursor: pointer; transition: color .12s, background .12s;
+      text-decoration: none; border-left: 2px solid transparent;
+    }
+    .help-nav-item:hover { color: var(--text); background: rgba(59,130,246,.05); }
+    .help-nav-item.active { color: var(--blue); border-left-color: var(--blue); background: rgba(59,130,246,.07); }
+    .help-nav-item svg { flex-shrink: 0; }
+
+    .help-content {
+      overflow-y: auto; padding: 2rem 2.5rem;
+      scrollbar-width: thin;
+      scrollbar-color: var(--border) transparent;
+    }
+    .help-content::-webkit-scrollbar { width: 4px; }
+    .help-content::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+    /* Sections */
+    .help-section { max-width: 760px; margin-bottom: 3.5rem; }
+    .help-section:last-child { margin-bottom: 0; padding-bottom: 4rem; }
+    .help-h1 {
+      font-size: 26px; font-weight: 700; color: var(--text);
+      letter-spacing: -.02em; margin-bottom: .35rem;
+    }
+    .help-lead {
+      font-size: 14px; color: var(--muted); line-height: 1.65;
+      margin-bottom: 1.75rem;
+    }
+    .help-h2 {
+      font-size: 16px; font-weight: 700; color: var(--text);
+      margin: 1.75rem 0 .6rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid var(--border);
+    }
+    .help-h2:first-of-type { margin-top: 0; padding-top: 0; border-top: none; }
+    .help-h3 {
+      font-size: 13px; font-weight: 700; color: var(--text);
+      margin: 1.1rem 0 .4rem;
+      text-transform: uppercase; letter-spacing: .05em;
+    }
+    .help-p {
+      font-size: 13.5px; color: rgba(230,235,245,.75); line-height: 1.7;
+      margin-bottom: .85rem;
+    }
+    .help-p:last-child { margin-bottom: 0; }
+
+    /* Step list */
+    .help-steps { display: flex; flex-direction: column; gap: .75rem; margin: .75rem 0 1rem; }
+    .help-step {
+      display: flex; gap: .875rem; align-items: flex-start;
+    }
+    .help-step-num {
+      width: 24px; height: 24px; border-radius: 50%;
+      background: rgba(59,130,246,.15); border: 1px solid rgba(59,130,246,.3);
+      color: var(--blue); font-size: 11px; font-weight: 800;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; margin-top: 2px;
+    }
+    .help-step-body { flex: 1; min-width: 0; }
+    .help-step-title { font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: .2rem; }
+    .help-step-desc  { font-size: 12.5px; color: var(--muted); line-height: 1.6; }
+
+    /* Callout boxes */
+    .help-callout {
+      border-radius: 10px; padding: .85rem 1rem;
+      margin: 1rem 0; font-size: 12.5px; line-height: 1.65;
+      display: flex; gap: .75rem; align-items: flex-start;
+    }
+    .help-callout svg { flex-shrink: 0; margin-top: 1px; }
+    .help-callout.tip    { background: rgba(59,130,246,.08); border: 1px solid rgba(59,130,246,.2); color: #93C5FD; }
+    .help-callout.warn   { background: rgba(245,158,11,.08); border: 1px solid rgba(245,158,11,.2); color: #FCD34D; }
+    .help-callout.danger { background: rgba(239,68,68,.08);  border: 1px solid rgba(239,68,68,.2);  color: #FCA5A5; }
+    .help-callout.good   { background: rgba(16,185,129,.08); border: 1px solid rgba(16,185,129,.2); color: #6EE7B7; }
+
+    /* Feature grid cards */
+    .help-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: .75rem; margin: 1rem 0; }
+    .help-card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 10px; padding: .9rem 1rem;
+    }
+    .help-card-icon {
+      width: 32px; height: 32px; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: .6rem;
+    }
+    .help-card-title { font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: .25rem; }
+    .help-card-desc  { font-size: 12px; color: var(--muted); line-height: 1.55; }
+
+    /* Inline code */
+    .help-code {
+      font-family: 'Courier New', monospace;
+      background: rgba(30,45,69,.7); border: 1px solid var(--border);
+      border-radius: 5px; padding: 1px 6px;
+      font-size: 12px; color: #93C5FD;
+    }
+
+    /* Key-value table */
+    .help-table {
+      width: 100%; border-collapse: collapse; font-size: 12.5px;
+      margin: .75rem 0 1rem; border-radius: 10px; overflow: hidden;
+      border: 1px solid var(--border);
+    }
+    .help-table thead th {
+      background: rgba(15,22,35,.6);
+      padding: .55rem .9rem; text-align: left;
+      font-size: 10.5px; font-weight: 700; color: var(--muted);
+      text-transform: uppercase; letter-spacing: .06em;
+      border-bottom: 1px solid var(--border);
+    }
+    .help-table tbody td {
+      padding: .6rem .9rem; color: var(--text);
+      border-bottom: 1px solid rgba(30,45,69,.6);
+      vertical-align: top; line-height: 1.55;
+    }
+    .help-table tbody tr:last-child td { border-bottom: none; }
+    .help-table tbody tr:hover td { background: rgba(59,130,246,.04); }
+    .help-table td:first-child { font-weight: 600; white-space: nowrap; }
+
+    /* Divider */
+    .help-divider { height: 1px; background: var(--border); margin: 2rem 0; }
+
+    /* Hero banner */
+    .help-hero {
+      background: linear-gradient(135deg, rgba(59,130,246,.12), rgba(139,92,246,.08));
+      border: 1px solid rgba(59,130,246,.2);
+      border-radius: 14px; padding: 1.75rem;
+      margin-bottom: 2rem; position: relative; overflow: hidden;
+    }
+    .help-hero::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+      background: linear-gradient(90deg, var(--blue), var(--purple));
+    }
+    .help-hero-title { font-size: 20px; font-weight: 800; color: var(--text); margin-bottom: .4rem; }
+    .help-hero-sub   { font-size: 13px; color: var(--muted); line-height: 1.6; }
+
+    /* Badge inline */
+    .help-badge {
+      display: inline-flex; align-items: center;
+      padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 700;
+    }
+    .help-badge.blue   { background: rgba(59,130,246,.15);  color: #93C5FD; }
+    .help-badge.green  { background: rgba(16,185,129,.15);  color: #6EE7B7; }
+    .help-badge.orange { background: rgba(245,158,11,.15);  color: #FCD34D; }
+    .help-badge.red    { background: rgba(239,68,68,.15);   color: #FCA5A5; }
+    .help-badge.purple { background: rgba(139,92,246,.15);  color: #C4B5FD; }
+  </style>
+</head>
+<body data-page="help">
+
+<!-- ── Sidebar ── -->
+<aside class="sidebar">
+  <div class="logo">
+    <div class="logo-mark icon-blue">
+      <svg width="18" height="18" viewBox="0 0 22 22" fill="none">
+        <path d="M11 2L20 7.5V14.5L11 20L2 14.5V7.5L11 2Z" fill="url(#lgs)"/>
+        <defs><linearGradient id="lgs" x1="2" y1="2" x2="20" y2="20">
+          <stop stop-color="#3B82F6"/><stop offset="1" stop-color="#8B5CF6"/>
+        </linearGradient></defs>
+      </svg>
+    </div>
+    <span class="logo-text">TradeBot</span>
+  </div>
+
+  <nav class="nav">
+    <p class="nav-section">Overview</p>
+    <a href="/static/index.html" class="nav-item" data-page="index">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      Dashboard
+    </a>
+    <p class="nav-section">Analysis</p>
+    <a href="/static/performance.html" class="nav-item" data-page="performance">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      Performance
+    </a>
+    <a href="/static/backtesting.html" class="nav-item" data-page="backtesting">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      Backtesting
+    </a>
+    <p class="nav-section">Portfolio</p>
+    <a href="/static/positions.html" class="nav-item" data-page="positions">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+      Positions &amp; Orders
+    </a>
+    <a href="/static/balances.html" class="nav-item" data-page="balances">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+      Balances
+    </a>
+    <a href="/static/bots.html" class="nav-item" data-page="bots">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="2" height="2"/><rect x="13" y="9" width="2" height="2"/><path d="M9 13a3 3 0 0 0 6 0"/></svg>
+      Bots &amp; Strategies
+    </a>
+    <p class="nav-section">System</p>
+    <a href="/static/risk.html" class="nav-item" data-page="risk">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      Risk
+    </a>
+    <a href="/static/logs.html" class="nav-item" data-page="logs">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+      Logs &amp; Signals
+    </a>
+    <a href="/static/apikeys.html" class="nav-item" data-page="apikeys">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+      Broker Accounts
+    </a>
+    <a href="/static/settings.html" class="nav-item" data-page="settings">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      Settings
+    </a>
+    <p class="nav-section">Help</p>
+    <a href="/static/help.html" class="nav-item active" data-page="help">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      User Guide
+    </a>
+  </nav>
+
+  <div class="sidebar-footer">
+    <div class="paper-card" id="mode-card">
+      <p class="paper-label">Paper Trading Mode</p>
+      <p style="font-size:12px;color:#E6EBF5;margin-top:2px;">Safe sandbox environment</p>
+      <a href="#" class="go-live">Go Live &rarr;</a>
+    </div>
+    <button class="nav-item logout-btn" onclick="doLogout()">
+      <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      Sign Out
+    </button>
+  </div>
+</aside>
+
+<!-- ── Page wrapper ── -->
+<div class="main">
+
+  <!-- ── Header ── -->
+  <header class="page-header">
+    <div class="title-wrap flex-1 min-w-0">
+      <div class="page-title">User Guide</div>
+      <div class="page-sub">Everything you need to get started and trade confidently</div>
+    </div>
+    <div id="market-chip" class="market-chip">US Equities&hellip;</div>
+    <div class="flex items-center gap-2">
+      <div class="avatar">JR</div>
+      <div class="hidden md:block">
+        <div style="font-size:13px;font-weight:600;">Trader</div>
+        <div class="text-muted" style="font-size:11px;">Admin</div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ── Two-column layout ── -->
+  <div class="help-layout">
+
+    <!-- Left nav -->
+    <nav class="help-nav" id="help-nav">
+      <div class="help-nav-section">Getting Started</div>
+      <a class="help-nav-item active" href="#intro">
+        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 8 12 12 14 14"/></svg>
+        Introduction
+      </a>
+      <a class="help-nav-item" href="#setup">
+        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        First-time Setup
+      </a>
+      <a class="help-nav-item" href="#broker">
+        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+        Broker Accounts
+      </a>
+      <div class="help-nav-section">Trading</div>
+      <a class="help-nav-item" href="#strategies">
+        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="2" height="2"/><rect x="13" y="9" width="2" height="2"/><path d="M9 13a3 3 0 0 0 6 0"/></svg>
+        Strategies &amp; Bots
+      </a>
+      <a class="help-nav-item" href="#manual">
+        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="22 2 11 13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        Manual Orders
+      </a>
+      <a class="help-nav-item" href="#positions">
+        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+        Positions &amp; Orders
+      </a>
+      <div class="help-nav-section">Risk &amp; Safety</div>
+      <a class="help-nav-item" href="#risk">
+        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        Risk Controls
+      </a>
+      <a class="help-nav-item" href="#killswitch">
+        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        Kill Switch
+      </a>
+      <div class="help-nav-section">Analysis</div>
+      <a class="help-nav-item" href="#performance">
+        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        Performance
+      </a>
+      <a class="help-nav-item" href="#backtesting">
+        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        Backtesting
+      </a>
+      <a class="help-nav-item" href="#logs">
+        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+        Logs &amp; Signals
+      </a>
+      <div class="help-nav-section">Settings</div>
+      <a class="help-nav-item" href="#notifications">
+        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        Notifications
+      </a>
+      <a class="help-nav-item" href="#faq">
+        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        FAQ
+      </a>
+    </nav>
+
+    <!-- Content -->
+    <div class="help-content" id="help-content">
+
+      <!-- ── INTRO ── -->
+      <div class="help-section" id="intro">
+        <div class="help-hero">
+          <div class="help-hero-title">Welcome to TradeBot</div>
+          <div class="help-hero-sub">TradeBot is an automated algorithmic trading platform that connects to your brokerage accounts, runs strategy-based signals on a 60-second engine tick, enforces risk limits, and lets you place manual orders &mdash; all from one dashboard.</div>
+        </div>
+
+        <div class="help-grid">
+          <div class="help-card">
+            <div class="help-card-icon" style="background:rgba(59,130,246,.12);">
+              <svg width="16" height="16" fill="none" stroke="#60A5FA" stroke-width="2" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="2" height="2"/><rect x="13" y="9" width="2" height="2"/><path d="M9 13a3 3 0 0 0 6 0"/></svg>
+            </div>
+            <div class="help-card-title">10 Built-in Strategies</div>
+            <div class="help-card-desc">Momentum, RSI Mean Reversion, MACD+Volume, Bollinger Bands, Golden Cross, SMA Crossover, 52-Week Breakout, and more.</div>
+          </div>
+          <div class="help-card">
+            <div class="help-card-icon" style="background:rgba(16,185,129,.12);">
+              <svg width="16" height="16" fill="none" stroke="#34D399" stroke-width="2" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            </div>
+            <div class="help-card-title">10-Layer Risk Engine</div>
+            <div class="help-card-desc">Kill switch, daily/weekly loss limits, PDT protection, max positions, symbol exposure, blacklist, and trading hours.</div>
+          </div>
+          <div class="help-card">
+            <div class="help-card-icon" style="background:rgba(139,92,246,.12);">
+              <svg width="16" height="16" fill="none" stroke="#A78BFA" stroke-width="2" viewBox="0 0 24 24"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+            </div>
+            <div class="help-card-title">Multi-Account Trading</div>
+            <div class="help-card-desc">Connect multiple broker accounts and route each strategy independently. Paper and live accounts side by side.</div>
+          </div>
+          <div class="help-card">
+            <div class="help-card-icon" style="background:rgba(245,158,11,.12);">
+              <svg width="16" height="16" fill="none" stroke="#FBBF24" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            </div>
+            <div class="help-card-title">Backtesting Studio</div>
+            <div class="help-card-desc">Run any strategy against historical data with slippage, commission, and capital controls. Save and compare runs.</div>
+          </div>
+        </div>
+
+        <div class="help-callout tip">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+          <div><strong>Start in Paper Trading mode.</strong> TradeBot defaults to Alpaca's paper trading sandbox. No real money is at risk until you explicitly add a live account and enable a strategy on it.</div>
+        </div>
+      </div>
+
+      <!-- ── SETUP ── -->
+      <div class="help-section" id="setup">
+        <div class="help-h1">First-time Setup</div>
+        <div class="help-lead">Get TradeBot running in under 5 minutes with these steps.</div>
+
+        <div class="help-h2">Prerequisites</div>
+        <table class="help-table">
+          <thead><tr><th>Requirement</th><th>Details</th></tr></thead>
+          <tbody>
+            <tr><td>Python 3.11+</td><td>TradeBot server requires Python 3.11 or higher. Check with <span class="help-code">python --version</span>.</td></tr>
+            <tr><td>Alpaca Account</td><td>Free at alpaca.markets. A paper trading account is created automatically with no funding needed.</td></tr>
+            <tr><td>Alpaca API Keys</td><td>From your Alpaca dashboard under <em>API Keys</em>. You need both the API key ID and the secret key.</td></tr>
+          </tbody>
+        </table>
+
+        <div class="help-h2">Installation &amp; Launch</div>
+        <div class="help-steps">
+          <div class="help-step">
+            <div class="help-step-num">1</div>
+            <div class="help-step-body">
+              <div class="help-step-title">Install dependencies</div>
+              <div class="help-step-desc">In the TradeBot directory, run: <span class="help-code">pip install -r requirements.txt</span></div>
+            </div>
+          </div>
+          <div class="help-step">
+            <div class="help-step-num">2</div>
+            <div class="help-step-body">
+              <div class="help-step-title">Create your .env file</div>
+              <div class="help-step-desc">Copy <span class="help-code">.env.example</span> to <span class="help-code">.env</span> and fill in your Alpaca API credentials. Set <span class="help-code">ALPACA_ACCOUNT_TYPE=paper</span> to start safely.</div>
+            </div>
+          </div>
+          <div class="help-step">
+            <div class="help-step-num">3</div>
+            <div class="help-step-body">
+              <div class="help-step-title">Start the server</div>
+              <div class="help-step-desc">Run: <span class="help-code">uvicorn server.main:app --reload --port 8000</span><br>Then open <span class="help-code">http://localhost:8000</span> in your browser.</div>
+            </div>
+          </div>
+          <div class="help-step">
+            <div class="help-step-num">4</div>
+            <div class="help-step-body">
+              <div class="help-step-title">Complete the setup wizard</div>
+              <div class="help-step-desc">On first launch you'll see the Setup page. Set your password, starting capital, daily loss limit, and pick your first strategy. This takes about 60 seconds.</div>
+            </div>
+          </div>
+          <div class="help-step">
+            <div class="help-step-num">5</div>
+            <div class="help-step-body">
+              <div class="help-step-title">Explore the dashboard</div>
+              <div class="help-step-desc">You'll land on the Dashboard showing your account equity, engine status, recent signals, and allocation. The engine ticks every 60 seconds during market hours.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="help-callout warn">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          <div>Keep your <span class="help-code">.env</span> file private. It contains your API credentials. Never commit it to version control or share it.</div>
+        </div>
+      </div>
+
+      <!-- ── BROKER ACCOUNTS ── -->
+      <div class="help-section" id="broker">
+        <div class="help-h1">Broker Accounts</div>
+        <div class="help-lead">TradeBot supports multiple broker accounts simultaneously. Each account has its own credentials, paper/live status, and strategy assignments.</div>
+
+        <div class="help-h2">Adding an Account</div>
+        <div class="help-steps">
+          <div class="help-step">
+            <div class="help-step-num">1</div>
+            <div class="help-step-body">
+              <div class="help-step-title">Navigate to Broker Accounts</div>
+              <div class="help-step-desc">Click <strong>Broker Accounts</strong> in the left sidebar.</div>
+            </div>
+          </div>
+          <div class="help-step">
+            <div class="help-step-num">2</div>
+            <div class="help-step-body">
+              <div class="help-step-title">Click "Add Account"</div>
+              <div class="help-step-desc">Fill in a label (e.g., "Alpaca Paper"), your API key, secret key, and whether it's paper or live.</div>
+            </div>
+          </div>
+          <div class="help-step">
+            <div class="help-step-num">3</div>
+            <div class="help-step-body">
+              <div class="help-step-title">Verify the connection</div>
+              <div class="help-step-desc">Click <strong>Test Connection</strong> &mdash; TradeBot will attempt to fetch your account balance to confirm credentials are valid.</div>
+            </div>
+          </div>
+          <div class="help-step">
+            <div class="help-step-num">4</div>
+            <div class="help-step-body">
+              <div class="help-step-title">Assign strategies</div>
+              <div class="help-step-desc">Go to <strong>Bots &amp; Strategies</strong> and enable strategies for this account. Each strategy × account pair can be independently toggled.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="help-h2">Switching Accounts</div>
+        <p class="help-p">On the <strong>Positions &amp; Orders</strong> and <strong>Balances</strong> pages, an account dropdown appears in the top header. Click it to switch which account's data is displayed. The order ticket also has an account selector so manual orders go to the right account.</p>
+
+        <div class="help-h2">Credential Security</div>
+        <p class="help-p">All API keys and secrets are encrypted with AES-256 (Fernet) before being stored in the database. The encryption key is stored in your <span class="help-code">.env</span> file as <span class="help-code">DB_SECRET_KEY</span> &mdash; generated automatically on first setup.</p>
+
+        <div class="help-callout danger">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          <div>If you lose your <span class="help-code">DB_SECRET_KEY</span>, stored broker credentials cannot be decrypted. Back up your <span class="help-code">.env</span> file securely.</div>
+        </div>
+      </div>
+
+      <!-- ── STRATEGIES ── -->
+      <div class="help-section" id="strategies">
+        <div class="help-h1">Strategies &amp; Bots</div>
+        <div class="help-lead">TradeBot comes with 9 automated strategies. Each one generates buy/sell signals that the engine evaluates every 60 seconds during market hours.</div>
+
+        <div class="help-h2">Strategy Reference</div>
+        <table class="help-table">
+          <thead><tr><th>Strategy</th><th>How it works</th><th>Best for</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>Momentum</td>
+              <td>Scans top actives/gainers. Enters when price is above its 20-day SMA and RSI is between 40&ndash;70.</td>
+              <td>Trending markets, high-volume days</td>
+            </tr>
+            <tr>
+              <td>RSI Mean Reversion</td>
+              <td>Buys when RSI drops below 30 (oversold). Exits when RSI crosses 50.</td>
+              <td>Range-bound stocks, post-selloff rebounds</td>
+            </tr>
+            <tr>
+              <td>MACD + Volume</td>
+              <td>Enters on bullish MACD crossover confirmed by above-average volume.</td>
+              <td>Momentum with volume confirmation</td>
+            </tr>
+            <tr>
+              <td>Bollinger Bands</td>
+              <td>Buys when price touches lower band; exits at middle band. Reversal strategy.</td>
+              <td>Mean-reverting, low-volatility stocks</td>
+            </tr>
+            <tr>
+              <td>Golden Cross</td>
+              <td>Enters when the 50-day SMA crosses above the 200-day SMA.</td>
+              <td>Long-term trend following</td>
+            </tr>
+            <tr>
+              <td>SMA Crossover</td>
+              <td>Fast (10-day) SMA crosses above slow (30-day) SMA.</td>
+              <td>Short-term trend detection</td>
+            </tr>
+            <tr>
+              <td>52-Week Breakout</td>
+              <td>Buys when price closes above its 52-week high on strong volume.</td>
+              <td>Breakout trading, momentum stocks</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="help-h2">Enabling a Strategy</div>
+        <div class="help-steps">
+          <div class="help-step">
+            <div class="help-step-num">1</div>
+            <div class="help-step-body">
+              <div class="help-step-title">Open Bots &amp; Strategies</div>
+              <div class="help-step-desc">Click it in the left sidebar. You'll see two panels &mdash; accounts on the left, strategies on the right.</div>
+            </div>
+          </div>
+          <div class="help-step">
+            <div class="help-step-num">2</div>
+            <div class="help-step-body">
+              <div class="help-step-title">Select an account</div>
+              <div class="help-step-desc">Click a broker account in the left panel to see which strategies are assigned to it.</div>
+            </div>
+          </div>
+          <div class="help-step">
+            <div class="help-step-num">3</div>
+            <div class="help-step-body">
+              <div class="help-step-title">Toggle strategies on/off</div>
+              <div class="help-step-desc">Use the toggle next to each strategy to enable it for that account. Disabled strategies are skipped by the engine.</div>
+            </div>
+          </div>
+          <div class="help-step">
+            <div class="help-step-num">4</div>
+            <div class="help-step-body">
+              <div class="help-step-title">Adjust parameters</div>
+              <div class="help-step-desc">Expand a strategy to edit its parameters &mdash; notional size, RSI thresholds, SMA periods, etc. Changes take effect on the next engine tick.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="help-callout tip">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+          <div>The engine only runs strategies during US market hours (9:30 AM &ndash; 4:00 PM ET). You can override this with <strong>Run Engine Now</strong> in the Dashboard for testing.</div>
+        </div>
+
+        <div class="help-h2">Position Sizing</div>
+        <p class="help-p">Each strategy has a <strong>notional</strong> parameter &mdash; the dollar amount per trade (e.g., $500 means each signal buys $500 worth of stock). You can also set position sizing to a <strong>% of portfolio</strong> in Risk settings, which overrides the per-strategy notional.</p>
+      </div>
+
+      <!-- ── MANUAL ORDERS ── -->
+      <div class="help-section" id="manual">
+        <div class="help-h1">Manual Orders</div>
+        <div class="help-lead">Place trades directly from the Positions &amp; Orders page without waiting for a strategy signal.</div>
+
+        <div class="help-h2">Using the Order Ticket</div>
+        <div class="help-steps">
+          <div class="help-step">
+            <div class="help-step-num">1</div>
+            <div class="help-step-body">
+              <div class="help-step-title">Select an account</div>
+              <div class="help-step-desc">Use the account dropdown inside the order ticket to pick which broker account to trade on.</div>
+            </div>
+          </div>
+          <div class="help-step">
+            <div class="help-step-num">2</div>
+            <div class="help-step-body">
+              <div class="help-step-title">Choose Buy or Sell</div>
+              <div class="help-step-desc">Click the Buy (green) or Sell (red) tab at the top of the ticket.</div>
+            </div>
+          </div>
+          <div class="help-step">
+            <div class="help-step-num">3</div>
+            <div class="help-step-body">
+              <div class="help-step-title">Enter a symbol and get a quote</div>
+              <div class="help-step-desc">Type a ticker symbol (e.g., AAPL) and click <strong>Quote</strong> to see the live bid/ask mid-price.</div>
+            </div>
+          </div>
+          <div class="help-step">
+            <div class="help-step-num">4</div>
+            <div class="help-step-body">
+              <div class="help-step-title">Set quantity or dollar amount</div>
+              <div class="help-step-desc">Switch between <strong>Shares</strong> and <strong>Dollars</strong> using the segmented control. Enter your desired quantity. An estimated cost appears below.</div>
+            </div>
+          </div>
+          <div class="help-step">
+            <div class="help-step-num">5</div>
+            <div class="help-step-body">
+              <div class="help-step-title">Place the order</div>
+              <div class="help-step-desc">Click <strong>Place Buy Order</strong> / <strong>Place Sell Order</strong>. A market order is submitted instantly. Results appear below the button with the order ID and status.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="help-callout warn">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          <div>Manual orders bypass the strategy engine and no-trade list. They execute immediately as market orders. Only use this when you know what you're doing.</div>
+        </div>
+      </div>
+
+      <!-- ── POSITIONS ── -->
+      <div class="help-section" id="positions">
+        <div class="help-h1">Positions &amp; Orders</div>
+        <div class="help-lead">Monitor all your open holdings and order history in one view, with per-account switching.</div>
+
+        <div class="help-h2">Reading the Positions Table</div>
+        <table class="help-table">
+          <thead><tr><th>Column</th><th>What it means</th></tr></thead>
+          <tbody>
+            <tr><td>Symbol</td><td>The ticker of the stock. The icon shows the first 3 letters for quick visual identification.</td></tr>
+            <tr><td>Side</td><td><span class="help-badge green">Long</span> means you own shares. <span class="help-badge red">Short</span> means you are short-selling.</td></tr>
+            <tr><td>Qty</td><td>Number of shares held (can be fractional).</td></tr>
+            <tr><td>Avg Entry</td><td>Your average purchase price per share.</td></tr>
+            <tr><td>Current Price</td><td>Live market price (refreshed every 30 seconds).</td></tr>
+            <tr><td>Market Value</td><td>Current worth of your position: Qty × Current Price.</td></tr>
+            <tr><td>P&amp;L</td><td>Unrealized profit or loss in dollars. Green = gain, red = loss.</td></tr>
+            <tr><td>P&amp;L %</td><td>Percentage gain or loss from your entry price.</td></tr>
+          </tbody>
+        </table>
+
+        <div class="help-h2">Order Status Reference</div>
+        <table class="help-table">
+          <thead><tr><th>Status</th><th>Meaning</th></tr></thead>
+          <tbody>
+            <tr><td><span class="help-badge blue">Open</span></td><td>Order submitted but not yet filled.</td></tr>
+            <tr><td><span class="help-badge green">Filled</span></td><td>Order fully executed. Check the "Filled At" price.</td></tr>
+            <tr><td><span class="help-badge orange">Partial</span></td><td>Order partially filled. Remaining quantity still working.</td></tr>
+            <tr><td><span class="help-badge red">Cancelled</span></td><td>Order was cancelled &mdash; either by you or by the market (e.g., day order expired).</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- ── RISK ── -->
+      <div class="help-section" id="risk">
+        <div class="help-h1">Risk Controls</div>
+        <div class="help-lead">TradeBot enforces 10 configurable risk guards on every strategy signal before an order is placed. These run in order &mdash; the first failing guard blocks the trade.</div>
+
+        <div class="help-h2">Guard Reference</div>
+        <table class="help-table">
+          <thead><tr><th>Guard</th><th>What it does</th></tr></thead>
+          <tbody>
+            <tr><td>Kill Switch</td><td>Master emergency stop. When on, ALL automated trading halts immediately. Manual orders still work.</td></tr>
+            <tr><td>Daily Loss Limit</td><td>Halts trading when today's P&amp;L drops below N% of starting equity.</td></tr>
+            <tr><td>Weekly Loss Limit</td><td>Same as daily but measured over the rolling 7-day window.</td></tr>
+            <tr><td>Consecutive Losses</td><td>Blocks new trades after N losses in a row. Resets when you manually reset or a trade wins.</td></tr>
+            <tr><td>PDT Protection</td><td>Prevents a 4th day-trade in a 5-day rolling window on accounts under $25,000.</td></tr>
+            <tr><td>Max Positions</td><td>Caps total open positions. New entries are blocked until an existing position is closed.</td></tr>
+            <tr><td>Symbol Exposure</td><td>Prevents allocating more than N% of portfolio to a single symbol.</td></tr>
+            <tr><td>Max Orders/Day</td><td>Limits total orders submitted in one trading day.</td></tr>
+            <tr><td>Trading Hours</td><td>Only allows orders between the start and end times you configure (ET).</td></tr>
+            <tr><td>No-Trade List</td><td>Symbols on the blacklist are never traded, regardless of signals.</td></tr>
+          </tbody>
+        </table>
+
+        <div class="help-h2">Configuring Risk Settings</div>
+        <div class="help-steps">
+          <div class="help-step">
+            <div class="help-step-num">1</div>
+            <div class="help-step-body">
+              <div class="help-step-title">Open Risk in the sidebar</div>
+              <div class="help-step-desc">The Risk page shows your current P&amp;L, engine status, and all configurable guards in one place.</div>
+            </div>
+          </div>
+          <div class="help-step">
+            <div class="help-step-num">2</div>
+            <div class="help-step-body">
+              <div class="help-step-title">Edit a value</div>
+              <div class="help-step-desc">Click the numeric input next to any guard and type a new value, then click <strong>Save</strong> next to it. Changes apply immediately on the next engine tick.</div>
+            </div>
+          </div>
+          <div class="help-step">
+            <div class="help-step-num">3</div>
+            <div class="help-step-body">
+              <div class="help-step-title">Add symbols to the no-trade list</div>
+              <div class="help-step-desc">Type a ticker in the No-Trade List field and press Enter or click Add. Chips appear for each blocked symbol. Click the × on a chip to remove it.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="help-callout good">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+          <div><strong>Recommended starting settings:</strong> Max daily loss 2%, max positions 5, trading hours 9:30&ndash;15:45 ET, PDT protection on. These prevent the most common beginner mistakes.</div>
+        </div>
+      </div>
+
+      <!-- ── KILL SWITCH ── -->
+      <div class="help-section" id="killswitch">
+        <div class="help-h1">Kill Switch</div>
+        <div class="help-lead">The kill switch is your emergency stop. One click halts all automated strategy trading instantly.</div>
+
+        <div class="help-h2">When to use it</div>
+        <p class="help-p">Activate the kill switch when: the market is behaving unexpectedly, you see a strategy generating bad signals, you're leaving for the day and don't want unsupervised trading, or you've hit an uncomfortable loss level.</p>
+
+        <div class="help-h2">How to activate</div>
+        <p class="help-p">The kill switch card is at the top of the <strong>Risk</strong> page. Click the red <strong>Activate Kill Switch</strong> button. The banner turns red across all pages. Click <strong>Deactivate</strong> to resume.</p>
+
+        <div class="help-callout tip">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+          <div>The kill switch does <strong>not</strong> close existing positions. It only stops new orders from being placed. To close all positions, use the close-all button on the Positions page.</div>
+        </div>
+      </div>
+
+      <!-- ── PERFORMANCE ── -->
+      <div class="help-section" id="performance">
+        <div class="help-h1">Performance Analytics</div>
+        <div class="help-lead">Track your bot's trading history, per-strategy stats, and equity curve over time.</div>
+
+        <div class="help-h2">What's on the Performance page</div>
+        <table class="help-table">
+          <thead><tr><th>Widget</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td>Equity Curve</td><td>Portfolio value over time. Toggle between 1W, 1M, 3M, 1Y views.</td></tr>
+            <tr><td>Strategy Stats</td><td>Per-strategy breakdown: total signals, fills, blocks, and fill rate.</td></tr>
+            <tr><td>Top Symbols</td><td>Most-traded symbols by signal count and fill rate.</td></tr>
+            <tr><td>Daily Activity</td><td>Bar chart of signals generated per day over the last 30 days.</td></tr>
+            <tr><td>Live P&amp;L</td><td>Unrealized gain/loss on current open positions.</td></tr>
+          </tbody>
+        </table>
+
+        <div class="help-h2">Interpreting the fill rate</div>
+        <p class="help-p">Fill rate = filled signals ÷ total signals. A low fill rate (below 50%) means risk guards are blocking most of your signals. Check the Risk page and Logs to understand which guard is triggering most often.</p>
+      </div>
+
+      <!-- ── BACKTESTING ── -->
+      <div class="help-section" id="backtesting">
+        <div class="help-h1">Backtesting</div>
+        <div class="help-lead">Test any strategy against historical price data before risking real money. Saved runs persist for future comparison.</div>
+
+        <div class="help-h2">Running a backtest</div>
+        <div class="help-steps">
+          <div class="help-step">
+            <div class="help-step-num">1</div>
+            <div class="help-step-body">
+              <div class="help-step-title">Choose a strategy</div>
+              <div class="help-step-desc">Select from the strategy dropdown. All 9 strategies are available for backtesting.</div>
+            </div>
+          </div>
+          <div class="help-step">
+            <div class="help-step-num">2</div>
+            <div class="help-step-body">
+              <div class="help-step-title">Enter symbols</div>
+              <div class="help-step-desc">Type one or more ticker symbols separated by commas (e.g., AAPL, MSFT, NVDA).</div>
+            </div>
+          </div>
+          <div class="help-step">
+            <div class="help-step-num">3</div>
+            <div class="help-step-body">
+              <div class="help-step-title">Set the date range and capital</div>
+              <div class="help-step-desc">Pick start/end dates (minimum 30 days recommended), initial capital, position size %, commission %, and slippage %.</div>
+            </div>
+          </div>
+          <div class="help-step">
+            <div class="help-step-num">4</div>
+            <div class="help-step-body">
+              <div class="help-step-title">Run and review</div>
+              <div class="help-step-desc">Click <strong>Run Backtest</strong>. Results show total return, win rate, max drawdown, Sharpe ratio, and a full trade log. Name the run to save it.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="help-h2">Key metrics explained</div>
+        <table class="help-table">
+          <thead><tr><th>Metric</th><th>Meaning</th></tr></thead>
+          <tbody>
+            <tr><td>Total Return</td><td>Net profit as a % of starting capital over the test period.</td></tr>
+            <tr><td>Win Rate</td><td>% of trades that closed with a profit.</td></tr>
+            <tr><td>Max Drawdown</td><td>Largest peak-to-trough decline. Lower is better. Over 20% is a warning sign.</td></tr>
+            <tr><td>Sharpe Ratio</td><td>Risk-adjusted return. Above 1.0 is acceptable; above 2.0 is excellent.</td></tr>
+            <tr><td>Avg Trade P&amp;L</td><td>Average dollar profit/loss per completed trade.</td></tr>
+          </tbody>
+        </table>
+
+        <div class="help-callout warn">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          <div><strong>Past performance does not predict future results.</strong> Backtests use daily bar data and assume limit-less liquidity. Real execution has wider spreads and slippage, especially on low-volume stocks.</div>
+        </div>
+      </div>
+
+      <!-- ── LOGS ── -->
+      <div class="help-section" id="logs">
+        <div class="help-h1">Logs &amp; Signals</div>
+        <div class="help-lead">Every signal generated by every strategy is logged here with its outcome &mdash; filled, blocked, or errored.</div>
+
+        <div class="help-h2">Signal statuses</div>
+        <table class="help-table">
+          <thead><tr><th>Status</th><th>Meaning</th></tr></thead>
+          <tbody>
+            <tr><td><span class="help-badge green">Filled</span></td><td>Order was submitted and executed by the broker.</td></tr>
+            <tr><td><span class="help-badge red">Blocked</span></td><td>A risk guard prevented the order from being placed. Hover to see which guard triggered.</td></tr>
+            <tr><td><span class="help-badge orange">Pending</span></td><td>Signal generated but order not yet confirmed. Usually resolves within seconds.</td></tr>
+            <tr><td><span class="help-badge red">Error</span></td><td>Something went wrong placing the order. Check the reason column for details.</td></tr>
+          </tbody>
+        </table>
+
+        <div class="help-h2">Filtering logs</div>
+        <p class="help-p">Use the filter tabs at the top of the table to show All, Filled, Blocked, or Error signals. This helps you quickly diagnose whether a strategy is producing signals but being blocked (risk issue) vs. producing no signals at all (strategy logic or market condition issue).</p>
+      </div>
+
+      <!-- ── NOTIFICATIONS ── -->
+      <div class="help-section" id="notifications">
+        <div class="help-h1">Notifications</div>
+        <div class="help-lead">Get alerted on trades, blocks, and daily summaries via email or Telegram.</div>
+
+        <div class="help-h2">Email (Gmail / SMTP)</div>
+        <div class="help-steps">
+          <div class="help-step">
+            <div class="help-step-num">1</div>
+            <div class="help-step-body">
+              <div class="help-step-title">Generate a Gmail App Password</div>
+              <div class="help-step-desc">In your Google account, go to Security &rarr; 2-Step Verification &rarr; App passwords. Generate one for "TradeBot".</div>
+            </div>
+          </div>
+          <div class="help-step">
+            <div class="help-step-num">2</div>
+            <div class="help-step-body">
+              <div class="help-step-title">Fill in SMTP settings</div>
+              <div class="help-step-desc">SMTP host: <span class="help-code">smtp.gmail.com</span>, Port: <span class="help-code">587</span>, username = your Gmail address, password = the App Password.</div>
+            </div>
+          </div>
+          <div class="help-step">
+            <div class="help-step-num">3</div>
+            <div class="help-step-body">
+              <div class="help-step-title">Test &amp; Save</div>
+              <div class="help-step-desc">Click <strong>Test Email</strong> to verify. A test message arrives in your inbox. Then click <strong>Save</strong>.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="help-h2">Telegram</div>
+        <div class="help-steps">
+          <div class="help-step">
+            <div class="help-step-num">1</div>
+            <div class="help-step-body">
+              <div class="help-step-title">Create a bot via BotFather</div>
+              <div class="help-step-desc">In Telegram, message <span class="help-code">@BotFather</span> and run <span class="help-code">/newbot</span>. Copy the token you receive.</div>
+            </div>
+          </div>
+          <div class="help-step">
+            <div class="help-step-num">2</div>
+            <div class="help-step-body">
+              <div class="help-step-title">Get your Chat ID</div>
+              <div class="help-step-desc">Start a chat with your new bot, then visit <span class="help-code">api.telegram.org/bot&lt;TOKEN&gt;/getUpdates</span> to find your chat ID.</div>
+            </div>
+          </div>
+          <div class="help-step">
+            <div class="help-step-num">3</div>
+            <div class="help-step-body">
+              <div class="help-step-title">Enter token and chat ID in Settings</div>
+              <div class="help-step-desc">Paste both into the Telegram section of the Settings page and click <strong>Test Telegram</strong> to verify.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── FAQ ── -->
+      <div class="help-section" id="faq">
+        <div class="help-h1">Frequently Asked Questions</div>
+        <div class="help-lead">Common questions and their answers.</div>
+
+        <div class="help-h2">Why is my strategy not placing any orders?</div>
+        <p class="help-p">Check these in order: (1) Is the strategy enabled for a broker account on the Bots page? (2) Is a risk guard blocking it? Check the Logs page for "blocked" signals. (3) Is the market open? The engine only runs during US trading hours. (4) Does the symbol meet the strategy's criteria? Use backtesting to verify the strategy generates signals on your symbols.</p>
+
+        <div class="help-h2">What is PDT and how does it affect me?</div>
+        <p class="help-p">The Pattern Day Trader (PDT) rule applies to US accounts under $25,000. It limits you to 3 day-trades (buying and selling the same stock in a single day) within any rolling 5-business-day period. TradeBot's PDT guard automatically blocks a 4th day-trade to protect your account. If you're over $25,000, you can disable the PDT guard in Risk settings.</p>
+
+        <div class="help-h2">Can I run TradeBot 24/7?</div>
+        <p class="help-p">Yes &mdash; the server runs continuously. The engine only evaluates strategies during configured trading hours (default 9:30 AM &ndash; 4:00 PM ET). Outside of hours, the engine ticks but skips order placement.</p>
+
+        <div class="help-h2">How do I add a symbol that the scanner misses?</div>
+        <p class="help-p">Each strategy has a <strong>symbols</strong> parameter you can override. Expand the strategy on the Bots page and add custom symbols to its symbol list. The strategy will then always evaluate those symbols regardless of scanner output.</p>
+
+        <div class="help-h2">Where is my data stored?</div>
+        <p class="help-p">All data is stored locally in <span class="help-code">trading.db</span> (SQLite). No data is sent to external servers except to your configured broker API. Backtest history, signals, settings, and encrypted credentials all live in this single file.</p>
+
+        <div class="help-h2">How do I reset consecutive losses?</div>
+        <p class="help-p">Go to the <strong>Risk</strong> page and click the <strong>Reset</strong> button next to the Consecutive Losses field. This manually clears the counter so strategies can trade again.</p>
+
+        <div class="help-h2">Is my API key safe?</div>
+        <p class="help-p">Yes &mdash; keys are encrypted with AES-256 before storage. The secret key is never returned by the API (only the last 4 characters of the public key are shown for identification). That said, use Alpaca's <strong>Trading only</strong> scope when generating keys &mdash; not the full "transfer funds" scope.</p>
+
+        <div class="help-callout good">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+          <div>Still stuck? Check the server log (<span class="help-code">server.log</span> in the TradeBot directory) for detailed error messages from the engine and API calls.</div>
+        </div>
+      </div>
+
+    </div><!-- /help-content -->
+  </div><!-- /help-layout -->
+</div><!-- /main -->
+
+<script src="/static/app.js"></script>
+<script>
+  // Highlight active nav item on scroll
+  const sections = document.querySelectorAll('.help-section');
+  const navItems = document.querySelectorAll('.help-nav-item[href^="#"]');
+  const content  = document.getElementById('help-content');
+
+  content.addEventListener('scroll', () => {
+    let current = '';
+    sections.forEach(s => {
+      if (s.offsetTop - content.scrollTop <= 80) current = s.id;
+    });
+    navItems.forEach(a => {
+      a.classList.toggle('active', a.getAttribute('href') === '#' + current);
+    });
+  });
+
+  // Smooth scroll
+  navItems.forEach(a => {
+    a.addEventListener('click', e => {
+      e.preventDefault();
+      const target = document.getElementById(a.getAttribute('href').slice(1));
+      if (target) content.scrollTo({ top: target.offsetTop - 24, behavior: 'smooth' });
+    });
+  });
+</script>
+</body>
+</html>
