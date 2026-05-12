@@ -1883,23 +1883,31 @@ button { cursor: pointer; font-family: inherit; }
 }
 [data-theme="light"] .btn-risksave:hover { background: rgba(59,130,246,.15); }
 
+/* Position close button column */
+.pos-table td:last-child {
+  padding: .3rem .4rem;
+  text-align: center;
+}
+
 /* Position close button */
 .btn-close-pos {
   background: transparent;
-  border: 1px solid var(--border);
+  border: 1px solid transparent;
   border-radius: 5px;
   color: var(--muted);
   cursor: pointer;
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 15px;
+  font-weight: 400;
   line-height: 1;
-  padding: 2px 6px;
+  padding: 2px 7px;
   transition: background .15s, color .15s, border-color .15s;
+  opacity: 0.5;
 }
 .btn-close-pos:hover {
-  background: rgba(239,68,68,.1);
-  border-color: rgba(239,68,68,.4);
+  background: rgba(239,68,68,.12);
+  border-color: rgba(239,68,68,.35);
   color: var(--red);
+  opacity: 1;
 }
 
 /* Close All button in positions card header */
@@ -1920,13 +1928,14 @@ button { cursor: pointer; font-family: inherit; }
 }
 
 [data-theme="light"] .btn-close-pos {
-  border-color: var(--border);
+  border-color: transparent;
   color: var(--muted);
 }
 [data-theme="light"] .btn-close-pos:hover {
   background: rgba(239,68,68,.08);
-  border-color: rgba(239,68,68,.35);
+  border-color: rgba(239,68,68,.3);
   color: #DC2626;
+  opacity: 1;
 }
 [data-theme="light"] .btn-close-all {
   background: rgba(239,68,68,.06);
