@@ -212,6 +212,44 @@
       </div>
     </div>
 
+    <!-- ── Slack Notifications ── -->
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem;">
+        <div>
+          <div style="font-size:14px;font-weight:600;">Slack Alerts</div>
+          <div class="text-muted" style="font-size:12px;margin-top:2px;">Send alerts to a Slack channel via Incoming Webhook</div>
+        </div>
+        <label class="toggle-switch toggle-sm">
+          <input type="checkbox" id="slack-enabled">
+          <span class="toggle-track"><span class="toggle-thumb"></span></span>
+        </label>
+      </div>
+      <div>
+        <div class="field-label">Slack Webhook URL</div>
+        <input id="slack-webhook-url" type="url" class="input-field" placeholder="https://hooks.slack.com/services/…" style="font-size:12px;">
+        <div class="field-hint">Create an Incoming Webhook at api.slack.com/apps → Your App → Incoming Webhooks</div>
+      </div>
+    </div>
+
+    <!-- ── Discord Notifications ── -->
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem;">
+        <div>
+          <div style="font-size:14px;font-weight:600;">Discord Alerts</div>
+          <div class="text-muted" style="font-size:12px;margin-top:2px;">Send alerts to a Discord channel via Webhook</div>
+        </div>
+        <label class="toggle-switch toggle-sm">
+          <input type="checkbox" id="discord-enabled">
+          <span class="toggle-track"><span class="toggle-thumb"></span></span>
+        </label>
+      </div>
+      <div>
+        <div class="field-label">Discord Webhook URL</div>
+        <input id="discord-webhook-url" type="url" class="input-field" placeholder="https://discord.com/api/webhooks/…" style="font-size:12px;">
+        <div class="field-hint">In Discord: Channel Settings → Integrations → Webhooks → New Webhook → Copy Webhook URL</div>
+      </div>
+    </div>
+
     <!-- ── Event Triggers ── -->
     <div class="card">
       <div style="font-size:14px;font-weight:600;margin-bottom:.25rem;">Event Triggers</div>
@@ -289,6 +327,79 @@
         <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
         Save Settings
       </button>
+    </div>
+
+    <!-- ── TradingView Webhooks ── -->
+    <div class="card">
+      <div style="font-size:14px;font-weight:600;margin-bottom:.5rem;">TradingView Webhooks</div>
+      <p class="text-muted" style="font-size:12px;margin-bottom:1rem;line-height:1.6;">
+        Receive buy/sell signals from TradingView alerts directly. Point your alert's webhook URL here and add the token as a header.
+      </p>
+
+      <div style="margin-bottom:.85rem;">
+        <div class="field-label">Webhook URL</div>
+        <div style="display:flex;gap:.5rem;">
+          <input id="webhook-url" class="input-field" readonly style="font-family:monospace;font-size:12px;flex:1;" placeholder="Generate a token to see the URL" value="">
+          <button class="btn btn-sm btn-ghost" id="copy-webhook-url">Copy</button>
+        </div>
+      </div>
+
+      <div style="margin-bottom:.85rem;">
+        <div class="field-label">Token (X-Webhook-Token header)</div>
+        <div style="display:flex;gap:.5rem;">
+          <input id="webhook-token" class="input-field" readonly style="font-family:monospace;font-size:12px;flex:1;" placeholder="Click Regenerate to create a token" value="">
+          <button class="btn btn-sm btn-ghost" id="copy-webhook-token">Copy</button>
+        </div>
+      </div>
+
+      <button class="btn btn-sm" id="rotate-webhook-token" style="background:rgba(239,68,68,.1);color:#EF4444;border-color:rgba(239,68,68,.3);">&#8635; Regenerate Token</button>
+      <p class="text-muted" style="font-size:11px;margin-top:.4rem;">Regenerating immediately invalidates the old token.</p>
+
+      <div style="margin-top:1rem;background:#0D1117;border:1px solid #1E2D45;border-radius:8px;padding:.85rem;font-size:12px;color:#94A3B8;line-height:1.7;">
+        <b style="color:#E6EBF5;">TradingView Alert Message (JSON body):</b><br>
+        <code style="color:#10B981;">{"symbol": "{{ticker}}", "side": "buy", "qty": 1, "strategy": "tradingview"}</code><br><br>
+        Set <b>Webhook URL</b> to the URL above. Add header:<br>
+        <code style="color:#10B981;">X-Webhook-Token: &lt;your token&gt;</code>
+      </div>
+    </div>
+
+    <!-- ── Price Alerts ── -->
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem;">
+        <div style="font-size:14px;font-weight:600;">Price Alerts</div>
+        <button class="btn btn-sm" id="add-alert-btn">+ Add Alert</button>
+      </div>
+
+      <div id="add-alert-form" style="display:none;background:#0D1117;border:1px solid #1E2D45;border-radius:8px;padding:.85rem;margin-bottom:.85rem;">
+        <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:.5rem;align-items:end;">
+          <div>
+            <div class="field-label">Symbol</div>
+            <input id="alert-symbol" class="input-field" placeholder="AAPL" style="text-transform:uppercase;">
+          </div>
+          <div>
+            <div class="field-label">Direction</div>
+            <select id="alert-direction" class="input-field">
+              <option value="above">Above</option>
+              <option value="below">Below</option>
+            </select>
+          </div>
+          <div>
+            <div class="field-label">Target Price ($)</div>
+            <input id="alert-price" class="input-field" type="number" step="0.01" placeholder="150.00">
+          </div>
+        </div>
+        <div style="display:flex;gap:.5rem;margin-top:.6rem;">
+          <button class="btn btn-sm btn-primary" id="save-alert-btn">Save Alert</button>
+          <button class="btn btn-sm btn-ghost" id="cancel-alert-btn">Cancel</button>
+        </div>
+      </div>
+
+      <div class="dtable-wrap">
+        <table class="dtable" id="alerts-table">
+          <thead><tr><th>Symbol</th><th>Direction</th><th>Target Price</th><th>Status</th><th></th></tr></thead>
+          <tbody id="alerts-body"><tr><td colspan="5" class="state-empty">No price alerts set.</td></tr></tbody>
+        </table>
+      </div>
     </div>
 
   </main>
