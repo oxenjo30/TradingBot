@@ -322,24 +322,34 @@ const PAGE_INIT = {
 };
 
 // ── Watchlist helpers (used inside initDashboard) ──
-let _wlData = [];    // [{id, name, symbols:[]}]
-let _wlActive = null; // id of currently selected watchlist
+let _wlData = [];
+let _wlActive = null;
 
 async function _wlLoad() {
-  _wlData = await api('/api/watchlists', { key: 'wl-list' });
-  _wlRenderSelect();
+  try { _wlData = await api('/api/watchlists', { key: 'wl-list' }); }
+  catch { _wlData = []; }
+  if (!_wlActive && _wlData.length) _wlActive = _wlData[0].id;
+  if (_wlActive && !_wlData.find(w => w.id === _wlActive)) _wlActive = _wlData[0]?.id ?? null;
+  _wlRenderTabs();
   _wlRenderChips();
 }
 
-function _wlRenderSelect() {
-  const sel = document.getElementById('wl-select');
-  if (!sel) return;
-  const prev = _wlActive;
-  sel.innerHTML = _wlData.length
-    ? _wlData.map(w => `<option value="${w.id}"${w.id === _wlActive ? ' selected' : ''}>${escHtml(w.name)}</option>`).join('')
-    : '<option value="">— no lists —</option>';
-  _wlActive = _wlData.length ? (prev && _wlData.find(w => w.id === prev) ? prev : _wlData[0].id) : null;
-  if (sel.value) _wlActive = Number(sel.value);
+function _wlRenderTabs() {
+  const tabs = document.getElementById('wl-tabs');
+  if (!tabs) return;
+  if (!_wlData.length) {
+    tabs.innerHTML = '<span style="font-size:12px;color:var(--muted);line-height:28px;">No watchlists yet — click <strong style="color:var(--text);">New list</strong> to create one.</span>';
+    return;
+  }
+  tabs.innerHTML = _wlData.map(w => {
+    const on = w.id === _wlActive;
+    return `<button onclick="window._wlSwitch(${w.id})" style="
+      display:inline-flex;align-items:center;height:28px;padding:0 14px;border-radius:7px;
+      font-size:12px;font-weight:${on ? '600' : '500'};cursor:pointer;
+      border:1px solid ${on ? 'rgba(99,102,241,.5)' : 'var(--border)'};
+      background:${on ? 'rgba(99,102,241,.15)' : 'transparent'};
+      color:${on ? '#A5B4FC' : 'var(--muted)'};transition:all .15s;">${escHtml(w.name)}</button>`;
+  }).join('');
 }
 
 function _wlRenderChips() {
@@ -347,22 +357,38 @@ function _wlRenderChips() {
   if (!el) return;
   const wl = _wlData.find(w => w.id === _wlActive);
   if (!wl || !wl.symbols.length) {
-    el.innerHTML = '<span style="font-size:12px;color:#64748b;">Empty — add symbols below.</span>';
+    el.innerHTML = `<span style="font-size:12px;color:var(--muted);">${wl ? 'Empty — add a symbol above.' : ''}</span>`;
     return;
   }
   el.innerHTML = wl.symbols.map(sym => `
-    <span style="display:inline-flex;align-items:center;gap:4px;background:var(--card);border:1px solid var(--border);border-radius:999px;padding:3px 10px;font-size:12px;font-weight:600;">
+    <span style="display:inline-flex;align-items:center;gap:6px;
+      background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.22);
+      border-radius:7px;padding:5px 10px 5px 12px;font-size:12px;font-weight:600;
+      color:#A5B4FC;letter-spacing:.03em;">
       ${escHtml(sym)}
       <button onclick="window._wlRemove(${_wlActive},'${escHtml(sym)}')"
-        style="background:none;border:none;cursor:pointer;color:#64748b;line-height:1;padding:0;font-size:14px;" title="Remove">&times;</button>
+        style="background:none;border:none;cursor:pointer;color:rgba(165,180,252,.45);
+        padding:0;display:flex;align-items:center;transition:color .1s;"
+        onmouseover="this.style.color='#EF4444'" onmouseout="this.style.color='rgba(165,180,252,.45)'"
+        title="Remove ${escHtml(sym)}">
+        <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
     </span>`).join('');
 }
+
+window._wlSwitch = function(id) {
+  _wlActive = id;
+  _wlRenderTabs();
+  _wlRenderChips();
+};
 
 window._wlRemove = async function(wlId, sym) {
   try {
     await api(`/api/watchlists/${wlId}/symbols/${encodeURIComponent(sym)}`, { method: 'DELETE' });
     await _wlLoad();
-  } catch (e) { alert('Failed to remove symbol.'); }
+  } catch { alert('Failed to remove symbol.'); }
 };
 
 // ── Account mode badge (sidebar card reflects live vs paper) ──
@@ -873,23 +899,22 @@ async function initDashboard() {
 
   // ── Watchlist wiring ──
   (function initWatchlistPanel() {
-    const selEl   = document.getElementById('wl-select');
+    const tabsEl  = document.getElementById('wl-tabs');
+    if (!tabsEl) return;
     const newBtn  = document.getElementById('wl-new-btn');
     const delBtn  = document.getElementById('wl-delete-btn');
     const addInp  = document.getElementById('wl-add-input');
     const addBtn  = document.getElementById('wl-add-btn');
-    if (!selEl) return;
-
-    selEl.addEventListener('change', () => {
-      _wlActive = Number(selEl.value) || null;
-      _wlRenderChips();
-    });
 
     newBtn && newBtn.addEventListener('click', async () => {
       const name = prompt('Watchlist name:');
       if (!name || !name.trim()) return;
       try {
-        const w = await api('/api/watchlists', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: name.trim() }) });
+        const w = await api('/api/watchlists', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: name.trim() }),
+        });
         _wlActive = w.id;
         await _wlLoad();
       } catch { alert('Could not create watchlist.'); }

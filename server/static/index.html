@@ -283,27 +283,51 @@
     </div>
 
     <!-- Row 4: Watchlist -->
-    <div class="card">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem;gap:.5rem;flex-wrap:wrap;">
-        <div style="font-size:13px;font-weight:600;">Watchlists</div>
-        <div style="display:flex;align-items:center;gap:.5rem;">
-          <select id="wl-select" class="input" style="font-size:12px;padding:.25rem .5rem;height:28px;min-width:120px;background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:6px;"></select>
-          <button class="btn btn-ghost btn-sm" id="wl-new-btn" title="New watchlist">
-            <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          </button>
-          <button class="btn btn-ghost btn-sm" id="wl-delete-btn" title="Delete watchlist" style="color:#EF4444;">
-            <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
-          </button>
+    <div class="card" style="padding:1.1rem 1.25rem;">
+
+      <!-- Header row -->
+      <div class="flex items-center justify-between mb-3">
+        <div class="flex items-center gap-2">
+          <div class="icon-circle" style="background:rgba(99,102,241,.15);">
+            <svg width="14" height="14" fill="none" stroke="#6366F1" stroke-width="2" viewBox="0 0 24 24">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+            </svg>
+          </div>
+          <span style="font-size:13px;font-weight:600;">Watchlist</span>
         </div>
+        <!-- New list button -->
+        <button id="wl-new-btn" class="btn btn-ghost btn-sm flex items-center gap-1" title="New watchlist" style="font-size:12px;color:var(--muted);">
+          <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          New list
+        </button>
       </div>
-      <!-- Chips -->
-      <div id="wl-chips" style="display:flex;flex-wrap:wrap;gap:.4rem;min-height:28px;margin-bottom:.65rem;"></div>
-      <!-- Add symbol -->
-      <div style="display:flex;gap:.5rem;">
-        <input id="wl-add-input" type="text" class="input" placeholder="Add symbol e.g. AAPL"
-          style="font-size:12px;padding:.25rem .6rem;height:28px;max-width:180px;text-transform:uppercase;">
-        <button class="btn btn-primary btn-sm" id="wl-add-btn" style="height:28px;font-size:12px;">Add</button>
+
+      <!-- List tabs (injected by JS into #wl-select) -->
+      <div id="wl-tabs" style="display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:.9rem;min-height:28px;"></div>
+
+      <!-- Divider -->
+      <div style="height:1px;background:var(--border);margin-bottom:.9rem;"></div>
+
+      <!-- Symbol chips area -->
+      <div id="wl-chips" style="display:flex;flex-wrap:wrap;gap:.45rem;min-height:32px;margin-bottom:.85rem;align-items:center;"></div>
+
+      <!-- Add symbol row -->
+      <div style="display:flex;gap:.5rem;align-items:center;">
+        <div class="search-bar" style="width:auto;flex:1;max-width:260px;padding:5px 12px;">
+          <svg width="13" height="13" fill="none" stroke="var(--muted)" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input id="wl-add-input" type="text" placeholder="Symbol e.g. AAPL"
+            style="background:none;border:none;outline:none;color:var(--text);font-size:12px;width:100%;text-transform:uppercase;"
+            autocomplete="off" spellcheck="false">
+        </div>
+        <button id="wl-add-btn" class="btn btn-primary btn-sm" style="font-size:12px;padding:5px 14px;">Add</button>
+        <button id="wl-delete-btn" class="btn btn-ghost btn-sm flex items-center gap-1" title="Delete watchlist" style="font-size:12px;color:#EF4444;margin-left:auto;">
+          <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+          Delete list
+        </button>
       </div>
+
+      <!-- hidden select kept for JS compatibility -->
+      <select id="wl-select" style="display:none;"></select>
     </div>
 
     <!-- Row 5: System Bar -->
