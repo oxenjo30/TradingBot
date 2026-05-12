@@ -14,12 +14,20 @@ from . import alpaca_client, auth, backtest as bt_mod, crypto, db, engine, notif
 from .config import STATIC_DIR, BASE_DIR
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
+log = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     crypto.init_crypto()  # must run before db.init_db() — migration calls crypto.encrypt()
     db.init_db()
+    # License check on startup
+    from .license import check_stored_license
+    lic = check_stored_license()
+    if not lic["valid"]:
+        log.warning("No valid license key. Dashboard will show license activation page.")
+    else:
+        log.info("License valid — %d days remaining.", lic["days_remaining"])
     existing = {s["name"] for s in db.get_strategies()}
     for cls in strategies.REGISTRY.values():
         if cls.name not in existing:
