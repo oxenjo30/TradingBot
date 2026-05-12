@@ -735,8 +735,10 @@ async function initDashboard() {
           badgeClass = 'b-disabled'; badgeText = 'Disabled';
         } else if (ranMap[s.name] && ranMap[s.name].error) {
           badgeClass = 'b-error'; badgeText = 'Error';
+        } else if (ranMap[s.name]) {
+          badgeClass = 'b-enabled'; badgeText = '';  // ran this cycle → Running
         } else {
-          badgeClass = 'b-enabled'; badgeText = '';  // enabled = always show Active
+          badgeClass = 'b-notrun'; badgeText = 'Idle'; // enabled but engine hasn't run it yet
         }
         badge.className = 'badge ' + badgeClass;
         if (badgeClass === 'b-enabled') {
@@ -744,7 +746,7 @@ async function initDashboard() {
           dot.className = 'pdot';
           badge.appendChild(dot);
           const t = document.createElement('span');
-          t.textContent = ranMap[s.name] ? 'Running' : 'Active';
+          t.textContent = 'Running';
           badge.appendChild(t);
         } else {
           badge.textContent = badgeText;
