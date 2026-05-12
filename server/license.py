@@ -12,8 +12,17 @@ MACHINE_ANY = "ANY"
 
 
 def _get_seller_secret() -> str:
-    """Return the seller secret from the environment, raising at runtime if absent."""
+    """Return the seller secret, re-reading .env if not already in environment."""
     secret = os.environ.get("TRADEBOT_LICENSE_SECRET")
+    if not secret:
+        # Try to load from .env directly (handles case where server started before key was added)
+        try:
+            from dotenv import load_dotenv
+            from pathlib import Path
+            load_dotenv(Path(__file__).parent.parent / ".env", override=True)
+            secret = os.environ.get("TRADEBOT_LICENSE_SECRET")
+        except Exception:
+            pass
     if not secret:
         raise RuntimeError(
             "TRADEBOT_LICENSE_SECRET environment variable is not set. "
