@@ -1502,14 +1502,19 @@ button { cursor: pointer; font-family: inherit; }
 }
 [data-theme="light"] .dtable tbody tr:hover { background: rgba(59,130,246,.04); }
 [data-theme="light"] .banner-paper {
-  background: rgba(59,130,246,.08);
-  border-color: rgba(59,130,246,.25);
-  color: #1d4ed8;
+  background: #DBEAFE;
+  border-bottom-color: #93C5FD;
+  color: #1D4ED8;
 }
 [data-theme="light"] .banner-kill {
-  background: rgba(239,68,68,.08);
-  border-color: rgba(239,68,68,.25);
-  color: #b91c1c;
+  background: #FEE2E2;
+  border-bottom-color: #FCA5A5;
+  color: #B91C1C;
+}
+[data-theme="light"] .banner-warn {
+  background: #FEF3C7;
+  border-bottom-color: #FCD34D;
+  color: #92400E;
 }
 [data-theme="light"] .skeleton {
   background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%);
