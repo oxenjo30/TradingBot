@@ -111,21 +111,43 @@ class TradierAccountClient:
         positions = raw.get("position", [])
         if isinstance(positions, dict):
             positions = [positions]
+        # Fetch quotes for all symbols in one call to enrich current_price / P&L
+        symbols = [p["symbol"] for p in positions]
+        quotes: dict[str, float] = {}
+        if symbols:
+            try:
+                data = self._get("/markets/quotes", params={"symbols": ",".join(symbols)})
+                raw_q = data.get("quotes", {}).get("quote", [])
+                if isinstance(raw_q, dict):
+                    raw_q = [raw_q]
+                for q in raw_q:
+                    mid = (float(q.get("bid", 0) or 0) + float(q.get("ask", 0) or 0)) / 2
+                    if not mid:
+                        mid = float(q.get("last", 0) or 0)
+                    quotes[q["symbol"]] = mid
+            except Exception:
+                pass
+
         out = []
         for p in positions:
             qty  = float(p.get("quantity", 0))
             side = "long" if qty >= 0 else "short"
             cost = float(p.get("cost_basis", 0) or 0)
             avg  = (cost / abs(qty)) if qty else 0.0
+            sym  = p["symbol"]
+            current_price = quotes.get(sym, 0.0)
+            market_value  = current_price * abs(qty) if current_price else cost
+            unrealized_pl = (current_price - avg) * abs(qty) if current_price else 0.0
+            unrealized_plpc = ((current_price - avg) / avg * 100) if avg and current_price else 0.0
             out.append({
-                "symbol":       p["symbol"],
-                "qty":          abs(qty),
-                "side":         side,
+                "symbol":          sym,
+                "qty":             abs(qty),
+                "side":            side,
                 "avg_entry_price": avg,
-                "current_price":   0.0,  # not available in position endpoint
-                "market_value":    float(p.get("cost_basis", 0) or 0),
-                "unrealized_pl":   0.0,
-                "unrealized_plpc": 0.0,
+                "current_price":   current_price,
+                "market_value":    market_value,
+                "unrealized_pl":   unrealized_pl,
+                "unrealized_plpc": unrealized_plpc,
                 "change_today":    0.0,
             })
         return out
