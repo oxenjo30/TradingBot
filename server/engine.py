@@ -15,6 +15,47 @@ _last_run: dict = {"ts": None, "ran": [], "signals": [], "error": None, "risk": 
 
 
 
+def _run_take_profit_pass(acct_client, acct_id: int, take_profit_pct: float,
+                          local_positions: dict) -> None:
+    """Sell any position whose unrealized gain >= take_profit_pct. Skips kill switch and risk checks."""
+    if take_profit_pct <= 0:
+        return
+    try:
+        live_positions = acct_client.get_positions()
+    except Exception as e:
+        log.warning("take-profit: get_positions failed for acct %d: %s", acct_id, e)
+        return
+
+    for p in live_positions:
+        if p.get("side", "long") != "long":
+            continue
+        plpc = p.get("unrealized_plpc", 0.0)
+        if plpc < take_profit_pct:
+            continue
+        symbol = p["symbol"]
+        qty = p.get("qty", 0.0)
+        if qty <= 0:
+            continue
+        reason = f"take-profit: {plpc:.2f}% >= {take_profit_pct:.2f}%"
+        log.info("take-profit triggered %s acct %d (%.2f%% gain)", symbol, acct_id, plpc)
+        try:
+            import uuid
+            client_oid = f"tp-{uuid.uuid4().hex[:12]}"
+            order = acct_client.submit_market_order(
+                symbol, "sell", qty=qty, client_order_id=client_oid
+            )
+            db.log_signal("take_profit", symbol, "sell", qty, reason,
+                          order["id"], order["status"], account_id=acct_id)
+            notifications.notify_trade(
+                "take_profit", symbol, "sell", qty, None, reason, order["id"]
+            )
+            local_positions.pop(symbol, None)
+        except Exception as e:
+            log.exception("take-profit order failed for %s acct %d", symbol, acct_id)
+            db.log_signal("take_profit", symbol, "sell", qty,
+                          f"{reason} | submit error: {e}", None, "error", account_id=acct_id)
+
+
 def run_tick():
     """Run all enabled strategies across all assigned broker accounts."""
     global _last_run
@@ -226,6 +267,13 @@ def run_tick():
         # record the strategy as market-closed so the UI can show "Waiting" vs "Idle".
         if not _strategy_ran:
             _last_run["ran"].append({"strategy": s["name"], "skipped": "market_closed"})
+
+    # ── Take-profit pass ────────────────────────────────────────────────────
+    tp_pct = db.get_risk_settings().get("take_profit_pct", 0.0)
+    for acct_id, acct_data in client_cache.items():
+        _run_take_profit_pass(
+            acct_data["client"], acct_id, tp_pct, acct_data["positions"]
+        )
 
     # Check price alerts using quotes fetched during this tick
     try:

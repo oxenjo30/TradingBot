@@ -75,6 +75,7 @@
     .ri-icon-cyan   { background: rgba(6,182,212,.1);   border: 1px solid rgba(6,182,212,.2); }
     .ri-icon-red    { background: rgba(239,68,68,.1);   border: 1px solid rgba(239,68,68,.2); }
     .ri-icon-indigo { background: rgba(99,102,241,.1);  border: 1px solid rgba(99,102,241,.2); }
+    .ri-icon-green  { background: rgba(16,185,129,.1);  border: 1px solid rgba(16,185,129,.2); }
     .ri-label { font-size: 12px; font-weight: 700; line-height: 1.2; }
     .ri-desc  { font-size: 11px; color: var(--muted); margin-top: 3px; line-height: 1.35; }
     .ri-sub   { font-size: 11px; color: var(--muted); }
@@ -434,6 +435,22 @@
               <span class="ri-suffix">%</span>
             </div>
             <button class="btn-risksave risk-save-btn" data-key="max_position_pct" data-source="inp-max-pos">Save</button>
+          </div>
+        </div>
+
+        <div class="ri">
+          <div class="ri-top">
+            <div class="ri-icon ri-icon-green">
+              <svg width="14" height="14" fill="none" stroke="#10B981" stroke-width="2" viewBox="0 0 24 24"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></svg>
+            </div>
+            <div><div class="ri-label">Take-Profit Target</div><div class="ri-desc">Auto-sell a position when unrealized gain reaches this %. 0 = disabled.</div></div>
+          </div>
+          <div class="ri-input-row">
+            <div class="ri-field">
+              <input id="inp-take-profit" type="number" step="0.5" min="0" max="1000" placeholder="0" data-key="take_profit_pct">
+              <span class="ri-suffix">%</span>
+            </div>
+            <button class="btn-risksave risk-save-btn" data-key="take_profit_pct" data-source="inp-take-profit">Save</button>
           </div>
         </div>
 
