@@ -321,6 +321,50 @@ const PAGE_INIT = {
   // login excluded — uses own inline script
 };
 
+// ── Watchlist helpers (used inside initDashboard) ──
+let _wlData = [];    // [{id, name, symbols:[]}]
+let _wlActive = null; // id of currently selected watchlist
+
+async function _wlLoad() {
+  _wlData = await api('/api/watchlists', { key: 'wl-list' });
+  _wlRenderSelect();
+  _wlRenderChips();
+}
+
+function _wlRenderSelect() {
+  const sel = document.getElementById('wl-select');
+  if (!sel) return;
+  const prev = _wlActive;
+  sel.innerHTML = _wlData.length
+    ? _wlData.map(w => `<option value="${w.id}"${w.id === _wlActive ? ' selected' : ''}>${escHtml(w.name)}</option>`).join('')
+    : '<option value="">— no lists —</option>';
+  _wlActive = _wlData.length ? (prev && _wlData.find(w => w.id === prev) ? prev : _wlData[0].id) : null;
+  if (sel.value) _wlActive = Number(sel.value);
+}
+
+function _wlRenderChips() {
+  const el = document.getElementById('wl-chips');
+  if (!el) return;
+  const wl = _wlData.find(w => w.id === _wlActive);
+  if (!wl || !wl.symbols.length) {
+    el.innerHTML = '<span style="font-size:12px;color:#64748b;">Empty — add symbols below.</span>';
+    return;
+  }
+  el.innerHTML = wl.symbols.map(sym => `
+    <span style="display:inline-flex;align-items:center;gap:4px;background:var(--card);border:1px solid var(--border);border-radius:999px;padding:3px 10px;font-size:12px;font-weight:600;">
+      ${escHtml(sym)}
+      <button onclick="window._wlRemove(${_wlActive},'${escHtml(sym)}')"
+        style="background:none;border:none;cursor:pointer;color:#64748b;line-height:1;padding:0;font-size:14px;" title="Remove">&times;</button>
+    </span>`).join('');
+}
+
+window._wlRemove = async function(wlId, sym) {
+  try {
+    await api(`/api/watchlists/${wlId}/symbols/${encodeURIComponent(sym)}`, { method: 'DELETE' });
+    await _wlLoad();
+  } catch (e) { alert('Failed to remove symbol.'); }
+};
+
 // ── Account mode badge (sidebar card reflects live vs paper) ──
 async function initAccountModeBadge() {
   const card = document.getElementById('mode-card');
@@ -678,28 +722,51 @@ async function initDashboard() {
     }
   }
 
-  // ── Fetch positions → allocation donut ──
+  // ── Fetch positions → portfolio heat map ──
   async function fetchPositions() {
     try {
       const positions = await api('/api/positions', { key: 'idx-positions' });
-      const allocEl = document.getElementById('alloc-chart');
-      const emptyEl = document.getElementById('alloc-empty');
+      const gridEl  = document.getElementById('heatmap-grid');
+      const emptyEl = document.getElementById('heatmap-empty');
 
       if (!positions.length) {
-        allocEl.classList.add('hidden');
+        gridEl.style.display  = 'none';
         emptyEl.classList.remove('hidden');
         return;
       }
-      allocEl.classList.remove('hidden');
+      gridEl.style.display = 'grid';
       emptyEl.classList.add('hidden');
-      allocEl.innerHTML = '';
-      if (allocChart) { allocChart.destroy(); }
-      const labels = positions.map(p => p.symbol);
-      const series = positions.map(p => Math.abs(p.market_value));
-      allocChart = safeMakeChart(allocEl, donutConfig(labels, series));
+
+      const totalMv = positions.reduce((s, p) => s + Math.abs(p.market_value || 0), 0) || 1;
+      const maxPct  = Math.max(...positions.map(p => Math.abs(p.unrealized_plpc || 0))) || 1;
+
+      gridEl.innerHTML = positions
+        .sort((a, b) => Math.abs(b.market_value) - Math.abs(a.market_value))
+        .map(p => {
+          const mv      = Math.abs(p.market_value || 0);
+          const plPct   = p.unrealized_plpc || 0;
+          const isGain  = plPct >= 0;
+          const intensity = Math.min(1, Math.abs(plPct) / maxPct);
+          const alpha   = 0.12 + intensity * 0.55;
+          const bg      = isGain
+            ? `rgba(16,185,129,${alpha.toFixed(2)})`
+            : `rgba(239,68,68,${alpha.toFixed(2)})`;
+          const border  = isGain ? 'rgba(16,185,129,.35)' : 'rgba(239,68,68,.35)';
+          const pnlSign = isGain ? '+' : '';
+          const sizePct = Math.round((mv / totalMv) * 100);
+          return `<div style="background:${bg};border:1px solid ${border};border-radius:8px;
+                    padding:.5rem .4rem;text-align:center;cursor:default;
+                    min-height:${Math.max(54, 40 + sizePct)}px;display:flex;flex-direction:column;
+                    align-items:center;justify-content:center;gap:2px;"
+                    title="${p.symbol} — MV: $${Math.round(mv).toLocaleString()} | P&L: ${pnlSign}${plPct.toFixed(2)}%">
+            <div style="font-size:11px;font-weight:700;color:#E6EBF5;letter-spacing:.03em;">${p.symbol}</div>
+            <div style="font-size:10px;color:${isGain ? '#10B981' : '#EF4444'};font-weight:600;">${pnlSign}${plPct.toFixed(1)}%</div>
+            <div style="font-size:9px;color:#64748B;">$${Math.round(mv).toLocaleString()}</div>
+          </div>`;
+        }).join('');
     } catch (e) {
       if (e.name === 'AbortError') return;
-      showError(document.getElementById('alloc-chart'));
+      showError(document.getElementById('heatmap-grid'));
       throw e;
     }
   }
@@ -803,6 +870,61 @@ async function initDashboard() {
       document.getElementById('sys-time').textContent = new Date(c.timestamp).toLocaleTimeString();
     } catch { /* non-critical */ }
   }
+
+  // ── Watchlist wiring ──
+  (function initWatchlistPanel() {
+    const selEl   = document.getElementById('wl-select');
+    const newBtn  = document.getElementById('wl-new-btn');
+    const delBtn  = document.getElementById('wl-delete-btn');
+    const addInp  = document.getElementById('wl-add-input');
+    const addBtn  = document.getElementById('wl-add-btn');
+    if (!selEl) return;
+
+    selEl.addEventListener('change', () => {
+      _wlActive = Number(selEl.value) || null;
+      _wlRenderChips();
+    });
+
+    newBtn && newBtn.addEventListener('click', async () => {
+      const name = prompt('Watchlist name:');
+      if (!name || !name.trim()) return;
+      try {
+        const w = await api('/api/watchlists', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: name.trim() }) });
+        _wlActive = w.id;
+        await _wlLoad();
+      } catch { alert('Could not create watchlist.'); }
+    });
+
+    delBtn && delBtn.addEventListener('click', async () => {
+      if (!_wlActive) return;
+      const wl = _wlData.find(w => w.id === _wlActive);
+      if (!wl || !confirm(`Delete watchlist "${wl.name}"?`)) return;
+      try {
+        await api(`/api/watchlists/${_wlActive}`, { method: 'DELETE' });
+        _wlActive = null;
+        await _wlLoad();
+      } catch { alert('Could not delete watchlist.'); }
+    });
+
+    const doAdd = async () => {
+      const sym = addInp ? addInp.value.trim().toUpperCase() : '';
+      if (!sym || !_wlActive) return;
+      try {
+        await api(`/api/watchlists/${_wlActive}/symbols`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ symbol: sym }),
+        });
+        addInp.value = '';
+        await _wlLoad();
+      } catch { alert('Could not add symbol.'); }
+    };
+
+    addBtn && addBtn.addEventListener('click', doAdd);
+    addInp && addInp.addEventListener('keydown', e => { if (e.key === 'Enter') doAdd(); });
+
+    _wlLoad();
+  })();
 
   // ── Start pollers ──
   fetchPerfChart('1D', '5Min');

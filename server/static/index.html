@@ -247,11 +247,11 @@
     <!-- Row 3: Allocation + P&L Breakdown + Recent Trades -->
     <div class="row-3col">
 
-      <!-- Allocation -->
+      <!-- Portfolio Heat Map -->
       <div class="card">
-        <div style="font-size:13px;font-weight:600;margin-bottom:.75rem;">Portfolio Allocation</div>
-        <div id="alloc-chart" style="min-height:155px;"></div>
-        <div id="alloc-empty" class="state-empty hidden">No open positions.</div>
+        <div style="font-size:13px;font-weight:600;margin-bottom:.75rem;">Portfolio Heat Map</div>
+        <div id="heatmap-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(72px,1fr));gap:6px;min-height:120px;"></div>
+        <div id="heatmap-empty" class="state-empty hidden">No open positions.</div>
       </div>
 
       <!-- P&L Breakdown -->
@@ -282,7 +282,31 @@
       </div>
     </div>
 
-    <!-- Row 4: System Bar -->
+    <!-- Row 4: Watchlist -->
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem;gap:.5rem;flex-wrap:wrap;">
+        <div style="font-size:13px;font-weight:600;">Watchlists</div>
+        <div style="display:flex;align-items:center;gap:.5rem;">
+          <select id="wl-select" class="input" style="font-size:12px;padding:.25rem .5rem;height:28px;min-width:120px;background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:6px;"></select>
+          <button class="btn btn-ghost btn-sm" id="wl-new-btn" title="New watchlist">
+            <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </button>
+          <button class="btn btn-ghost btn-sm" id="wl-delete-btn" title="Delete watchlist" style="color:#EF4444;">
+            <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+          </button>
+        </div>
+      </div>
+      <!-- Chips -->
+      <div id="wl-chips" style="display:flex;flex-wrap:wrap;gap:.4rem;min-height:28px;margin-bottom:.65rem;"></div>
+      <!-- Add symbol -->
+      <div style="display:flex;gap:.5rem;">
+        <input id="wl-add-input" type="text" class="input" placeholder="Add symbol e.g. AAPL"
+          style="font-size:12px;padding:.25rem .6rem;height:28px;max-width:180px;text-transform:uppercase;">
+        <button class="btn btn-primary btn-sm" id="wl-add-btn" style="height:28px;font-size:12px;">Add</button>
+      </div>
+    </div>
+
+    <!-- Row 5: System Bar -->
     <div class="sys-bar">
       <div class="sys-item"><div id="sys-exchange-dot" class="sys-dot off"></div><span>Exchange: <span id="sys-exchange">&rdquo;&rdquo;</span></span></div>
       <div class="sys-item"><div id="sys-api-dot" class="sys-dot off"></div><span>API: <span id="sys-api">&rdquo;&rdquo;</span></span></div>
