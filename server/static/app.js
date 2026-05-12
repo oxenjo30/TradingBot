@@ -1672,6 +1672,12 @@ async function initPerformance() {
       statsTbody.innerHTML = '';
       (p.strategy_stats || []).forEach(s => {
         const tr = document.createElement('tr');
+        // Status badge
+        const statusTd = document.createElement('td');
+        statusTd.innerHTML = s.enabled
+          ? '<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;color:#10B981;"><span style="width:6px;height:6px;border-radius:50%;background:#10B981;display:inline-block;"></span>Active</span>'
+          : '<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;color:#64748B;"><span style="width:6px;height:6px;border-radius:50%;background:#64748B;display:inline-block;"></span>Disabled</span>';
+        tr.appendChild(statusTd);
         [s.strategy, s.total, s.buys, s.sells, s.blocked].forEach(v => {
           const td = document.createElement('td');
           td.textContent = v ?? '0';
@@ -1680,7 +1686,7 @@ async function initPerformance() {
         statsTbody.appendChild(tr);
       });
       if (!p.strategy_stats?.length) {
-        statsTbody.innerHTML = '<tr><td colspan="5" class="state-empty">No data.</td></tr>';
+        statsTbody.innerHTML = '<tr><td colspan="6" class="state-empty">No data.</td></tr>';
       }
 
       // Top symbols table

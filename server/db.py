@@ -355,21 +355,34 @@ def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def upsert_strategy(name: str, enabled: bool, params: dict,
-                    active_start: str | None = None, active_end: str | None = None):
+_UNSET = object()  # sentinel — caller didn't provide the argument
+
+def upsert_strategy(name: str, enabled: bool, params: dict = _UNSET,
+                    active_start: str | None = _UNSET, active_end: str | None = _UNSET):
     with get_conn() as c:
-        c.execute(
-            """INSERT INTO strategies(name, enabled, params_json, active_start, active_end, updated_at)
-               VALUES(?,?,?,?,?,?)
-               ON CONFLICT(name) DO UPDATE SET
-                 enabled=excluded.enabled,
-                 params_json=excluded.params_json,
-                 active_start=excluded.active_start,
-                 active_end=excluded.active_end,
-                 updated_at=excluded.updated_at""",
-            (name, 1 if enabled else 0, json.dumps(params),
-             active_start or None, active_end or None, now_iso()),
-        )
+        existing = c.execute("SELECT * FROM strategies WHERE name=?", (name,)).fetchone()
+        if existing is None:
+            # First insert — use provided values or safe defaults
+            c.execute(
+                """INSERT INTO strategies(name, enabled, params_json, active_start, active_end, updated_at)
+                   VALUES(?,?,?,?,?,?)""",
+                (name, 1 if enabled else 0,
+                 json.dumps({} if params is _UNSET else params),
+                 None if active_start is _UNSET else (active_start or None),
+                 None if active_end   is _UNSET else (active_end   or None),
+                 now_iso()),
+            )
+        else:
+            # Partial update — only touch columns that were explicitly passed
+            sets, vals = ["enabled=?", "updated_at=?"], [1 if enabled else 0, now_iso()]
+            if params is not _UNSET:
+                sets.append("params_json=?"); vals.append(json.dumps(params))
+            if active_start is not _UNSET:
+                sets.append("active_start=?"); vals.append(active_start or None)
+            if active_end is not _UNSET:
+                sets.append("active_end=?");   vals.append(active_end   or None)
+            vals.append(name)
+            c.execute(f"UPDATE strategies SET {', '.join(sets)} WHERE name=?", vals)
 
 
 def get_strategies() -> list[dict]:
@@ -425,22 +438,24 @@ def recent_signals(limit: int = 100) -> list[dict]:
 # ── Performance analytics ──────────────────────────────────────────────────────
 
 def performance_by_strategy() -> list[dict]:
-    """Aggregate signal counts per strategy."""
+    """Aggregate signal counts per strategy, joined with live enabled status."""
     with get_conn() as c:
         rows = c.execute("""
             SELECT
-                strategy,
-                COUNT(*)                                          AS total,
-                SUM(CASE WHEN side='buy'       THEN 1 ELSE 0 END) AS buys,
-                SUM(CASE WHEN side='sell'      THEN 1 ELSE 0 END) AS sells,
-                SUM(CASE WHEN status='blocked' THEN 1 ELSE 0 END) AS blocked,
-                SUM(CASE WHEN status='error'   THEN 1 ELSE 0 END) AS errors,
-                COUNT(DISTINCT symbol)                             AS unique_symbols,
-                MIN(ts)                                           AS first_signal,
-                MAX(ts)                                           AS last_signal
-            FROM signals
-            WHERE strategy != 'manual'
-            GROUP BY strategy
+                sig.strategy,
+                COUNT(*)                                               AS total,
+                SUM(CASE WHEN sig.side='buy'       THEN 1 ELSE 0 END) AS buys,
+                SUM(CASE WHEN sig.side='sell'      THEN 1 ELSE 0 END) AS sells,
+                SUM(CASE WHEN sig.status='blocked' THEN 1 ELSE 0 END) AS blocked,
+                SUM(CASE WHEN sig.status='error'   THEN 1 ELSE 0 END) AS errors,
+                COUNT(DISTINCT sig.symbol)                             AS unique_symbols,
+                MIN(sig.ts)                                            AS first_signal,
+                MAX(sig.ts)                                            AS last_signal,
+                COALESCE(st.enabled, 0)                               AS enabled
+            FROM signals sig
+            LEFT JOIN strategies st ON st.name = sig.strategy
+            WHERE sig.strategy != 'manual'
+            GROUP BY sig.strategy
             ORDER BY total DESC
         """).fetchall()
     return [dict(r) for r in rows]
