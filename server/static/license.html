@@ -67,7 +67,7 @@
         const r = await fetch('/api/license/status');
         const d = await r.json();
         if (d.machine_id && d.machine_id !== 'ANY') {
-          document.getElementById('machine-id-display').textContent = 'Machine ID: ' + d.machine_id.slice(0,16) + '…';
+          document.getElementById('machine-id-display').textContent = 'Machine ID: ' + d.machine_id.slice(0,16) + '&hellip;';
         }
       } catch {}
     }
@@ -76,7 +76,7 @@
     btn.addEventListener('click', async () => {
       const key = input.value.trim();
       if (!key) { msg.textContent = 'Please paste your license key.'; msg.className = 'lic-msg lic-err'; return; }
-      btn.disabled = true; btn.textContent = 'Activating…';
+      btn.disabled = true; btn.textContent = 'Activating&hellip;';
       msg.textContent = ''; msg.className = 'lic-msg';
       try {
         const r = await fetch('/api/license/activate', {
@@ -86,7 +86,7 @@
         });
         const d = await r.json();
         if (r.ok && d.valid) {
-          msg.textContent = '✓ Activated! ' + d.days_remaining + ' days remaining. Redirecting…';
+          msg.textContent = '✓ Activated! ' + d.days_remaining + ' days remaining. Redirecting&hellip;';
           msg.className = 'lic-msg lic-ok';
           setTimeout(() => { location.href = '/static/login.html'; }, 1500);
         } else {

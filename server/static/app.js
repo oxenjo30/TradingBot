@@ -882,7 +882,7 @@ async function initBots() {
       document.getElementById('assigned-list').innerHTML =
         '<div class="empty-state"><div class="empty-state-icon">&#x1F511;</div>' +
         '<div class="empty-state-title">No accounts connected</div>' +
-        '<div class="empty-state-desc">Add a broker account to start assigning strategies.</div></div>';
+        '<div class="empty-state-desc">Add a broker account to start enabling strategies.</div></div>';
     }
   }
 
@@ -937,35 +937,20 @@ async function initBots() {
   }
 
   function renderStratPanel(acct, acctStrats) {
-    const assigned   = acctStrats.filter(s => s.assigned);
-    const unassigned = acctStrats.filter(s => !s.assigned);
-
+    const enabledCount = acctStrats.filter(s => s.enabled).length;
     document.getElementById('panel-meta').textContent =
-      `${assigned.length} of ${acctStrats.length} strategies assigned`;
-
-    const aLabel = document.getElementById('assigned-label');
-    const uLabel = document.getElementById('unassigned-label');
-    aLabel.style.display = '';
-    uLabel.style.display = '';
+      `${enabledCount} of ${acctStrats.length} strategies enabled`;
 
     const aList = document.getElementById('assigned-list');
     aList.innerHTML = '';
-    if (assigned.length === 0) {
-      aList.innerHTML = '<div style="padding:.85rem 1.25rem;font-size:12px;color:#64748B;font-style:italic;">No strategies assigned. Use + Assign below to add one.</div>';
+    if (acctStrats.length === 0) {
+      aList.innerHTML = '<div style="padding:.85rem 1.25rem;font-size:12px;color:#64748B;font-style:italic;">No strategies available.</div>';
     } else {
-      assigned.forEach(s => aList.appendChild(buildAssignedRow(acct, s)));
-    }
-
-    const uList = document.getElementById('unassigned-list');
-    uList.innerHTML = '';
-    if (unassigned.length === 0) {
-      uList.innerHTML = '<div style="padding:.85rem 1.25rem;font-size:12px;color:#64748B;font-style:italic;">All strategies are assigned to this account.</div>';
-    } else {
-      unassigned.forEach(s => uList.appendChild(buildUnassignedRow(acct, s)));
+      acctStrats.forEach(s => aList.appendChild(buildStratRow(acct, s)));
     }
   }
 
-  function buildAssignedRow(acct, s) {
+  function buildStratRow(acct, s) {
     const row = document.createElement('div');
     row.className = 'strat-row';
 
@@ -1006,58 +991,7 @@ async function initBots() {
       } catch { toggle.classList.remove('disabled'); }
     };
 
-    const removeBtn = document.createElement('button');
-    removeBtn.className = 'btn-remove';
-    removeBtn.textContent = 'Remove';
-    removeBtn.onclick = async () => {
-      removeBtn.disabled = true;
-      try {
-        await api(`/api/strategies/${s.name}/accounts/${acct.id}`, {
-          method: 'DELETE',
-          key: `bots-remove-${s.name}-${acct.id}`,
-        });
-        await selectAccount(acct);
-      } catch { removeBtn.disabled = false; }
-    };
-
-    actions.append(statusBadge, toggle, removeBtn);
-    row.append(icon, info, actions);
-    return row;
-  }
-
-  function buildUnassignedRow(acct, s) {
-    const row = document.createElement('div');
-    row.className = 'strat-row unassigned';
-
-    const icon = document.createElement('div');
-    icon.className = 'strat-icon si-inactive';
-    icon.innerHTML = stratIcon(s.name, false);
-
-    const info = document.createElement('div');
-    info.className = 'strat-info';
-    info.innerHTML = `<div class="strat-name">${escHtml(s.label)}</div>` +
-      `<div class="strat-desc">${escHtml(s.description)}</div>`;
-
-    const actions = document.createElement('div');
-    actions.className = 'strat-actions';
-
-    const assignBtn = document.createElement('button');
-    assignBtn.className = 'btn-assign';
-    assignBtn.textContent = '+ Assign';
-    assignBtn.onclick = async () => {
-      assignBtn.disabled = true;
-      try {
-        await api(`/api/strategies/${s.name}/accounts`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ account_id: acct.id, enabled: true }),
-          key: `bots-assign-${s.name}-${acct.id}`,
-        });
-        await selectAccount(acct);
-      } catch { assignBtn.disabled = false; }
-    };
-
-    actions.appendChild(assignBtn);
+    actions.append(statusBadge, toggle);
     row.append(icon, info, actions);
     return row;
   }
