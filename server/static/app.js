@@ -694,12 +694,10 @@ async function initDashboard() {
   // ── Fetch strategies → active bots + bot status panel ──
   async function fetchStrategies() {
     try {
-      console.log('[dashboard] fetchStrategies called');
       const [strats, engine] = await Promise.all([
         api('/api/strategies', { key: 'idx-strategies' }),
         api('/api/engine',     { key: 'idx-engine' }),
       ]);
-      console.log('[dashboard] strats received:', strats.map(s => s.name + ':' + s.enabled));
       const botsEl = document.getElementById('bots-val');
       clearState(botsEl);
       botsEl.textContent = strats.filter(s => s.enabled).length;
@@ -731,11 +729,9 @@ async function initDashboard() {
         if (!s.enabled) {
           badgeClass = 'b-disabled'; badgeText = 'Disabled';
         } else if (ranMap[s.name] && ranMap[s.name].error) {
-          badgeClass = 'b-error'; badgeText = 'Last Run Error';
-        } else if (ranMap[s.name]) {
-          badgeClass = 'b-enabled'; badgeText = '';
+          badgeClass = 'b-error'; badgeText = 'Error';
         } else {
-          badgeClass = 'b-notrun'; badgeText = 'Not Run Yet';
+          badgeClass = 'b-enabled'; badgeText = '';  // enabled = always show Active
         }
         badge.className = 'badge ' + badgeClass;
         if (badgeClass === 'b-enabled') {
@@ -743,7 +739,7 @@ async function initDashboard() {
           dot.className = 'pdot';
           badge.appendChild(dot);
           const t = document.createElement('span');
-          t.textContent = 'Enabled';
+          t.textContent = ranMap[s.name] ? 'Running' : 'Active';
           badge.appendChild(t);
         } else {
           badge.textContent = badgeText;
@@ -759,7 +755,6 @@ async function initDashboard() {
 
     } catch (e) {
       if (e.name === 'AbortError') return;
-      console.error('[dashboard] fetchStrategies error:', e.message, e);
       showError(document.getElementById('bots-val'));
       throw e;
     }
