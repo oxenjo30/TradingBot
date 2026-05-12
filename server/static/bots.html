@@ -135,6 +135,31 @@
     .result-panel { border-radius: 10px; padding: .75rem 1rem; font-size: 12px; line-height: 1.6; }
     .result-panel.error { background: rgba(239,68,68,.1); border: 1px solid rgba(239,68,68,.2); color: #fca5a5; }
     .result-panel:not(.error) { background: rgba(16,185,129,.08); border: 1px solid rgba(16,185,129,.2); color: #6ee7b7; }
+
+    /* ── Configure modal fields ── */
+    .cfg-field { display: flex; flex-direction: column; gap: .3rem; }
+    .cfg-label { font-size: 12px; font-weight: 600; color: var(--text); }
+    .cfg-hint  { font-size: 11px; color: var(--muted); line-height: 1.4; }
+    .cfg-input {
+      background: rgba(15,23,42,.6); border: 1px solid var(--border); border-radius: 8px;
+      padding: .4rem .65rem; font-size: 13px; color: var(--text); font-family: inherit;
+      width: 100%; outline: none; transition: border-color .15s;
+    }
+    .cfg-input:focus { border-color: #3B82F6; }
+    .cfg-toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+    .cfg-toggle-text { flex: 1; }
+    .cfg-bool-toggle {
+      position: relative; width: 34px; height: 19px; flex-shrink: 0;
+      background: rgba(255,255,255,.08); border-radius: 10px; cursor: pointer;
+      transition: background .2s; border: 1px solid var(--border);
+    }
+    .cfg-bool-toggle.on { background: #16c784; border-color: #16c784; }
+    .cfg-bool-toggle::after {
+      content: ''; position: absolute; width: 13px; height: 13px;
+      background: #fff; border-radius: 50%; top: 2px; left: 2px;
+      transition: transform .2s; box-shadow: 0 1px 3px rgba(0,0,0,.3);
+    }
+    .cfg-bool-toggle.on::after { transform: translateX(15px); }
   </style>
 </head>
 <body data-page="bots">
@@ -339,6 +364,19 @@
     <div class="modal-actions">
       <button class="btn btn-ghost" data-action="cancel">Cancel</button>
       <button class="btn btn-primary" data-action="confirm">Deactivate</button>
+    </div>
+  </div>
+</div>
+
+<!-- Configure Strategy modal -->
+<div id="modal-configure" class="modal-overlay hidden" role="dialog" aria-modal="true">
+  <div class="modal-box" style="max-width:480px;width:100%;">
+    <div class="modal-title" id="cfg-modal-title">Configure Strategy</div>
+    <div class="modal-body" id="cfg-modal-body" style="max-height:60vh;overflow-y:auto;display:flex;flex-direction:column;gap:.9rem;"></div>
+    <div id="cfg-modal-msg" style="font-size:12px;min-height:16px;padding:0 0 .25rem;"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="cfg-cancel">Cancel</button>
+      <button class="btn btn-primary" id="cfg-save">Save</button>
     </div>
   </div>
 </div>
