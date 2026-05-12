@@ -8,8 +8,18 @@ import platform
 import time
 import uuid
 
-SELLER_SECRET = os.environ.get("TRADEBOT_LICENSE_SECRET", "CHANGE-ME-32-CHARS-SELLER-SECRET!")
 MACHINE_ANY = "ANY"
+
+
+def _get_seller_secret() -> str:
+    """Return the seller secret from the environment, raising at runtime if absent."""
+    secret = os.environ.get("TRADEBOT_LICENSE_SECRET")
+    if not secret:
+        raise RuntimeError(
+            "TRADEBOT_LICENSE_SECRET environment variable is not set. "
+            "Set it before starting the server."
+        )
+    return secret
 
 
 class LicenseError(Exception):
@@ -62,7 +72,7 @@ def check_stored_license() -> dict:
     if not key:
         return {"valid": False, "reason": "No license key entered.", "days_remaining": 0}
     try:
-        result = verify_key(key, SELLER_SECRET)
+        result = verify_key(key, _get_seller_secret())
         return {**result, "reason": ""}
     except LicenseError as e:
         return {"valid": False, "reason": str(e), "days_remaining": 0}
