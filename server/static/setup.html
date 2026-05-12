@@ -136,7 +136,7 @@
           <div class="feature-icon">&#x1F514;</div>
           <div>
             <div class="feature-title">Instant Notifications</div>
-            <div class="feature-desc">Email, Telegram, Slack, or Discord alerts every time a trade executes</div>
+            <div class="feature-desc">Email and Telegram alerts every time a trade executes</div>
           </div>
         </div>
       </div>
@@ -319,7 +319,7 @@
         Open Dashboard &rarr;
       </button>
       <div style="text-align:center;margin-top:.75rem;">
-        <a href="/static/settings.html" style="font-size:.8rem;color:#4a6080;text-decoration:none;">Set up notifications (Slack, email, Telegram)</a>
+        <a href="/static/settings.html" style="font-size:.8rem;color:#4a6080;text-decoration:none;">Set up notifications (email, Telegram)</a>
       </div>
     </div>
 
@@ -417,16 +417,32 @@ function showBrokerResult(msg, type) {
   el.style.display = 'block';
 }
 
-function testBrokerConnection() {
+async function testBrokerConnection() {
   const key    = document.getElementById('s-api-key').value.trim();
   const secret = document.getElementById('s-api-secret').value.trim();
   if (!key || !secret) { showBrokerResult('Enter your API Key and Secret first.', 'err'); return; }
-  // Basic format check — full validation happens when broker is saved after login
-  const looksValid = (key.startsWith('PK') || key.startsWith('AK') || key.length >= 20) && secret.length >= 20;
-  if (looksValid) {
-    showBrokerResult('Keys look valid. Click "Save & Continue" to connect.', 'ok');
-  } else {
-    showBrokerResult('Keys look invalid. Alpaca API keys start with PK (paper) or AK (live) and are 20+ characters.', 'err');
+  const btn = document.getElementById('btn-test-broker');
+  btn.disabled = true;
+  btn.textContent = 'Testing…';
+  showBrokerResult('Connecting to Alpaca…', 'ok');
+  try {
+    const r = await fetch('/api/setup/test-credentials', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ api_key: key, api_secret: secret, account_type: _brokerMode, broker: 'alpaca' }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (r.ok) {
+      const equity = d.equity ? ` — Equity: $${parseFloat(d.equity).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2})}` : '';
+      showBrokerResult(`✓ Connected successfully${equity}`, 'ok');
+    } else {
+      showBrokerResult(d.detail || 'Connection failed. Check your keys and account type.', 'err');
+    }
+  } catch {
+    showBrokerResult('Could not reach server. Is TradeBot running?', 'err');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> Test';
   }
 }
 
@@ -450,6 +466,9 @@ async function finishSetup() {
     err.style.display = 'block'; err.textContent = 'Passwords do not match.'; return;
   }
   err.style.display = 'none';
+
+  const finishBtn = document.querySelector('#step-4 .btn-primary');
+  if (finishBtn) { finishBtn.disabled = true; finishBtn.textContent = 'Setting up…'; }
 
   const payload = {
     notional:           parseFloat(document.getElementById('s-notional').value) || 500,
@@ -505,6 +524,7 @@ async function finishSetup() {
     nextStep();
   } catch {
     err.style.display = 'block'; err.textContent = 'Error saving setup. Please try again.';
+    if (finishBtn) { finishBtn.disabled = false; finishBtn.textContent = 'Finish Setup →'; }
   }
 }
 
