@@ -139,6 +139,7 @@ RISK_DEFAULTS = {
     "max_symbol_exposure_pct": "0",     # 0 = disabled
     "trading_hours_start":     "",      # "" = disabled (HH:MM ET)
     "trading_hours_end":       "",      # "" = disabled (HH:MM ET)
+    "take_profit_pct":         "0",    # 0 = disabled
 }
 
 
@@ -296,6 +297,7 @@ def get_risk_settings() -> dict:
         "max_symbol_exposure_pct": float(base["max_symbol_exposure_pct"]),
         "trading_hours_start":     base["trading_hours_start"],
         "trading_hours_end":       base["trading_hours_end"],
+        "take_profit_pct":         float(base["take_profit_pct"]),
     }
 
 
@@ -1125,3 +1127,11 @@ def get_strategy_perf_90d(strategy: str) -> dict:
         "win_rate":     round(wins / total * 100, 1) if total else 0.0,
         "avg_pnl":      round(row["avg_pnl"], 2),
     }
+
+
+def set_tuning_win_rate_after(run_id: int, win_rate: float) -> None:
+    with get_conn() as c:
+        c.execute(
+            "UPDATE ai_tuning_log SET win_rate_after=? WHERE id=?",
+            (win_rate, run_id),
+        )
