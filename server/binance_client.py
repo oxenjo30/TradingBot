@@ -107,3 +107,21 @@ class BinanceAccountClient:
                 "change_today":    0.0,
             })
         return out
+
+    def get_recent_bars(self, symbol: str, days: int = 60) -> list[dict]:
+        from datetime import datetime, timezone
+        ohlcv = self._exchange.fetch_ohlcv(_to_ccxt(symbol), "1d", limit=days)
+        out = []
+        for row in ohlcv:
+            ts_ms, o, h, l, c, v = row
+            t = datetime.fromtimestamp(ts_ms / 1000, tz=timezone.utc).isoformat()
+            out.append({"t": t, "o": float(o), "h": float(h),
+                        "l": float(l), "c": float(c), "v": float(v)})
+        return out
+
+    def get_latest_quote(self, symbol: str) -> dict:
+        book = self._exchange.fetch_order_book(_to_ccxt(symbol), limit=1)
+        bid  = float(book["bids"][0][0]) if book.get("bids") else 0.0
+        ask  = float(book["asks"][0][0]) if book.get("asks") else 0.0
+        mid  = (bid + ask) / 2 if (bid and ask) else (bid or ask)
+        return {"symbol": _from_ccxt(_to_ccxt(symbol)), "bid": bid, "ask": ask, "price": mid}
