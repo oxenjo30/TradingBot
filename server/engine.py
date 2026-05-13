@@ -171,7 +171,7 @@ def run_tick():
 
             try:
                 strat = strategies.build(s["name"], s["params"])
-                signals = strat.evaluate(positions)
+                signals = strat.evaluate(positions, client=acct_client)
             except Exception as e:
                 log.exception("strategy %s acct %d failed", s["name"], acct_id)
                 db.log_signal(s["name"], "-", "-", 0, f"error: {e}", None, "error")

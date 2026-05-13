@@ -44,8 +44,15 @@ class Strategy:
         return Signal(symbol=symbol, side=side, reason=reason,
                       qty=float(qty) if qty else 1.0)
 
-    def evaluate(self, positions: dict[str, float]) -> list[Signal]:
+    def evaluate(self, positions: dict[str, float], client=None) -> list[Signal]:
         return []
+
+    def _get_bars(self, client, symbol: str, days: int) -> list[dict]:
+        """Fetch bars from the account's broker client, falling back to alpaca."""
+        if client is not None and hasattr(client, "get_recent_bars"):
+            return client.get_recent_bars(symbol, days=days)
+        from .. import alpaca_client
+        return alpaca_client.get_recent_bars(symbol, days=days)
 
     @classmethod
     def describe(cls) -> dict:

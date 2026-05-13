@@ -188,8 +188,13 @@ function initMobileSidebar() {
 // ── Clock chip ──
 async function initClockChip(chipEl) {
   try {
-    const clock = await api('/api/clock', { key: 'clock' });
-    chipEl.textContent = 'US Equities ' + (clock.is_open ? 'Open' : 'Closed');
+    const [clock, accounts] = await Promise.all([
+      api('/api/clock', { key: 'clock' }),
+      api('/api/broker-accounts', { key: 'clock-accounts' }).catch(() => []),
+    ]);
+    const hasBinance = (accounts || []).some(a => a.broker === 'binance');
+    const usLabel = 'US Equities ' + (clock.is_open ? 'Open' : 'Closed');
+    chipEl.textContent = hasBinance ? usLabel + ' · Binance 24/7' : usLabel;
     chipEl.className = 'market-chip ' + (clock.is_open ? 'open' : 'closed');
     return clock;
   } catch {
@@ -1602,6 +1607,7 @@ async function initPositions() {
   // Account selector for positions/orders
   let posAccountId = null;
   let moAccountId  = null;
+  let moIsCrypto   = false; // true when selected account is Binance
 
   async function buildAccountSelectors() {
     try {
@@ -1626,7 +1632,15 @@ async function initPositions() {
       }
 
       makeSelect('pos-account-wrap', id => { posAccountId = id; fetchPositions(); fetchOrders(); });
-      makeSelect('mo-account-wrap',  id => { moAccountId  = id; });
+      makeSelect('mo-account-wrap', id => {
+        moAccountId = id;
+        const acct = id ? accounts.find(a => a.id === id) : null;
+        moIsCrypto = !!(acct && acct.broker === 'binance');
+        applyMoMarketType();
+        // Re-fetch quote with new account context if symbol already entered
+        const sym = symInput?.value.trim();
+        if (sym) fetchQuote(sym);
+      });
     } catch {}
   }
   buildAccountSelectors();
@@ -1809,17 +1823,25 @@ async function initPositions() {
     modeQtyBtn?.classList.toggle('mot-toggle-active', isQty);
     modeNotionalBtn?.classList.toggle('mot-toggle-active', !isQty);
     if (isQty) {
-      if (qtyLabel) qtyLabel.textContent = 'Shares';
+      if (qtyLabel) qtyLabel.textContent = moIsCrypto ? 'Qty' : 'Shares';
       if (qtyInput) { qtyInput.placeholder = '0'; qtyInput.step = 'any'; }
       if (priceWrap) priceWrap.style.display = '';
     } else {
-      if (qtyLabel) qtyLabel.textContent = 'USD Value';
+      if (qtyLabel) qtyLabel.textContent = moIsCrypto ? 'USDT Value' : 'USD Value';
       if (qtyInput) { qtyInput.placeholder = '0.00'; qtyInput.step = '0.01'; }
       if (priceWrap) priceWrap.style.display = 'none';
       if (priceInput) priceInput.value = '';
     }
     updateEstTotal();
   }
+
+  function applyMoMarketType() {
+    // Update labels and toggle button text based on market type
+    if (modeQtyBtn) modeQtyBtn.textContent = moIsCrypto ? 'Qty' : 'Shares';
+    if (modeNotionalBtn) modeNotionalBtn.textContent = moIsCrypto ? 'USDT Value' : 'USD Value';
+    setMoMode(modeIsQty); // refresh current mode labels
+  }
+
   modeQtyBtn?.addEventListener('click',      () => setMoMode(true));
   modeNotionalBtn?.addEventListener('click', () => setMoMode(false));
 
@@ -1830,7 +1852,8 @@ async function initPositions() {
     quoteDisplay.textContent = 'Fetching price…';
     moMidPrice = 0;
     try {
-      const res = await fetch('/api/quote/' + encodeURIComponent(sym));
+      const qs = moAccountId ? `?account_id=${moAccountId}` : '';
+      const res = await fetch('/api/quote/' + encodeURIComponent(sym) + qs);
       if (!res.ok) throw new Error('not found');
       const q = await res.json();
       const bid = parseFloat(q.bid) || 0;

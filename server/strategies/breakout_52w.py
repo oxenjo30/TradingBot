@@ -90,7 +90,7 @@ class Breakout52Week(Strategy):
                     seen.add(s)
         return fixed
 
-    def evaluate(self, positions):
+    def evaluate(self, positions, client=None):
         out: list[Signal] = []
         lookback     = int(self.params.get("lookback_days", 252))
         vol_days     = int(self.params.get("volume_avg_days", 20))
@@ -103,7 +103,7 @@ class Breakout52Week(Strategy):
 
         for sym in self._get_symbols():
             try:
-                bars = alpaca_client.get_recent_bars(sym, days=lookback + 30)
+                bars = self._get_bars(client, sym, days=lookback + 30)
             except Exception:
                 continue
             if len(bars) < lookback:

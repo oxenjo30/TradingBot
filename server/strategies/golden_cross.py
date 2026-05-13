@@ -53,7 +53,7 @@ class GoldenCross(Strategy):
             )
         return [s.upper().strip() for s in (self.params.get("symbols") or []) if s]
 
-    def evaluate(self, positions):
+    def evaluate(self, positions, client=None):
         out: list[Signal] = []
         fast = int(self.params.get("fast", 50))
         slow = int(self.params.get("slow", 200))
@@ -61,7 +61,7 @@ class GoldenCross(Strategy):
         for sym in self._get_symbols():
             try:
                 # need 200 + a few extra days of history
-                bars = alpaca_client.get_recent_bars(sym, days=slow + 30)
+                bars = self._get_bars(client, sym, days=slow + 30)
             except Exception:
                 continue
             closes = [b["c"] for b in bars]

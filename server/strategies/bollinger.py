@@ -88,7 +88,7 @@ class BollingerBandMeanReversion(Strategy):
             )
         return [s.upper().strip() for s in (self.params.get("symbols") or []) if s]
 
-    def evaluate(self, positions):
+    def evaluate(self, positions, client=None):
         out: list[Signal] = []
         period      = int(self.params.get("period", 20))
         num_std     = float(self.params.get("num_std", 2.0))
@@ -98,7 +98,7 @@ class BollingerBandMeanReversion(Strategy):
 
         for sym in self._get_symbols():
             try:
-                bars = alpaca_client.get_recent_bars(sym, days=max(period * 4, 90))
+                bars = self._get_bars(client, sym, days=max(period * 4, 90))
             except Exception:
                 continue
             closes = [b["c"] for b in bars]

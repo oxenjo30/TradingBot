@@ -85,7 +85,7 @@ class MomentumBreakout(Strategy):
                     seen.add(s)
         return fixed
 
-    def evaluate(self, positions):
+    def evaluate(self, positions, client=None):
         out: list[Signal] = []
         sma_n   = int(self.params.get("sma_period", 20))
         rsi_n   = int(self.params.get("rsi_period", 14))
@@ -98,7 +98,7 @@ class MomentumBreakout(Strategy):
 
         for sym in self._get_symbols():
             try:
-                bars = alpaca_client.get_recent_bars(sym, days=max(sma_n * 4, 90))
+                bars = self._get_bars(client, sym, days=max(sma_n * 4, 90))
             except Exception:
                 continue
             closes = [b["c"] for b in bars]
