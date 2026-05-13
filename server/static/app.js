@@ -1903,7 +1903,7 @@ async function initPositions() {
     const qty        = modeIsQty ? parseFloat(rawVal) : null;
     const notional   = !modeIsQty ? parseFloat(rawVal) : null;
     const limitPrice = modeIsQty && rawPrice ? parseFloat(rawPrice) : null;
-    const unitLabel  = modeIsQty ? 'shares' : 'USD';
+    const unitLabel  = modeIsQty ? (moIsCrypto ? 'units' : 'shares') : (moIsCrypto ? 'USDT' : 'USD');
     const sideLabel  = moSide === 'buy' ? 'BUY' : 'SELL';
     const priceLabel = limitPrice ? ` @ $${limitPrice.toFixed(2)} limit` : ' at market price';
 
