@@ -324,6 +324,7 @@ const PAGE_INIT = {
   performance: initPerformance,
   balances:    initBalances,
   logs:        initLogs,
+  'ai-tuning': initAiTuning,
   apikeys:     initApiKeys,
   risk:        initRisk,
   settings:    initSettings,
@@ -2836,6 +2837,84 @@ async function initLogs() {
   createPoller(fetchSignals, 30_000).start();
   createPoller(fetchAudit,   60_000).start();
 }
+
+// initAiTuning — ai-tuning.html
+// ─────────────────────────────────────────
+async function initAiTuning() {
+  initClockChip(document.getElementById('market-chip'));
+
+  async function loadStatus() {
+    try {
+      const s = await api('/api/ai/status');
+      const dot   = document.getElementById('ai-status-dot');
+      const label = document.getElementById('ai-status-label');
+      if (dot)   dot.style.background   = s.reachable ? '#10B981' : '#EF4444';
+      if (label) label.textContent = s.reachable
+        ? `Connected — model: ${s.model}`
+        : `Offline (${s.url})`;
+    } catch (_) {}
+  }
+
+  async function loadLog() {
+    const tbody = document.getElementById('tuning-log-body');
+    if (!tbody) return;
+    try {
+      const rows = await api('/api/ai/tuning-log');
+      if (!rows.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="state-empty">No tuning runs yet. The AI will analyze your strategies every Sunday at 11 PM.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = rows.map(r => {
+        const changes = Object.entries(r.new_params)
+          .filter(([k, v]) => r.old_params[k] !== v)
+          .map(([k, v]) => `${k}: ${r.old_params[k]} → ${v}`)
+          .join(', ') || 'No changes';
+        return `<tr>
+          <td style="white-space:nowrap;">${fmt.time(r.created_at)}</td>
+          <td>${escHtml(r.strategy.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase()))}</td>
+          <td>${r.win_rate_before !== null ? r.win_rate_before + '%' : '—'}</td>
+          <td style="font-size:11px;font-family:monospace;">${escHtml(changes)}</td>
+          <td style="font-size:11px;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escHtml(r.rationale)}">${escHtml(r.rationale)}</td>
+          <td><button class="btn btn-sm" style="font-size:11px;background:rgba(239,68,68,.1);color:#EF4444;border-color:rgba(239,68,68,.3);" onclick="revertTuning(${r.id})">Revert</button></td>
+        </tr>`;
+      }).join('');
+    } catch (_) {
+      tbody.innerHTML = '<tr><td colspan="6" class="state-error">Failed to load tuning log.</td></tr>';
+    }
+  }
+
+  document.getElementById('tune-now-btn')?.addEventListener('click', async () => {
+    const btn = document.getElementById('tune-now-btn');
+    const msg = document.getElementById('tune-msg');
+    btn.disabled = true;
+    btn.textContent = 'Running…';
+    if (msg) msg.textContent = '';
+    try {
+      const result = await api('/api/ai/tune-now', { method: 'POST' });
+      if (msg) msg.textContent = result.error
+        ? `Error: ${result.error}`
+        : `Done — ${result.tuned} updated, ${result.skipped} skipped`;
+      await loadLog();
+    } catch (e) {
+      if (msg) msg.textContent = `Error: ${e.message}`;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Run Tuning Now';
+    }
+  });
+
+  await Promise.all([loadStatus(), loadLog()]);
+}
+
+window.revertTuning = async function(runId) {
+  if (!confirm('Revert this tuning change? The strategy params will be restored to their previous values.')) return;
+  try {
+    await api(`/api/ai/tuning-log/${runId}/revert`, { method: 'POST' });
+    location.reload();
+  } catch (e) {
+    alert(`Revert failed: ${e.message}`);
+  }
+};
 
 // initApiKeys — apikeys.html
 // ─────────────────────────────────────────
