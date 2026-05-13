@@ -929,11 +929,20 @@ def rename_backtest_run(run_id: int, name: str) -> bool:
 
 # ── Watchlists ─────────────────────────────────────────────────────────────────
 
+def _clean_wl_symbols(syms: list) -> list:
+    seen, out = set(), []
+    for s in syms:
+        s = str(s).upper().strip().split("/")[0]
+        if s and s not in seen:
+            seen.add(s)
+            out.append(s)
+    return out
+
 def get_watchlists() -> list[dict]:
     with get_conn() as c:
         rows = c.execute("SELECT * FROM watchlists ORDER BY name").fetchall()
     return [{"id": r["id"], "name": r["name"],
-             "symbols": json.loads(r["symbols"]), "updated_at": r["updated_at"]} for r in rows]
+             "symbols": _clean_wl_symbols(json.loads(r["symbols"])), "updated_at": r["updated_at"]} for r in rows]
 
 def get_watchlist(wl_id: int) -> dict | None:
     with get_conn() as c:
@@ -941,7 +950,7 @@ def get_watchlist(wl_id: int) -> dict | None:
     if not r:
         return None
     return {"id": r["id"], "name": r["name"],
-            "symbols": json.loads(r["symbols"]), "updated_at": r["updated_at"]}
+            "symbols": _clean_wl_symbols(json.loads(r["symbols"])), "updated_at": r["updated_at"]}
 
 def create_watchlist(name: str) -> dict:
     with get_conn() as c:
@@ -960,7 +969,7 @@ def add_watchlist_symbol(wl_id: int, symbol: str) -> dict | None:
     if not wl:
         return None
     syms = wl["symbols"]
-    symbol = symbol.upper().strip()
+    symbol = symbol.upper().strip().split("/")[0]
     if symbol not in syms:
         syms.append(symbol)
     with get_conn() as c:
@@ -972,7 +981,7 @@ def remove_watchlist_symbol(wl_id: int, symbol: str) -> dict | None:
     wl = get_watchlist(wl_id)
     if not wl:
         return None
-    syms = [s for s in wl["symbols"] if s != symbol.upper().strip()]
+    syms = [s for s in wl["symbols"] if s != symbol.upper().strip().split("/")[0]]
     with get_conn() as c:
         c.execute("UPDATE watchlists SET symbols=?, updated_at=? WHERE id=?",
                   (json.dumps(syms), now_iso(), wl_id))
