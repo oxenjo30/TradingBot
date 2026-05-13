@@ -7,6 +7,10 @@ from .bollinger import BollingerBandMeanReversion
 from .breakout_52w import Breakout52Week
 from .macd_volume import MACDVolume
 from .golden_cross import GoldenCross
+from .crypto_trend import CryptoTrend
+from .crypto_rsi_bounce import CryptoRSIBounce
+from .crypto_volatility_breakout import CryptoVolatilityBreakout
+from .crypto_grid import CryptoGrid
 
 REGISTRY: dict[str, type[Strategy]] = {
     cls.name: cls for cls in (
@@ -18,6 +22,10 @@ REGISTRY: dict[str, type[Strategy]] = {
         Breakout52Week,
         MACDVolume,
         GoldenCross,
+        CryptoTrend,
+        CryptoRSIBounce,
+        CryptoVolatilityBreakout,
+        CryptoGrid,
     )
 }
 
