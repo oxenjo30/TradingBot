@@ -196,6 +196,7 @@ def run_tick():
                         open_positions_count=len(acct_data["positions"]),
                         current_symbol_value=acct_data["market_values"].get(sig.symbol, 0.0),
                         account_id=acct_id,
+                        broker=broker,
                     )
                 except risk.RiskViolation as rv:
                     reason = f"RISK BLOCK: {rv}"

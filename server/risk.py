@@ -79,9 +79,12 @@ def _get_weekly_pl_pct(account: dict) -> float:
 
 # ── Pre-order checks ──────────────────────────────────────────────────────────
 
+_CRYPTO_BROKERS = {"binance"}
+
 def check_all(symbol: str, side: str, account: dict, day_trade_count: int,
               open_positions_count: int = 0, current_symbol_value: float = 0.0,
-              notional: float = 0.0, qty: float = None, account_id: int | None = None):
+              notional: float = 0.0, qty: float = None, account_id: int | None = None,
+              broker: str = "alpaca"):
     """
     Raises RiskViolation if any guard fails.
     Call before every auto-order submission.
@@ -91,8 +94,10 @@ def check_all(symbol: str, side: str, account: dict, day_trade_count: int,
     open_positions_count  — number of currently open positions
     current_symbol_value  — current market value (USD) held in this symbol
     account_id            — broker account id for per-account kill switch check
+    broker                — broker name; crypto brokers skip trading-hours guard
     """
     settings = get_settings()
+    is_crypto = broker.lower() in _CRYPTO_BROKERS
 
     # 1. Kill switch
     if settings["kill_switch"]:
@@ -108,10 +113,10 @@ def check_all(symbol: str, side: str, account: dict, day_trade_count: int,
     if symbol.upper() in blacklist:
         raise RiskViolation(f"{symbol} is on the no-trade blacklist")
 
-    # 3. Trading hours guard (ET)
+    # 3. Trading hours guard (ET) — skipped for 24/7 crypto brokers
     start_str = settings.get("trading_hours_start", "")
     end_str   = settings.get("trading_hours_end", "")
-    if start_str and end_str:
+    if start_str and end_str and not is_crypto:
         try:
             from zoneinfo import ZoneInfo
             et_now = datetime.now(ZoneInfo("America/New_York")).time()
