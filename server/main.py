@@ -121,7 +121,9 @@ def _get_broker_client(account_id: int | None):
         api_key=crypto.decrypt(acct["api_key"]),
         api_secret=crypto.decrypt(acct["api_secret"]),
         paper=(acct["account_type"] == "paper"),
+        account_id=account_id,
     )
+    client._account_id = account_id
     _broker_client_cache[account_id] = client
     return client
 
@@ -312,7 +314,24 @@ def license_deactivate(request: Request):
 @app.get("/api/account")
 def account(request: Request, account_id: int | None = None):
     _require_auth(request)
-    return _get_broker_client(account_id).get_account_summary()
+    summary = _get_broker_client(account_id).get_account_summary()
+    # For Binance accounts, attach signals-based P&L (more accurate than cost_basis table)
+    if account_id is not None:
+        acct_row = db.get_broker_account(account_id)
+        if acct_row and (acct_row.get("broker") or "alpaca").lower() == "binance":
+            pnl_data = db.crypto_pnl_from_signals(account_id)
+            summary["realized_pnl"]  = pnl_data["realized_pnl"]
+            summary["total_buy"]     = pnl_data["total_buy"]
+            summary["total_sell"]    = pnl_data["total_sell"]
+            summary["pnl_by_symbol"] = pnl_data["by_symbol"]
+    return summary
+
+
+@app.get("/api/crypto-pnl")
+def crypto_pnl(request: Request, account_id: int):
+    _require_auth(request)
+    return db.crypto_pnl_from_signals(account_id)
+
 
 @app.get("/api/clock")
 def clock():

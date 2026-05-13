@@ -242,9 +242,14 @@ def run_tick():
                         client_order_id=client_oid,
                     )
                     display_qty = final_qty if not sig.notional else sig.notional
+                    # Capture filled qty/price from order response for crypto P&L tracking
+                    ord_filled_qty   = float(order.get("qty") or 0) or None
+                    ord_filled_price = float(order.get("filled_avg_price") or price or 0) or None
                     sig_id = db.log_signal(s["name"], sig.symbol, sig.side, display_qty,
                                            sig.reason, order["id"], order["status"],
-                                           account_id=acct_id)
+                                           account_id=acct_id,
+                                           filled_qty=ord_filled_qty,
+                                           filled_price=ord_filled_price)
                     try:
                         ai_explainer.enqueue({
                             "id": sig_id,
@@ -261,16 +266,6 @@ def run_tick():
                         final_qty, sig.notional, sig.reason, order["id"]
                     )
                     db.reset_consecutive_losses()
-                    # Track cost basis for crypto brokers so P&L can be computed
-                    if broker in CRYPTO_BROKERS:
-                        filled_qty   = float(order.get("qty") or final_qty or 0)
-                        filled_price = float(order.get("filled_avg_price") or price or 0)
-                        if filled_qty > 0 and filled_price > 0:
-                            cost = filled_qty * filled_price
-                            if sig.side == "buy":
-                                db.crypto_record_buy(acct_id, sig.symbol, filled_qty, cost)
-                            else:
-                                db.crypto_record_sell(acct_id, sig.symbol, filled_qty, cost)
                     _last_run["signals"].append({
                         "strategy": s["name"], "symbol": sig.symbol, "side": sig.side,
                         "qty": final_qty, "reason": sig.reason, "order_id": order["id"],
