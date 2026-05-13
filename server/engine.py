@@ -121,6 +121,7 @@ def run_tick():
         # Track whether any account actually ran for this strategy this tick.
         _strategy_ran = False
         _skip_reasons = set()
+        _init_failed = False
 
         for acct in accounts:
             if acct["account_type"] != active_mode:
@@ -157,6 +158,8 @@ def run_tick():
                     }
                 except Exception as e:
                     log.warning("acct %d init failed: %s", acct_id, e)
+                    _init_failed = True
+                    _skip_reasons.add("init_error")
                     continue
                 client_cache[acct_id] = {
                     "client": acct_client,
@@ -282,7 +285,9 @@ def run_tick():
 
         # If no account ran, record why so the UI shows the right badge.
         if not _strategy_ran:
-            if "market_closed" in _skip_reasons:
+            if "init_error" in _skip_reasons:
+                skip_reason = "init_error"
+            elif "market_closed" in _skip_reasons:
                 skip_reason = "market_closed"
             elif "mode_mismatch" in _skip_reasons:
                 skip_reason = "mode_mismatch"

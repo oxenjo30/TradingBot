@@ -761,12 +761,16 @@ async function initDashboard() {
           badgeClass = 'b-notrun'; badgeText = 'Mkt Closed';
         } else if (ranEntry && ranEntry.skipped === 'mode_mismatch') {
           badgeClass = 'b-disabled'; badgeText = 'Wrong Mode';
+        } else if (ranEntry && ranEntry.skipped === 'init_error') {
+          badgeClass = 'b-error'; badgeText = 'Conn Error';
         } else if (ranEntry && ranEntry.skipped === 'window') {
           badgeClass = 'b-notrun'; badgeText = 'Off Hours';
         } else if (ranEntry && ranEntry.skipped === 'no_accounts') {
           badgeClass = 'b-disabled'; badgeText = 'No Accounts';
+        } else if (s.enabled) {
+          badgeClass = 'b-notrun'; badgeText = 'Waiting'; // enabled but engine hasn't ticked yet
         } else {
-          badgeClass = 'b-notrun'; badgeText = 'Idle'; // engine hasn't run yet
+          badgeClass = 'b-notrun'; badgeText = 'Idle';
         }
         badge.className = 'badge ' + badgeClass;
         if (badgeClass === 'b-enabled') {
