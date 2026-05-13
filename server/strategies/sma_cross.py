@@ -56,14 +56,14 @@ class SMACrossover(Strategy):
             )
         return [s.upper().strip() for s in (self.params.get("symbols") or []) if s]
 
-    def evaluate(self, positions):
+    def evaluate(self, positions, client=None):
         out: list[Signal] = []
         fast = int(self.params.get("fast", 10))
         slow = int(self.params.get("slow", 30))
 
         for sym in self._get_symbols():
             try:
-                bars = alpaca_client.get_recent_bars(sym, days=max(slow * 3, 90))
+                bars = self._get_bars(client, sym, days=max(slow * 3, 90))
             except Exception:
                 continue
             closes = [b["c"] for b in bars]

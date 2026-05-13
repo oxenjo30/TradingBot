@@ -68,7 +68,7 @@ class RSIMeanReversion(Strategy):
             )
         return [s.upper().strip() for s in (self.params.get("symbols") or []) if s]
 
-    def evaluate(self, positions):
+    def evaluate(self, positions, client=None):
         out: list[Signal] = []
         period   = int(self.params.get("period", 14))
         oversold = float(self.params.get("oversold", 30))
@@ -76,7 +76,7 @@ class RSIMeanReversion(Strategy):
 
         for sym in self._get_symbols():
             try:
-                bars = alpaca_client.get_recent_bars(sym, days=max(period * 4, 60))
+                bars = self._get_bars(client, sym, days=max(period * 4, 60))
             except Exception:
                 continue
             closes = [b["c"] for b in bars]

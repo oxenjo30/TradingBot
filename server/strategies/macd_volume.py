@@ -89,7 +89,7 @@ class MACDVolume(Strategy):
             )
         return [s.upper().strip() for s in (self.params.get("symbols") or []) if s]
 
-    def evaluate(self, positions):
+    def evaluate(self, positions, client=None):
         out: list[Signal] = []
         fast     = int(self.params.get("macd_fast", 12))
         slow     = int(self.params.get("macd_slow", 26))
@@ -99,7 +99,7 @@ class MACDVolume(Strategy):
 
         for sym in self._get_symbols():
             try:
-                bars = alpaca_client.get_recent_bars(sym, days=max(slow * 6, 180))
+                bars = self._get_bars(client, sym, days=max(slow * 6, 180))
             except Exception:
                 continue
 
