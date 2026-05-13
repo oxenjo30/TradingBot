@@ -12,7 +12,7 @@ from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from . import alpaca_client, auth, backtest as bt_mod, crypto, db, engine, notifications, risk, scanner, strategies
+from . import ai_explainer, ai_tuner, alpaca_client, auth, backtest as bt_mod, crypto, db, engine, notifications, risk, scanner, strategies
 from .config import STATIC_DIR, BASE_DIR
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
@@ -184,6 +184,13 @@ class StrategyAccountAssign(BaseModel):
 
 class StrategyAccountPatch(BaseModel):
     enabled: bool
+
+
+class AiSettingsBody(BaseModel):
+    ollama_url:           str | None = None
+    ollama_model:         str | None = None
+    explanations_enabled: bool | None = None
+    tuner_enabled:        bool | None = None
 
 
 # ── Setup & Auth routes ────────────────────────────────────────────────────────
@@ -360,6 +367,7 @@ def close_pos(symbol: str, request: Request, account_id: int | None = None):
     _require_auth(request)
     try:
         _get_broker_client(account_id).close_position(symbol)
+        db.log_audit("position", f"manually closed {symbol}", f"account_id={account_id}")
         return {"ok": True}
     except HTTPException:
         raise
@@ -372,6 +380,7 @@ def close_all(request: Request, account_id: int | None = None):
     client = _get_broker_client(account_id)
     if hasattr(client, "close_all_positions"):
         client.close_all_positions()
+    db.log_audit("position", "manually closed ALL positions", f"account_id={account_id}")
     return {"ok": True}
 
 @app.get("/api/quote/{symbol}")
@@ -447,6 +456,14 @@ def update_strategy(name: str, body: StrategyUpdate, request: Request):
         kwargs["active_end"]   = None if body.active_end   == "" else body.active_end
 
     db.upsert_strategy(name, **kwargs)
+    parts = []
+    if body.enabled is not None:
+        parts.append(f"enabled={body.enabled}")
+    if body.params is not None:
+        parts.append(f"params updated")
+    if body.active_start is not None or body.active_end is not None:
+        parts.append(f"window={kwargs.get('active_start','')}-{kwargs.get('active_end','')}")
+    db.log_audit("strategy", f"updated {name}", ", ".join(parts) or "no changes")
     return db.get_strategy(name)
 
 
@@ -521,6 +538,7 @@ def create_broker_account(body: BrokerAccountCreate, request: Request):
         )
     except Exception as e:
         raise HTTPException(400, str(e))
+    db.log_audit("account", f"created account '{body.label}'", f"type={body.account_type}, broker={body.broker}")
     return _mask_account(db.get_broker_account(new_id))
 
 
@@ -530,6 +548,7 @@ def patch_broker_account(account_id: int, body: BrokerAccountPatch, request: Req
     if not db.get_broker_account(account_id):
         raise HTTPException(404, "account not found")
     db.update_broker_account(account_id, label=body.label, account_type=body.account_type)
+    db.log_audit("account", f"updated account #{account_id}", f"label={body.label}, type={body.account_type}")
     return _mask_account(db.get_broker_account(account_id))
 
 
@@ -543,6 +562,7 @@ def rotate_broker_credentials(account_id: int, body: BrokerCredentialsUpdate, re
         crypto.encrypt(body.api_key),
         crypto.encrypt(body.api_secret),
     )
+    db.log_audit("account", f"rotated credentials #{account_id}", "API key + secret replaced")
     return _mask_account(db.get_broker_account(account_id))
 
 
@@ -604,7 +624,9 @@ def delete_broker_account(account_id: int, request: Request):
     _require_auth(request)
     if not db.get_broker_account(account_id):
         raise HTTPException(404, "account not found")
+    label = (db.get_broker_account(account_id) or {}).get("label", str(account_id))
     db.delete_broker_account(account_id)
+    db.log_audit("account", f"deleted account '{label}'", f"id={account_id}")
     return {"ok": True}
 
 
@@ -621,6 +643,7 @@ def set_account_kill_switch_route(account_id: int, request: Request, on: bool = 
     if not db.get_broker_account(account_id):
         raise HTTPException(404, "account not found")
     db.set_account_kill_switch(account_id, on)
+    db.log_audit("kill_switch", f"account #{account_id} kill switch {'ON' if on else 'OFF'}", f"account_id={account_id}")
     return {"account_id": account_id, "kill_switch": on}
 
 
@@ -644,6 +667,7 @@ def assign_strategy_account(name: str, body: StrategyAccountAssign, request: Req
     inserted = db.assign_strategy_account(name, body.account_id, body.enabled)
     if not inserted:
         raise HTTPException(409, "account already assigned to this strategy")
+    db.log_audit("strategy", f"assigned account #{body.account_id} to {name}", f"enabled={body.enabled}")
     return db.get_strategy_account_list(name)
 
 
@@ -655,6 +679,7 @@ def patch_strategy_account(name: str, account_id: int, body: StrategyAccountPatc
     account_list = db.get_strategy_account_list(name)
     globally_enabled = any(a["enabled"] for a in account_list)
     db.upsert_strategy(name, enabled=globally_enabled)
+    db.log_audit("strategy", f"{name} account #{account_id} {'enabled' if body.enabled else 'disabled'}", "")
     return account_list
 
 
@@ -717,6 +742,72 @@ def engine_run_now(request: Request):
     _require_auth(request)
     engine.run_tick()
     return engine.last_run()
+
+
+@app.get("/api/signals/{signal_id}/explanation")
+def signal_explanation(signal_id: int, request: Request):
+    _require_auth(request)
+    text = db.get_signal_explanation(signal_id)
+    return {"explanation": text, "ready": text is not None}
+
+
+@app.get("/api/ai/status")
+def ai_status(request: Request):
+    _require_auth(request)
+    return ai_explainer.ollama_status()
+
+
+@app.get("/api/ai/settings")
+def ai_settings_get(request: Request):
+    _require_auth(request)
+    return {
+        "ollama_url":           db.get_app_config("ai_ollama_url", "http://localhost:11434"),
+        "ollama_model":         db.get_app_config("ai_ollama_model", "llama3"),
+        "explanations_enabled": db.get_app_config("ai_explanations_enabled", "true") == "true",
+        "tuner_enabled":        db.get_app_config("ai_tuner_enabled", "true") == "true",
+    }
+
+
+@app.patch("/api/ai/settings")
+def ai_settings_patch(body: AiSettingsBody, request: Request):
+    _require_auth(request)
+    if body.ollama_url is not None:
+        db.set_app_config("ai_ollama_url", body.ollama_url.strip())
+    if body.ollama_model is not None:
+        db.set_app_config("ai_ollama_model", body.ollama_model.strip())
+    if body.explanations_enabled is not None:
+        db.set_app_config("ai_explanations_enabled", "true" if body.explanations_enabled else "false")
+    if body.tuner_enabled is not None:
+        db.set_app_config("ai_tuner_enabled", "true" if body.tuner_enabled else "false")
+    return {"ok": True}
+
+
+@app.get("/api/ai/tuning-log")
+def ai_tuning_log_get(request: Request):
+    _require_auth(request)
+    return db.list_tuning_log()
+
+
+@app.post("/api/ai/tune-now")
+def ai_tune_now(request: Request):
+    _require_auth(request)
+    import threading
+    result_holder: dict = {}
+    def _run():
+        result_holder["result"] = ai_tuner.run_tuning()
+    t = threading.Thread(target=_run, daemon=True)
+    t.start()
+    t.join(timeout=120)
+    return result_holder.get("result", {"tuned": 0, "skipped": 0, "error": "timeout"})
+
+
+@app.post("/api/ai/tuning-log/{run_id}/revert")
+def ai_tuning_revert(run_id: int, request: Request):
+    _require_auth(request)
+    ok = db.revert_tuning_run(run_id)
+    if not ok:
+        raise HTTPException(404, "Tuning run not found or strategy no longer exists")
+    return {"ok": True}
 
 
 # ── Export ─────────────────────────────────────────────────────────────────────
@@ -935,6 +1026,7 @@ def set_kill(body: dict, request: Request):
     _require_auth(request)
     on = bool(body.get("on", True))
     risk.set_kill_switch(on)
+    db.log_audit("kill_switch", f"global kill switch {'ON' if on else 'OFF'}", "")
     return {"kill_switch": on}
 
 @app.patch("/api/risk/{key}")
@@ -942,6 +1034,7 @@ def update_risk_setting(key: str, body: RiskSettingUpdate, request: Request):
     _require_auth(request)
     try:
         db.set_risk_setting(key, body.value)
+        db.log_audit("risk", f"set {key}", f"value={body.value}")
         return db.get_risk_settings()
     except ValueError as e:
         raise HTTPException(400, str(e))
@@ -958,12 +1051,14 @@ def add_to_blacklist(body: dict, request: Request):
     if not symbol:
         raise HTTPException(400, "symbol required")
     db.add_symbol_to_blacklist(symbol)
+    db.log_audit("risk", f"blacklisted {symbol}", "")
     return {"symbols": db.get_symbol_blacklist()}
 
 @app.delete("/api/risk/blacklist/{symbol}")
 def remove_from_blacklist(symbol: str, request: Request):
     _require_auth(request)
     db.remove_symbol_from_blacklist(symbol.upper())
+    db.log_audit("risk", f"removed {symbol.upper()} from blacklist", "")
     return {"symbols": db.get_symbol_blacklist()}
 
 @app.post("/api/risk/reset_losses")
@@ -971,6 +1066,12 @@ def reset_losses(request: Request):
     _require_auth(request)
     db.reset_consecutive_losses()
     return {"consecutive_losses": 0}
+
+
+@app.get("/api/audit")
+def get_audit_log(request: Request, limit: int = 200):
+    _require_auth(request)
+    return db.list_audit(limit=min(limit, 500))
 
 
 # ── Notifications ──────────────────────────────────────────────────────────────
