@@ -79,3 +79,31 @@ class BinanceAccountClient:
 
     def get_day_trade_count(self) -> int:
         return 0
+
+    def get_positions(self) -> list[dict]:
+        balance = self._exchange.fetch_balance()
+        totals  = balance.get("total") or {}
+        out = []
+        for asset, qty in totals.items():
+            qty = float(qty or 0)
+            if asset == "USDT" or qty < 0.000001:
+                continue
+            try:
+                ticker       = self._exchange.fetch_ticker(_to_ccxt(asset))
+                price        = float(ticker.get("last", 0) or 0)
+                market_value = qty * price
+            except Exception:
+                price        = 0.0
+                market_value = 0.0
+            out.append({
+                "symbol":          asset,
+                "qty":             qty,
+                "side":            "long",
+                "avg_entry_price": 0.0,
+                "current_price":   price,
+                "market_value":    market_value,
+                "unrealized_pl":   0.0,
+                "unrealized_plpc": 0.0,
+                "change_today":    0.0,
+            })
+        return out
