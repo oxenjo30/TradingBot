@@ -18,4 +18,8 @@ def get_account_client(broker: str, api_key: str, api_secret: str, paper: bool):
         from .tradier_client import TradierAccountClient
         return TradierAccountClient(api_key=api_key, api_secret=api_secret, paper=paper)
 
-    raise ValueError(f"Unsupported broker: {broker!r}. Supported: alpaca, tradier")
+    if broker == "binance":
+        from .binance_client import BinanceAccountClient
+        return BinanceAccountClient(api_key=api_key, api_secret=api_secret, paper=paper)
+
+    raise ValueError(f"Unsupported broker: {broker!r}. Supported: alpaca, tradier, binance")
