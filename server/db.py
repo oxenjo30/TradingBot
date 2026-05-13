@@ -528,6 +528,32 @@ def performance_by_strategy_account() -> list[dict]:
     return [dict(r) for r in rows]
 
 
+def compare_paper_vs_live() -> dict:
+    """Signal stats split by account_type (paper vs live) for the comparison panel."""
+    with get_conn() as c:
+        rows = c.execute("""
+            SELECT
+                COALESCE(ba.account_type, 'paper') AS account_type,
+                COUNT(*)                            AS total_signals,
+                SUM(CASE WHEN s.blocked=0 AND s.status NOT IN ('blocked','error') THEN 1 ELSE 0 END) AS executed,
+                SUM(CASE WHEN s.blocked=1 THEN 1 ELSE 0 END)  AS blocked,
+                SUM(CASE WHEN s.side='buy'  THEN 1 ELSE 0 END) AS buys,
+                SUM(CASE WHEN s.side='sell' THEN 1 ELSE 0 END) AS sells,
+                COUNT(DISTINCT s.strategy)   AS strategies_active,
+                COUNT(DISTINCT s.symbol)     AS unique_symbols,
+                MIN(s.ts)                    AS first_signal,
+                MAX(s.ts)                    AS last_signal
+            FROM signals s
+            LEFT JOIN broker_accounts ba ON ba.id = s.account_id
+            WHERE s.strategy NOT IN ('manual')
+            GROUP BY account_type
+        """).fetchall()
+    result = {"paper": {}, "live": {}}
+    for r in rows:
+        result[r["account_type"]] = dict(r)
+    return result
+
+
 def top_symbols_overall(limit: int = 10) -> list[dict]:
     """Most traded symbols across all strategies."""
     with get_conn() as c:

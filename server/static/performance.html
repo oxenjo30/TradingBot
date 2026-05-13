@@ -220,6 +220,27 @@
       </div>
     </div>
 
+    <!-- Paper vs Live comparison -->
+    <div class="card">
+      <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:1rem;">
+        <div style="width:28px;height:28px;border-radius:7px;background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.2);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+          <svg width="14" height="14" fill="none" stroke="#6366F1" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="18" rx="1"/><rect x="13" y="3" width="8" height="18" rx="1"/></svg>
+        </div>
+        <div style="font-size:14px;font-weight:600;">Paper vs Live</div>
+        <span style="font-size:11px;color:var(--muted);margin-left:auto;">Signal activity &amp; account snapshot</span>
+      </div>
+      <div id="compare-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+        <div id="compare-paper" class="compare-col">
+          <div class="compare-col-hd compare-paper-hd">Paper</div>
+          <div class="compare-body" id="compare-paper-body"></div>
+        </div>
+        <div id="compare-live" class="compare-col">
+          <div class="compare-col-hd compare-live-hd">Live</div>
+          <div class="compare-body" id="compare-live-body"></div>
+        </div>
+      </div>
+    </div>
+
     <!-- Strategy × Account attribution -->
     <div class="card">
       <div style="font-size:14px;font-weight:600;margin-bottom:.75rem;">Strategy &times; Account Attribution</div>

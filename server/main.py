@@ -727,6 +727,37 @@ def performance_by_account(request: Request):
     return db.performance_by_strategy_account()
 
 
+@app.get("/api/performance/compare")
+def performance_compare(request: Request):
+    _require_auth(request)
+    stats = db.compare_paper_vs_live()
+
+    def _enrich(bucket: dict, account_type: str) -> dict:
+        accts = [a for a in db.get_broker_accounts() if a["account_type"] == account_type]
+        for acct in accts:
+            try:
+                creds = db.get_broker_account_credentials(acct["id"])
+                from .broker_factory import get_account_client
+                client = get_account_client(
+                    broker=acct.get("broker", "alpaca"),
+                    api_key=crypto.decrypt(creds["api_key"]),
+                    api_secret=crypto.decrypt(creds["api_secret"]),
+                    paper=(account_type == "paper"),
+                )
+                summary = client.get_account_summary()
+                bucket["equity"]       = summary.get("equity")
+                bucket["day_pl_pct"]   = summary.get("day_pl_pct")
+                bucket["buying_power"] = summary.get("buying_power")
+                break
+            except Exception:
+                pass
+        return bucket
+
+    stats["paper"] = _enrich(stats.get("paper", {}), "paper")
+    stats["live"]  = _enrich(stats.get("live",  {}), "live")
+    return stats
+
+
 # ── Signals & Engine ───────────────────────────────────────────────────────────
 
 @app.get("/api/signals")
