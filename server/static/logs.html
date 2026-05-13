@@ -8,6 +8,11 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="/static/styles.css">
+  <style>
+    .btn-explain { font-size: 0.75rem; padding: 2px 8px; cursor: pointer; }
+    .explanation-row td { background: var(--bg-secondary, #1e1e2e); padding: 8px 12px; }
+    .explanation-text { font-style: italic; color: var(--text-secondary, #888); max-width: 600px; white-space: pre-wrap; }
+  </style>
 </head>
 <body data-page="logs">
 
@@ -135,9 +140,9 @@
       </div>
       <div class="dtable-wrap">
         <table class="dtable">
-          <colgroup><col style="width:90px"><col style="width:90px"><col style="width:70px"><col style="width:50px"><col style="width:60px"><col><col style="width:70px"></colgroup>
-          <thead><tr><th>Time</th><th>Strategy</th><th>Symbol</th><th>Side</th><th>Qty</th><th>Reason</th><th>Status</th></tr></thead>
-          <tbody id="logs-body"><tr><td colspan="7" class="state-empty">Loading&hellip;</td></tr></tbody>
+          <colgroup><col style="width:90px"><col style="width:90px"><col style="width:70px"><col style="width:50px"><col style="width:60px"><col><col style="width:70px"><col style="width:70px"></colgroup>
+          <thead><tr><th>Time</th><th>Strategy</th><th>Symbol</th><th>Side</th><th>Qty</th><th>Reason</th><th>Status</th><th>Explain</th></tr></thead>
+          <tbody id="logs-body"><tr><td colspan="8" class="state-empty">Loading&hellip;</td></tr></tbody>
         </table>
       </div>
     </div>
