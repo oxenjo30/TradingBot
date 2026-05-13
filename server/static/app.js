@@ -215,7 +215,14 @@ function openModal(overlayEl, onConfirm) {
   function handleClick(e) {
     const action = e.target.closest('[data-action]')?.dataset.action;
     if (action === 'cancel') { closeModal(overlayEl); cleanup(); }
-    if (action === 'confirm') { closeModal(overlayEl); cleanup(); onConfirm(); }
+    if (action === 'confirm') {
+      const result = onConfirm();
+      if (result && typeof result.then === 'function') {
+        result.then(() => { closeModal(overlayEl); cleanup(); }).catch(() => { /* keep modal open on error */ });
+      } else {
+        closeModal(overlayEl); cleanup();
+      }
+    }
   }
   const trap = function(e) {
     if (e.key !== 'Tab') return;
