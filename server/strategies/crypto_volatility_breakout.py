@@ -68,13 +68,13 @@ class CryptoVolatilityBreakout(Strategy):
             if held > 0:
                 if price < mid:
                     out.append(Signal(symbol=sym, side="sell", qty=held,
-                        reason=f"price {price:.4f} < SMA{period} {mid:.4f} — exit breakout"))
+                        reason=f"price {price:.4f} < SMA{period} {mid:.4f} - exit breakout"))
             else:
                 if open_positions >= max_pos:
                     continue
                 if price > upper:
                     out.append(self._signal(sym, "buy",
-                        f"price {price:.4f} > upper band {upper:.4f} (BB{period} ±{num_std}σ)"))
+                        f"price {price:.4f} > upper band {upper:.4f} (BB{period} +/-{num_std}std)"))
                     open_positions += 1
 
         return out

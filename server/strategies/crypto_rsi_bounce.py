@@ -92,7 +92,7 @@ class CryptoRSIBounce(Strategy):
                 # Bounce confirmed: RSI was below oversold, now recovered above it
                 if rsi_prev < rsi_os and rsi_cur >= rsi_os:
                     out.append(self._signal(sym, "buy",
-                        f"RSI({rsi_n}) bounced {rsi_prev:.1f}→{rsi_cur:.1f} above oversold {rsi_os}"))
+                        f"RSI({rsi_n}) bounced {rsi_prev:.1f}->{rsi_cur:.1f} above oversold {rsi_os}"))
                     open_positions += 1
 
         return out

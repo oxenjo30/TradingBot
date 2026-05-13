@@ -149,13 +149,24 @@ def run_tick():
                     acct_summary = acct_client.get_account_summary()
                     acct_dtc = acct_client.get_day_trade_count()
                     raw_positions = acct_client.get_positions()
+                    # For Binance, positions use bare tickers (e.g. "ETH") but crypto
+                    # strategies use slash pairs (e.g. "ETH/USDT"). Normalise to match.
+                    # Also filter out dust (< $1 market value) so strategies don't
+                    # treat tiny leftover fractions as real holdings.
+                    def _pos_key(sym: str) -> str:
+                        if broker in CRYPTO_BROKERS and "/" not in sym:
+                            return sym + "/USDT"
+                        return sym
+                    _dust_threshold = 1.0 if broker in CRYPTO_BROKERS else 0.0
                     acct_positions = {
-                        p["symbol"]: (p["qty"] if p["side"] == "long" else -p["qty"])
+                        _pos_key(p["symbol"]): (p["qty"] if p["side"] == "long" else -p["qty"])
                         for p in raw_positions
+                        if p.get("market_value", 0) >= _dust_threshold
                     }
                     acct_market_values = {
-                        p["symbol"]: p["market_value"]
+                        _pos_key(p["symbol"]): p["market_value"]
                         for p in raw_positions
+                        if p.get("market_value", 0) >= _dust_threshold
                     }
                 except Exception as e:
                     log.warning("acct %d init failed: %s", acct_id, e)
