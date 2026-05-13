@@ -127,6 +127,59 @@
   <!-- -€-€ Main -€-€ -->
   <main class="content flex flex-col gap-4">
 
+    <!-- Crypto Divider + Section (hidden until Binance account detected) -->
+    <div data-section="crypto-perf">
+    <div style="display:flex;align-items:center;gap:.75rem;margin:.25rem 0;">
+      <div style="flex:1;height:1px;background:var(--border);"></div>
+      <span style="font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:#F0B90B;white-space:nowrap;">&#x2B21; Crypto &mdash; Performance</span>
+      <div style="flex:1;height:1px;background:var(--border);"></div>
+    </div>
+
+    <!-- Crypto Performance Section -->
+    <div style="border:1px solid rgba(240,185,11,.22);border-radius:16px;padding:1.25rem;background:rgba(240,185,11,.04);display:flex;flex-direction:column;gap:1rem;">
+
+      <!-- Binance header -->
+      <div style="display:flex;align-items:center;gap:.6rem;font-size:13px;font-weight:700;color:#F0B90B;margin-bottom:.25rem;">
+        <div style="width:22px;height:22px;border-radius:50%;background:#F0B90B;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#000;flex-shrink:0;">B</div>
+        Binance
+        <span id="crypto-perf-account-name" style="font-size:11px;font-weight:400;color:var(--muted);"></span>
+      </div>
+
+      <!-- Crypto 4-card grid -->
+      <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1rem;">
+
+        <!-- Crypto Signals -->
+        <div class="card" style="border-color:rgba(240,185,11,.22);background:rgba(240,185,11,.04);">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:.3rem;">Crypto Signals</div>
+          <div id="crypto-signals" style="font-size:20px;font-weight:700;color:#F0B90B;">&mdash;</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px;">Total generated</div>
+        </div>
+
+        <!-- Filled -->
+        <div class="card" style="border-color:rgba(240,185,11,.22);background:rgba(240,185,11,.04);">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:.3rem;">Filled</div>
+          <div id="crypto-filled" style="font-size:20px;font-weight:700;color:#F0B90B;">&mdash;</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px;">Executed on Binance</div>
+        </div>
+
+        <!-- Total Realized P&L -->
+        <div class="card" style="border-color:rgba(240,185,11,.22);background:rgba(240,185,11,.04);">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:.3rem;">Total Realized P&amp;L</div>
+          <div id="crypto-realized-pnl" style="font-size:20px;font-weight:700;color:#F0B90B;">&mdash;</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px;">Closed positions</div>
+        </div>
+
+        <!-- Best Asset -->
+        <div class="card" style="border-color:rgba(240,185,11,.22);background:rgba(240,185,11,.04);">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:.3rem;">Best Asset</div>
+          <div id="crypto-best-asset" style="font-size:20px;font-weight:700;color:#F0B90B;">&mdash;</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px;">Most profitable</div>
+        </div>
+
+      </div>
+    </div>
+    </div><!-- /crypto-perf wrapper -->
+
     <div class="row-2col" style="grid-template-columns:1fr 1fr;">
 
       <!-- Strategy Stats -->
