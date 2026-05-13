@@ -48,6 +48,10 @@ class BinanceAccountClient:
             # sapi endpoints that demo doesn't support.
             self._exchange.enable_demo_trading(True)
 
+        # Widen recvWindow and sync clock offset to handle minor system clock drift.
+        self._exchange.options["recvWindow"] = 10000
+        self._exchange.load_time_difference()
+
     def _ensure_markets(self):
         """Load markets on first use — avoids slow network call on construction."""
         if not self._exchange.markets:
