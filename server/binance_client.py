@@ -82,7 +82,7 @@ class BinanceAccountClient:
         balance = self._exchange.fetch_balance()
         held_assets = [
             a for a, q in (balance.get("total") or {}).items()
-            if a not in ("USDT", "USDC") and q and float(q) > 0.000001
+            if a not in self._STABLES and q and float(q) > 0.000001
         ]
         # Also include assets that had trades but may be fully sold
         traded_assets = set(held_assets)
@@ -141,15 +141,26 @@ class BinanceAccountClient:
             "total_sold":          total_sold,
         }
 
+    # Stablecoins treated as $1 cash — included in equity and buying power
+    _STABLES = {"USDT", "USDC", "BUSD", "TUSD", "FDUSD", "DAI", "USDS"}
+
     def get_account_summary(self) -> dict:
         balance = self._exchange.fetch_balance()
-        usdt_free  = float((balance.get("free")  or {}).get("USDT", 0) or 0)
-        usdt_total = float((balance.get("total") or {}).get("USDT", 0) or 0)
+        totals = balance.get("total") or {}
+        free   = balance.get("free")  or {}
 
-        # Value non-USDT/USDC holdings at current price
+        # All stablecoins count as cash (1:1 USD)
+        stable_total = sum(
+            float(totals.get(s, 0) or 0) for s in self._STABLES
+        )
+        stable_free = sum(
+            float(free.get(s, 0) or 0) for s in self._STABLES
+        )
+
+        # Value non-stable crypto holdings at current price
         crypto_value = 0.0
-        for asset, qty in (balance.get("total") or {}).items():
-            if asset in ("USDT", "USDC") or not qty or float(qty) <= 0.000001:
+        for asset, qty in totals.items():
+            if asset in self._STABLES or not qty or float(qty) <= 0.000001:
                 continue
             try:
                 ticker = self._exchange.fetch_ticker(_to_ccxt(asset))
@@ -157,7 +168,7 @@ class BinanceAccountClient:
             except Exception:
                 pass
 
-        equity = usdt_total + crypto_value
+        equity = stable_total + crypto_value
 
         # Real P&L from trade history
         try:
@@ -174,10 +185,10 @@ class BinanceAccountClient:
 
         return {
             "status":             "active",
-            "cash":               usdt_free,
+            "cash":               stable_free,
             "equity":             equity,
             "last_equity":        equity,
-            "buying_power":       usdt_free,
+            "buying_power":       stable_free,
             "portfolio_value":    equity,
             "day_pl":             realized_pnl,
             "day_pl_pct":         0.0,
@@ -208,7 +219,7 @@ class BinanceAccountClient:
         out = []
         for asset, qty in totals.items():
             qty = float(qty or 0)
-            if asset in ("USDT", "USDC") or qty < 0.000001:
+            if asset in self._STABLES or qty < 0.000001:
                 continue
             try:
                 ticker       = self._exchange.fetch_ticker(_to_ccxt(asset))
