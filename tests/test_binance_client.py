@@ -143,3 +143,65 @@ class TestGetPositions:
             ticker_prices={"BTC/USDT": 60000.0},
         )
         assert client.get_positions() == []
+
+
+class TestMarketData:
+    def setup_method(self):
+        import importlib, server.binance_client as m
+        importlib.reload(m)
+        self.BinanceAccountClient = m.BinanceAccountClient
+
+    def _make(self, mock_ex):
+        mock_ex.load_markets.return_value = {}
+        with patch("ccxt.binance", return_value=mock_ex):
+            c = self.BinanceAccountClient.__new__(self.BinanceAccountClient)
+            c._paper = True
+            c._exchange = mock_ex
+            return c
+
+    def test_get_recent_bars_returns_ohlcv(self):
+        mock_ex = MagicMock()
+        mock_ex.fetch_ohlcv.return_value = [
+            [1715000000000, 60000.0, 61000.0, 59500.0, 60500.0, 1234.5],
+            [1715086400000, 60500.0, 62000.0, 60000.0, 61500.0, 2345.6],
+        ]
+        client = self._make(mock_ex)
+        bars = client.get_recent_bars("BTC", days=2)
+        assert len(bars) == 2
+        assert bars[0]["o"] == 60000.0
+        assert bars[0]["h"] == 61000.0
+        assert bars[0]["l"] == 59500.0
+        assert bars[0]["c"] == 60500.0
+        assert bars[0]["v"] == 1234.5
+        assert "t" in bars[0]
+        mock_ex.fetch_ohlcv.assert_called_once_with("BTC/USDT", "1d", limit=2)
+
+    def test_get_recent_bars_uses_days_as_limit(self):
+        mock_ex = MagicMock()
+        mock_ex.fetch_ohlcv.return_value = []
+        client = self._make(mock_ex)
+        client.get_recent_bars("ETH", days=30)
+        mock_ex.fetch_ohlcv.assert_called_once_with("ETH/USDT", "1d", limit=30)
+
+    def test_get_latest_quote_returns_bid_ask(self):
+        mock_ex = MagicMock()
+        mock_ex.fetch_order_book.return_value = {
+            "bids": [[60490.0, 1.0]],
+            "asks": [[60510.0, 0.5]],
+        }
+        client = self._make(mock_ex)
+        quote = client.get_latest_quote("BTC")
+        assert quote["symbol"] == "BTC"
+        assert quote["bid"] == 60490.0
+        assert quote["ask"] == 60510.0
+        assert "price" in quote
+        mock_ex.fetch_order_book.assert_called_once_with("BTC/USDT", limit=1)
+
+    def test_get_latest_quote_empty_book(self):
+        mock_ex = MagicMock()
+        mock_ex.fetch_order_book.return_value = {"bids": [], "asks": []}
+        client = self._make(mock_ex)
+        quote = client.get_latest_quote("BTC")
+        assert quote["bid"] == 0.0
+        assert quote["ask"] == 0.0
+        assert quote["price"] == 0.0
