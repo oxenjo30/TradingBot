@@ -20,6 +20,7 @@ const BROKER_CATALOG = [
   // Crypto
   { id: 'coinbase',    name: 'Coinbase',      initials: 'CB', color: '#1652F0', bg: 'rgba(22,82,240,.15)',    available: false },
   { id: 'kraken',      name: 'Kraken',        initials: 'KR', color: '#5741D9', bg: 'rgba(87,65,217,.15)',    available: false },
+  { id: 'binance',     name: 'Binance',       initials: 'BN', color: '#F0B90B', bg: 'rgba(240,185,11,.15)',   available: true  },
   { id: 'binanceus',   name: 'Binance.US',    initials: 'BI', color: '#F0B90B', bg: 'rgba(240,185,11,.15)',   available: false },
   // Forex
   { id: 'oanda',       name: 'OANDA',         initials: 'OA', color: '#FF6600', bg: 'rgba(255,102,0,.15)',    available: false },
@@ -3180,7 +3181,7 @@ async function initApiKeys() {
   // ── Broker picker (Add Account 2-step) ───────────────────────────
   const BP_SECTIONS = [
     { label: 'Stocks & Options',      ids: ['alpaca','ibkr','schwab','tradier','tastytrade','robinhood','webull','fidelity','etrade'] },
-    { label: 'Crypto',                ids: ['coinbase','kraken','binanceus'] },
+    { label: 'Crypto',                ids: ['binance','coinbase','kraken','binanceus'] },
     { label: 'Forex',                 ids: ['oanda','forexcom','fxcm','ig'] },
     { label: 'Futures & Commodities', ids: ['ninjatrader','tradestation','ampfutures','cqg'] },
   ];
@@ -3243,6 +3244,10 @@ async function initApiKeys() {
     const iconWrap = document.getElementById('add-broker-icon-wrap');
     iconWrap.style.cssText = `width:36px;height:36px;border-radius:10px;background:${b.bg};color:${b.color};display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0;letter-spacing:-.5px;`;
     iconWrap.textContent = b.initials;
+    // Show broker-specific hints
+    document.querySelectorAll('.broker-hint').forEach(el => el.classList.add('hidden'));
+    const hint = document.getElementById(`${b.id}-hint`);
+    if (hint) hint.classList.remove('hidden');
     document.getElementById('add-step-1').classList.add('hidden');
     document.getElementById('add-step-2').classList.remove('hidden');
   });
