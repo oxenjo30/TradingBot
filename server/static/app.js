@@ -352,7 +352,7 @@ const WL_NAME  = '__default__';
 
 async function _wlLoad() {
   try {
-    const lists = await api('/api/watchlists', { key: 'wl-list' });
+    const lists = await api('/api/watchlists');
     let wl = lists[0];
     if (!wl) {
       wl = await api('/api/watchlists', {
@@ -363,7 +363,7 @@ async function _wlLoad() {
     }
     _wlId      = wl.id;
     _wlSymbols = wl.symbols || [];
-  } catch { _wlId = null; _wlSymbols = []; }
+  } catch { /* keep existing _wlId/_wlSymbols on transient errors */ }
   _wlRenderRows();
   if (_wlSymbols.length) _wlRefreshPrices();
 }
@@ -423,8 +423,14 @@ function _wlRenderRows() {
 window._wlRemove = async function(sym) {
   if (!_wlId) return;
   try {
-    await api(`/api/watchlists/${_wlId}/symbols/${encodeURIComponent(sym)}`, { method: 'DELETE' });
-    await _wlLoad();
+    const res = await fetch(`/api/watchlists/${_wlId}/symbols/${encodeURIComponent(sym)}`, {
+      method: 'DELETE',
+      headers: { 'X-Requested-With': 'XMLHttpRequest' },
+    });
+    if (res.status === 401) { location.href = '/static/login.html'; return; }
+    if (!res.ok && res.status !== 204) { alert('Failed to remove symbol.'); return; }
+    _wlSymbols = _wlSymbols.filter(s => s !== sym);
+    _wlRenderRows();
   } catch { alert('Failed to remove symbol.'); }
 };
 
@@ -1367,10 +1373,10 @@ async function initBots() {
       <div style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;">
         <span style="font-size:11px;color:#64748B;white-space:nowrap;">Active hours (ET):</span>
         <input type="time" class="input" id="sched-start-${s.name}" value="${s.active_start || ''}"
-          style="width:120px;padding:.25rem .5rem;font-size:12px;height:28px;background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:6px;color-scheme:dark;">
+          style="width:120px;padding:.25rem .5rem;font-size:12px;height:28px;background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:6px;">
         <span style="font-size:11px;color:#64748B;">to</span>
         <input type="time" class="input" id="sched-end-${s.name}" value="${s.active_end || ''}"
-          style="width:120px;padding:.25rem .5rem;font-size:12px;height:28px;background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:6px;color-scheme:dark;">
+          style="width:120px;padding:.25rem .5rem;font-size:12px;height:28px;background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:6px;">
         <button class="btn btn-primary" id="sched-save-${s.name}"
           style="font-size:11px;padding:.25rem .65rem;height:28px;">Save</button>
         <button class="btn btn-ghost" id="sched-clear-${s.name}"
