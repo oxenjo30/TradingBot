@@ -3173,8 +3173,109 @@ async function initBalances() {
     }
   }
 
-  createPoller(fetchAccount,  30_000).start();
-  createPoller(fetchHoldings, 30_000).start();
+  // ── Crypto (Binance) balances section ──
+  let _balBinanceId = null;
+
+  async function fetchCryptoBalances() {
+    const section = document.querySelector('[data-section="crypto-bal"]');
+
+    if (_balBinanceId === null) {
+      try {
+        const accounts = await api('/api/broker-accounts', { key: 'bal-binance-accts' });
+        const b = (accounts || []).find(a => a.broker === 'binance');
+        _balBinanceId = b ? b.id : undefined;
+      } catch { _balBinanceId = undefined; }
+    }
+
+    if (!_balBinanceId) {
+      if (section) section.style.display = 'none';
+      return;
+    }
+    if (section) section.style.display = '';
+
+    try {
+      const [summary, positions] = await Promise.all([
+        api(`/api/account?account_id=${_balBinanceId}`, { key: 'bal-crypto-summary' }),
+        api(`/api/positions?account_id=${_balBinanceId}`, { key: 'bal-crypto-positions' }),
+      ]);
+
+      // Account name label
+      const nameEl = document.getElementById('crypto-bal-account-name');
+      if (nameEl) nameEl.textContent = summary.account_type === 'paper' ? '(paper)' : '(live)';
+
+      // Portfolio value = equity
+      const pvEl = document.getElementById('crypto-bal-portfolio');
+      if (pvEl) pvEl.textContent = summary.equity != null ? fmt.usd(summary.equity) : '—';
+
+      // USDT balance = cash
+      const usdtEl = document.getElementById('crypto-bal-usdt');
+      if (usdtEl) usdtEl.textContent = summary.cash != null ? fmt.usd(summary.cash) : '—';
+
+      // Crypto assets count = positions held
+      const assetCount = (positions || []).filter(p => (p.qty || 0) > 0).length;
+      const assetsEl = document.getElementById('crypto-bal-assets');
+      if (assetsEl) assetsEl.textContent = assetCount;
+      const assetsSub = document.getElementById('crypto-bal-assets-sub');
+      if (assetsSub) assetsSub.textContent = assetCount === 1 ? 'coin held' : 'coins held';
+
+      // 24h P&L from unrealized_pl sum (proxy — Binance demo doesn't provide daily change)
+      const totalUpnl = (positions || []).reduce((s, p) => s + (p.unrealized_pl || 0), 0);
+      const pnl24El = document.getElementById('crypto-bal-24h');
+      if (pnl24El) {
+        pnl24El.textContent = fmt.usdSigned(totalUpnl, '—');
+        pnl24El.style.color = totalUpnl >= 0 ? 'var(--green)' : 'var(--red)';
+      }
+
+      // Crypto holdings table
+      const tbody = document.getElementById('crypto-holdings-body');
+      if (tbody) {
+        tbody.innerHTML = '';
+        const held = (positions || []).filter(p => (p.qty || 0) > 0);
+        if (!held.length) {
+          tbody.innerHTML = '<tr><td colspan="7" class="state-empty">No crypto positions held</td></tr>';
+        } else {
+          held.forEach(p => {
+            const tr = document.createElement('tr');
+            const pnl = p.unrealized_pl || 0;
+            // Strip /USDT suffix for display in Asset column
+            const asset = (p.symbol || '').replace('/USDT', '').replace('USDT', '') || p.symbol;
+            const cells = [
+              asset,
+              (p.qty || 0).toFixed(6),
+              fmt.usd(p.avg_entry_price),
+              fmt.usd(p.current_price),
+              fmt.usd(p.market_value),
+              '', // unrealized P&L (special)
+              '—', // 24h (not available from demo API)
+            ];
+            cells.forEach((v, i) => {
+              const td = document.createElement('td');
+              if (i === 5) {
+                td.textContent = fmt.usdSigned(pnl, '—');
+                td.className = 'text-tabular ' + (pnl >= 0 ? 'text-green' : 'text-red');
+              } else {
+                td.textContent = v;
+              }
+              tr.appendChild(td);
+            });
+            tbody.appendChild(tr);
+          });
+        }
+      }
+    } catch (e) {
+      if (e.name === 'AbortError') return;
+      const tbody = document.getElementById('crypto-holdings-body');
+      if (tbody) tbody.innerHTML = '<tr><td colspan="7" class="state-error">Failed to load</td></tr>';
+    }
+  }
+
+  // Refresh button
+  const refreshBtn = document.getElementById('crypto-holdings-refresh');
+  if (refreshBtn) refreshBtn.addEventListener('click', fetchCryptoBalances);
+
+  createPoller(fetchAccount,       30_000).start();
+  createPoller(fetchHoldings,      30_000).start();
+  createPoller(fetchCryptoBalances, 30_000).start();
 }
 
 // ─────────────────────────────────────────
