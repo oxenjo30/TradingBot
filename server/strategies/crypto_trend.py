@@ -1,4 +1,5 @@
 import math
+from typing import ClassVar
 from .base import Strategy, Signal
 
 
@@ -15,6 +16,7 @@ def _ema(closes: list[float], period: int) -> list[float]:
 class CryptoTrend(Strategy):
     name = "crypto_trend"
     label = "Crypto EMA Trend"
+    brokers: ClassVar[list[str]] = ["binance"]
     description = (
         "Trend-following strategy for crypto pairs. Buys when the fast EMA crosses above "
         "the slow EMA (uptrend confirmed), sells when it crosses back below. "

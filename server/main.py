@@ -38,6 +38,20 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="TradeBot", lifespan=lifespan)
 
+# ── No-cache middleware for static assets (dev) ────────────────────────────────
+from starlette.middleware.base import BaseHTTPMiddleware
+
+class NoCacheStaticMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        response = await call_next(request)
+        if request.url.path.startswith("/static/"):
+            response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+            response.headers["Pragma"] = "no-cache"
+            response.headers["Expires"] = "0"
+        return response
+
+app.add_middleware(NoCacheStaticMiddleware)
+
 # ── Auth helpers ───────────────────────────────────────────────────────────────
 
 def _get_token(request: Request) -> str | None:
@@ -651,10 +665,12 @@ def broker_account_assignments(account_id: int, request: Request):
 
 @app.get("/api/broker-accounts/{account_id}/strategies")
 def broker_account_strategy_view(account_id: int, request: Request):
-    """All strategies with per-account assignment + enabled status. Used by Bots page."""
+    """All strategies compatible with this account's broker, with assignment + enabled status."""
     _require_auth(request)
-    if not db.get_broker_account(account_id):
+    acct = db.get_broker_account(account_id)
+    if not acct:
         raise HTTPException(404, "account not found")
+    broker = (acct.get("broker") or "alpaca").lower()
     assignments = db.get_account_strategy_assignments(account_id)
     global_strats = {s["name"]: s for s in db.get_strategies()}
     return [
@@ -670,7 +686,7 @@ def broker_account_strategy_view(account_id: int, request: Request):
             "params_schema": cls.params_schema,
         }
         for name, cls in strategies.REGISTRY.items()
-        if not cls.hidden
+        if not cls.hidden and broker in cls.brokers
     ]
 
 
