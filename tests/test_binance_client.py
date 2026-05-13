@@ -92,3 +92,54 @@ class TestGetAccountSummary:
             c._paper = True
             c._exchange = mock_ex
             assert c.get_day_trade_count() == 0
+
+
+class TestGetPositions:
+    def setup_method(self):
+        import importlib, server.binance_client as m
+        importlib.reload(m)
+        self.BinanceAccountClient = m.BinanceAccountClient
+
+    def _make(self, balance, ticker_prices=None):
+        mock_ex = MagicMock()
+        mock_ex.load_markets.return_value = {}
+        mock_ex.fetch_balance.return_value = balance
+        ticker_prices = ticker_prices or {}
+        def mock_ticker(symbol):
+            return {"last": ticker_prices.get(symbol, 0.0)}
+        mock_ex.fetch_ticker.side_effect = mock_ticker
+        with patch("ccxt.binance", return_value=mock_ex):
+            c = self.BinanceAccountClient.__new__(self.BinanceAccountClient)
+            c._paper = True
+            c._exchange = mock_ex
+            return c
+
+    def test_empty_balance_returns_empty_list(self):
+        client = self._make({"total": {"USDT": 1000.0}, "free": {"USDT": 1000.0}})
+        assert client.get_positions() == []
+
+    def test_btc_position_returned(self):
+        client = self._make(
+            balance={"total": {"BTC": 0.5, "USDT": 1000.0}, "free": {"BTC": 0.5, "USDT": 1000.0}},
+            ticker_prices={"BTC/USDT": 60000.0},
+        )
+        positions = client.get_positions()
+        assert len(positions) == 1
+        pos = positions[0]
+        assert pos["symbol"] == "BTC"
+        assert pos["qty"] == 0.5
+        assert pos["market_value"] == pytest.approx(30000.0)
+        assert pos["side"] == "long"
+        assert pos["avg_entry_price"] == 0.0
+        assert pos["unrealized_pl"] == 0.0
+
+    def test_usdt_excluded_from_positions(self):
+        client = self._make({"total": {"USDT": 5000.0}, "free": {"USDT": 5000.0}})
+        assert client.get_positions() == []
+
+    def test_dust_amounts_excluded(self):
+        client = self._make(
+            balance={"total": {"BTC": 0.0000001, "USDT": 1000.0}, "free": {"BTC": 0.0000001, "USDT": 1000.0}},
+            ticker_prices={"BTC/USDT": 60000.0},
+        )
+        assert client.get_positions() == []
