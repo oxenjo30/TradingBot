@@ -43,13 +43,10 @@ class BinanceAccountClient:
             "options": {"defaultType": "spot"},
         })
         if paper:
-            # Point spot endpoints to demo.binance.com for keys from demo.binance.com.
-            # Only override the keys demo provides — leave sapi/dapi/fapi on live URLs
-            # so load_markets() doesn't fail looking for a missing sapi sandbox URL.
-            demo = self._exchange.urls.get("demo", {})
-            for key in ("public", "private", "v1"):
-                if key in demo:
-                    self._exchange.urls["api"][key] = demo[key]
+            # Use ccxt's built-in demo trading mode for demo.binance.com keys.
+            # This switches URLs to demo-api.binance.com and tells ccxt to skip
+            # sapi endpoints that demo doesn't support.
+            self._exchange.enable_demo_trading(True)
 
     def _ensure_markets(self):
         """Load markets on first use — avoids slow network call on construction."""
