@@ -2865,17 +2865,19 @@ async function initAiTuning() {
         return;
       }
       tbody.innerHTML = rows.map(r => {
-        const changes = Object.entries(r.new_params)
-          .filter(([k, v]) => r.old_params[k] !== v)
-          .map(([k, v]) => `${k}: ${r.old_params[k]} → ${v}`)
+        const newP = r.new_params || {};
+        const oldP = r.old_params || {};
+        const changes = Object.entries(newP)
+          .filter(([k, v]) => oldP[k] !== v)
+          .map(([k, v]) => `${k}: ${oldP[k]} → ${v}`)
           .join(', ') || 'No changes';
         return `<tr>
           <td style="white-space:nowrap;">${fmt.time(r.created_at)}</td>
           <td>${escHtml(r.strategy.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase()))}</td>
-          <td>${r.win_rate_before !== null ? r.win_rate_before + '%' : '—'}</td>
+          <td>${r.win_rate_before != null ? escHtml(String(r.win_rate_before)) + '%' : '—'}</td>
           <td style="font-size:11px;font-family:monospace;">${escHtml(changes)}</td>
           <td style="font-size:11px;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escHtml(r.rationale)}">${escHtml(r.rationale)}</td>
-          <td><button class="btn btn-sm" style="font-size:11px;background:rgba(239,68,68,.1);color:#EF4444;border-color:rgba(239,68,68,.3);" onclick="revertTuning(${r.id})">Revert</button></td>
+          <td><button class="btn btn-sm" style="font-size:11px;background:rgba(239,68,68,.1);color:#EF4444;border-color:rgba(239,68,68,.3);" onclick="revertTuning(${parseInt(r.id, 10)})">Revert</button></td>
         </tr>`;
       }).join('');
     } catch (_) {
