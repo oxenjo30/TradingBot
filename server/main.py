@@ -103,20 +103,26 @@ class WebhookSignal(BaseModel):
     strategy:   str = "webhook"
     account_id: int | None = None
 
+_broker_client_cache: dict[int, object] = {}
+
 def _get_broker_client(account_id: int | None):
     """Return a broker client for the given account_id, or fall back to the global alpaca client."""
     if account_id is None:
         return alpaca_client
+    if account_id in _broker_client_cache:
+        return _broker_client_cache[account_id]
     acct = db.get_broker_account_credentials(account_id)
     if not acct:
         raise HTTPException(404, f"Account {account_id} not found")
     from .broker_factory import get_account_client
-    return get_account_client(
+    client = get_account_client(
         broker=acct.get("broker", "alpaca"),
         api_key=crypto.decrypt(acct["api_key"]),
         api_secret=crypto.decrypt(acct["api_secret"]),
         paper=(acct["account_type"] == "paper"),
     )
+    _broker_client_cache[account_id] = client
+    return client
 
 
 class AlertCreate(BaseModel):
@@ -408,14 +414,7 @@ def quote(symbol: str, request: Request, account_id: int | None = None):
     binance_accts = [a for a in db.get_broker_accounts() if a.get("broker") == "binance"]
     if binance_accts:
         try:
-            from .broker_factory import get_account_client
-            creds = db.get_broker_account_credentials(binance_accts[0]["id"])
-            bclient = get_account_client(
-                broker="binance",
-                api_key=creds.get("api_key", ""),
-                api_secret=creds.get("api_secret", ""),
-                paper=binance_accts[0].get("paper", False),
-            )
+            bclient = _get_broker_client(binance_accts[0]["id"])
             return bclient.get_latest_quote(symbol)
         except Exception as e:
             raise HTTPException(400, str(e))
@@ -436,14 +435,7 @@ def quotes_snapshot(symbols: str, request: Request):
         binance_accts = [a for a in db.get_broker_accounts() if a.get("broker") == "binance"]
         if binance_accts:
             try:
-                from .broker_factory import get_account_client
-                creds = db.get_broker_account_credentials(binance_accts[0]["id"])
-                bclient = get_account_client(
-                    broker="binance",
-                    api_key=creds.get("api_key", ""),
-                    api_secret=creds.get("api_secret", ""),
-                    paper=binance_accts[0].get("paper", False),
-                )
+                bclient = _get_broker_client(binance_accts[0]["id"])
                 price_map = {r["symbol"]: r for r in results}
                 for sym in missing:
                     try:
@@ -467,14 +459,7 @@ def assets_search(q: str = "", request: Request = None):
         binance_accts = [a for a in db.get_broker_accounts() if a.get("broker") == "binance"]
         if binance_accts:
             try:
-                from .broker_factory import get_account_client
-                creds = db.get_broker_account_credentials(binance_accts[0]["id"])
-                bclient = get_account_client(
-                    broker="binance",
-                    api_key=creds.get("api_key", ""),
-                    api_secret=creds.get("api_secret", ""),
-                    paper=binance_accts[0].get("paper", False),
-                )
+                bclient = _get_broker_client(binance_accts[0]["id"])
                 bclient._ensure_markets()
                 q_up = q.upper()
                 existing_syms = {r["symbol"] for r in results}
