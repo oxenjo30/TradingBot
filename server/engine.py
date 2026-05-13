@@ -12,6 +12,7 @@ log = logging.getLogger("engine")
 log.setLevel(logging.INFO)
 
 _scheduler: AsyncIOScheduler | None = None
+_tuner_timer: threading.Timer | None = None
 _last_run: dict = {"ts": None, "ran": [], "signals": [], "error": None, "risk": None}
 
 
@@ -351,7 +352,10 @@ def start(interval_seconds: int = 60):
 
 
 def shutdown():
-    global _scheduler
+    global _scheduler, _tuner_timer
+    if _tuner_timer:
+        _tuner_timer.cancel()
+        _tuner_timer = None
     if _scheduler:
         _scheduler.shutdown(wait=False)
         _scheduler = None
@@ -359,6 +363,7 @@ def shutdown():
 
 def _schedule_weekly_tuner():
     """Fire ai_tuner.run_tuning() every Sunday at 11 PM ET, then reschedule."""
+    global _tuner_timer
     import zoneinfo
     from datetime import datetime, timedelta, timezone
     now_et = datetime.now(timezone.utc).astimezone(zoneinfo.ZoneInfo("America/New_York"))
@@ -378,4 +383,6 @@ def _schedule_weekly_tuner():
             log.exception("Weekly tuner failed")
         _schedule_weekly_tuner()  # reschedule for next week
 
-    threading.Timer(delay_s, _fire).start()
+    _tuner_timer = threading.Timer(delay_s, _fire)
+    _tuner_timer.daemon = True
+    _tuner_timer.start()
