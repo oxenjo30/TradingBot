@@ -43,8 +43,13 @@ class BinanceAccountClient:
             "options": {"defaultType": "spot"},
         })
         if paper:
-            # Use demo.binance.com (keys from demo.binance.com), not testnet.binance.vision
-            self._exchange.urls["api"] = self._exchange.urls["demo"]
+            # Point spot endpoints to demo.binance.com for keys from demo.binance.com.
+            # Only override the keys demo provides — leave sapi/dapi/fapi on live URLs
+            # so load_markets() doesn't fail looking for a missing sapi sandbox URL.
+            demo = self._exchange.urls.get("demo", {})
+            for key in ("public", "private", "v1"):
+                if key in demo:
+                    self._exchange.urls["api"][key] = demo[key]
 
     def _ensure_markets(self):
         """Load markets on first use — avoids slow network call on construction."""

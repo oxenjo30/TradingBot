@@ -3290,14 +3290,11 @@ async function initApiKeys() {
           key: 'add-account',
         });
         await loadAccounts();
-        // Show brief success banner above the grid
-        const grid = document.getElementById('accounts-grid');
-        if (grid) {
-          const ok = document.createElement('div');
-          ok.style.cssText = 'background:rgba(16,185,129,.12);border:1px solid rgba(16,185,129,.3);border-radius:8px;padding:.6rem 1rem;font-size:13px;color:#10B981;margin-bottom:.75rem;';
-          ok.textContent = `✓ ${label} added successfully.`;
-          grid.parentElement.insertBefore(ok, grid);
-          setTimeout(() => ok.remove(), 4000);
+        const toast = document.getElementById('acct-toast');
+        if (toast) {
+          toast.textContent = `✓ ${label} added successfully.`;
+          toast.classList.remove('hidden');
+          setTimeout(() => toast.classList.add('hidden'), 4000);
         }
       } catch (e) {
         errEl.textContent = 'Add failed: ' + (e.message || 'unknown error');
