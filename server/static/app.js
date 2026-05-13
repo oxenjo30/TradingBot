@@ -759,6 +759,8 @@ async function initDashboard() {
           badgeClass = 'b-enabled'; badgeText = '';  // ran this cycle → Running
         } else if (ranEntry && ranEntry.skipped === 'market_closed') {
           badgeClass = 'b-notrun'; badgeText = 'Mkt Closed';
+        } else if (ranEntry && ranEntry.skipped === 'mode_mismatch') {
+          badgeClass = 'b-disabled'; badgeText = 'Wrong Mode';
         } else if (ranEntry && ranEntry.skipped === 'window') {
           badgeClass = 'b-notrun'; badgeText = 'Off Hours';
         } else if (ranEntry && ranEntry.skipped === 'no_accounts') {
@@ -1489,7 +1491,7 @@ async function initBots() {
     modal.classList.remove('hidden');
 
     document.getElementById('cfg-cancel').onclick = () => modal.classList.add('hidden');
-    modal.onclick = e => { if (e.target === modal) modal.classList.add('hidden'); };
+    modal.onclick = null;
 
     document.getElementById('cfg-save').onclick = async () => {
       const updated = {};

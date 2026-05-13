@@ -120,9 +120,11 @@ def run_tick():
 
         # Track whether any account actually ran for this strategy this tick.
         _strategy_ran = False
+        _skip_reasons = set()
 
         for acct in accounts:
             if acct["account_type"] != active_mode:
+                _skip_reasons.add("mode_mismatch")
                 continue
             acct_id = acct["id"]
             broker  = (acct.get("broker") or "alpaca").lower()
@@ -131,6 +133,7 @@ def run_tick():
             # Crypto brokers (Binance) run 24/7 — skip the clock gate.
             if broker not in CRYPTO_BROKERS and not is_us_market_open():
                 log.info("market closed; skipping acct %d (%s)", acct_id, broker)
+                _skip_reasons.add("market_closed")
                 continue
 
             if acct_id not in client_cache:
@@ -277,10 +280,15 @@ def run_tick():
                                   f"{sig.reason} | submit error: {e}", None, "error",
                                   account_id=acct_id)
 
-        # If no account ran (e.g. all stock accounts skipped because market is closed),
-        # record the strategy as market-closed so the UI can show "Waiting" vs "Idle".
+        # If no account ran, record why so the UI shows the right badge.
         if not _strategy_ran:
-            _last_run["ran"].append({"strategy": s["name"], "skipped": "market_closed"})
+            if "market_closed" in _skip_reasons:
+                skip_reason = "market_closed"
+            elif "mode_mismatch" in _skip_reasons:
+                skip_reason = "mode_mismatch"
+            else:
+                skip_reason = "market_closed"
+            _last_run["ran"].append({"strategy": s["name"], "skipped": skip_reason})
 
     # ── Take-profit pass ────────────────────────────────────────────────────
     tp_pct = db.get_risk_settings().get("take_profit_pct", 0.0)
