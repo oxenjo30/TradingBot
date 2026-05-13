@@ -1090,14 +1090,15 @@ async function initDashboard() {
       const usdtEl = document.getElementById('crypto-usdt-bal');
       if (usdtEl) usdtEl.textContent = fmt.usd(summary.cash ?? summary.buying_power ?? 0);
 
-      const upnl = (positions || []).reduce((s, p) => s + (p.unrealized_pl || 0), 0);
+      // Total bought = USDT spent on buys
+      const totalBuy = summary.total_buy ?? null;
       const upnlEl = document.getElementById('crypto-upnl');
       if (upnlEl) {
-        upnlEl.textContent = fmt.usdSigned(upnl, '$0.00');
-        upnlEl.style.color = upnl >= 0 ? '#16c784' : '#ef4444';
+        upnlEl.textContent = totalBuy !== null ? fmt.usd(totalBuy) : '—';
+        upnlEl.style.color = '#F0B90B';
       }
 
-      // Realized P&L from closed trades (tracked in our own DB)
+      // Realized P&L = sell proceeds - buy cost
       const realizedPnl = summary.realized_pnl ?? null;
       const ch24El = document.getElementById('crypto-24h');
       if (ch24El) {
@@ -2540,22 +2541,28 @@ async function initPerformance() {
     if (section) section.style.display = '';
 
     try {
-      const sigs = await api('/api/signals?limit=500', { key: 'perf-crypto-sigs' });
-      const cryptoSigs = (sigs || []).filter(s => CRYPTO_STRATEGY_NAMES.includes(s.strategy));
+      const [sigs, pnlData] = await Promise.all([
+        api('/api/signals?limit=500', { key: 'perf-crypto-sigs' }),
+        api(`/api/crypto-pnl?account_id=${binanceId}`, { key: 'perf-crypto-pnl' }),
+      ]);
 
+      const cryptoSigs = (sigs || []).filter(s =>
+        CRYPTO_STRATEGY_NAMES.includes(s.strategy) || s.account_id === binanceId
+      );
       const total  = cryptoSigs.length;
-      const filled = cryptoSigs.filter(s => s.status === 'filled').length;
+      const filled = cryptoSigs.filter(s => ['filled','closed'].includes(s.status)).length;
 
-      // Realized P&L: sum qty * price for sells minus buys (best-effort from reason text)
-      // We don't store P&L per signal so show filled sell count as proxy, or 0
-      const realizedPnl = 0; // placeholder — Binance unrealized_pl is always 0 from API
+      // Real realized P&L from signals (sell proceeds - buy cost)
+      const realizedPnl = pnlData?.realized_pnl ?? null;
 
-      // Best asset: symbol with most filled signals
-      const symCounts = {};
-      cryptoSigs.filter(s => s.status === 'filled').forEach(s => {
-        symCounts[s.symbol] = (symCounts[s.symbol] || 0) + 1;
-      });
-      const bestAsset = Object.entries(symCounts).sort((a,b) => b[1]-a[1])[0]?.[0] || '—';
+      // Best asset: highest P&L by symbol from pnlData
+      const bySymbol = pnlData?.by_symbol ?? {};
+      let bestAsset = '—';
+      let bestPnl = -Infinity;
+      for (const [sym, d] of Object.entries(bySymbol)) {
+        if (d.pnl > bestPnl) { bestPnl = d.pnl; bestAsset = sym; }
+      }
+      if (bestPnl === 0 && bestAsset !== '—') bestAsset = '—'; // no trades yet
 
       const sigEl = document.getElementById('crypto-signals');
       if (sigEl) sigEl.textContent = total || '0';
@@ -2564,7 +2571,14 @@ async function initPerformance() {
       if (fillEl) fillEl.textContent = filled || '0';
 
       const pnlEl = document.getElementById('crypto-realized-pnl');
-      if (pnlEl) pnlEl.textContent = filled > 0 ? filled + ' sells' : '—';
+      if (pnlEl) {
+        if (realizedPnl !== null) {
+          pnlEl.textContent = fmt.usdSigned(realizedPnl, '$0.00');
+          pnlEl.style.color = realizedPnl >= 0 ? '#16c784' : '#ef4444';
+        } else {
+          pnlEl.textContent = '—';
+        }
+      }
 
       const bestEl = document.getElementById('crypto-best-asset');
       if (bestEl) bestEl.textContent = bestAsset;
@@ -3246,14 +3260,14 @@ async function initBalances() {
       const usdtEl = document.getElementById('crypto-bal-usdt');
       if (usdtEl) usdtEl.textContent = summary.cash != null ? fmt.usd(summary.cash) : '—';
 
-      // Crypto assets count = positions held
-      const assetCount = (positions || []).filter(p => (p.qty || 0) > 0).length;
+      // Total bought = USDT spent on buys across all trades
+      const totalBuy = summary.total_buy ?? null;
       const assetsEl = document.getElementById('crypto-bal-assets');
-      if (assetsEl) assetsEl.textContent = assetCount;
+      if (assetsEl) assetsEl.textContent = totalBuy !== null ? fmt.usd(totalBuy) : '—';
       const assetsSub = document.getElementById('crypto-bal-assets-sub');
-      if (assetsSub) assetsSub.textContent = assetCount === 1 ? 'coin held' : 'coins held';
+      if (assetsSub) assetsSub.textContent = 'USDT spent';
 
-      // Realized P&L from closed trades (tracked in our own cost basis DB)
+      // Realized P&L = sell proceeds - buy cost
       const realizedPnl = summary.realized_pnl ?? null;
       const pnl24El = document.getElementById('crypto-bal-24h');
       if (pnl24El) {

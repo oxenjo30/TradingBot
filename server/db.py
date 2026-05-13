@@ -474,12 +474,15 @@ def get_strategy(name: str) -> dict | None:
 
 def log_signal(strategy: str, symbol: str, side: str, qty: float, reason: str,
                order_id: str | None = None, status: str = "ok",
-               blocked: bool = False, account_id: int | None = None) -> int:
+               blocked: bool = False, account_id: int | None = None,
+               filled_qty: float | None = None, filled_price: float | None = None) -> int:
     with get_conn() as c:
         cur = c.execute(
-            """INSERT INTO signals(ts, strategy, symbol, side, qty, reason, order_id, status, blocked, account_id)
-               VALUES(?,?,?,?,?,?,?,?,?,?)""",
-            (now_iso(), strategy, symbol, side, qty, reason, order_id, status, int(blocked), account_id),
+            """INSERT INTO signals(ts, strategy, symbol, side, qty, reason, order_id, status,
+                                   blocked, account_id, filled_qty, filled_price)
+               VALUES(?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (now_iso(), strategy, symbol, side, qty, reason, order_id, status,
+             int(blocked), account_id, filled_qty, filled_price),
         )
         return cur.lastrowid
 
@@ -909,6 +912,73 @@ def crypto_get_realized_pnl(account_id: int) -> float:
             (account_id,),
         ).fetchone()
         return float(row["total"]) if row else 0.0
+
+
+def crypto_pnl_from_signals(account_id: int) -> dict:
+    """
+    Compute per-symbol and total P&L purely from filled signals.
+
+    Uses filled_qty * filled_price when available, falls back to the raw qty
+    field (which for notional orders stores the dollar amount spent/received).
+
+    Returns:
+        {
+          "total_buy":      float,   # total USDT spent on buys
+          "total_sell":     float,   # total USDT received from sells
+          "realized_pnl":  float,   # sell proceeds - matched buy cost
+          "by_symbol": {
+            "BTC": {"buy": x, "sell": y, "pnl": z, "trades": n}, ...
+          }
+        }
+    """
+    with get_conn() as c:
+        rows = c.execute(
+            """SELECT symbol, side,
+                      COALESCE(filled_qty, qty)   AS fqty,
+                      COALESCE(filled_price, 0)   AS fprice,
+                      qty                          AS raw_qty
+               FROM signals
+               WHERE account_id=? AND status IN ('filled','closed') AND blocked=0
+               ORDER BY id""",
+            (account_id,),
+        ).fetchall()
+
+    by_sym: dict = {}
+    for r in rows:
+        sym   = r["symbol"].upper().replace("/USDT", "").replace("USDT", "")
+        fqty  = float(r["fqty"]  or 0)
+        fprice = float(r["fprice"] or 0)
+        raw   = float(r["raw_qty"] or 0)
+
+        # Dollar value of this leg:
+        # If we have both filled_qty and filled_price → use their product.
+        # If only filled_price is 0 (pre-migration rows) → treat raw_qty as the notional.
+        if fprice > 0 and fqty > 0:
+            notional = fqty * fprice
+        else:
+            notional = raw   # raw_qty stored as notional dollars for manual orders
+
+        s = by_sym.setdefault(sym, {"buy": 0.0, "sell": 0.0, "pnl": 0.0, "trades": 0})
+        s["trades"] += 1
+        if r["side"] == "buy":
+            s["buy"] += notional
+        else:
+            s["sell"] += notional
+
+    # Realized P&L per symbol = sell proceeds - buy cost (capped at what was bought)
+    total_buy = total_sell = realized = 0.0
+    for sym, s in by_sym.items():
+        s["pnl"] = s["sell"] - s["buy"]
+        total_buy  += s["buy"]
+        total_sell += s["sell"]
+        realized   += s["pnl"]
+
+    return {
+        "total_buy":     total_buy,
+        "total_sell":    total_sell,
+        "realized_pnl":  realized,
+        "by_symbol":     by_sym,
+    }
 
 
 # ── Backtest Runs ─────────────────────────────────────────────────────────────
