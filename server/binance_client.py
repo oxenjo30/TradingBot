@@ -44,13 +44,18 @@ class BinanceAccountClient:
         })
         if paper:
             self._exchange.set_sandbox_mode(True)
-        self._exchange.load_markets()
+
+    def _ensure_markets(self):
+        """Load markets on first use — avoids slow network call on construction."""
+        if not self._exchange.markets:
+            self._exchange.load_markets()
 
     def get_account_summary(self) -> dict:
         balance = self._exchange.fetch_balance()
-        usdt_free  = float(balance.get("free",  {}).get("USDT", 0) or 0)
-        usdt_total = float(balance.get("total", {}).get("USDT", 0) or 0)
+        usdt_free  = float((balance.get("free")  or {}).get("USDT", 0) or 0)
+        usdt_total = float((balance.get("total") or {}).get("USDT", 0) or 0)
 
+        # Value non-USDT holdings at current price (best-effort; skip on error)
         crypto_value = 0.0
         for asset, qty in (balance.get("total") or {}).items():
             if asset == "USDT" or not qty or float(qty) <= 0:
@@ -110,6 +115,7 @@ class BinanceAccountClient:
 
     def get_recent_bars(self, symbol: str, days: int = 60) -> list[dict]:
         from datetime import datetime, timezone
+        self._ensure_markets()
         ohlcv = self._exchange.fetch_ohlcv(_to_ccxt(symbol), "1d", limit=days)
         out = []
         for row in ohlcv:
@@ -120,6 +126,7 @@ class BinanceAccountClient:
         return out
 
     def get_latest_quote(self, symbol: str) -> dict:
+        self._ensure_markets()
         book = self._exchange.fetch_order_book(_to_ccxt(symbol), limit=1)
         bid  = float(book["bids"][0][0]) if book.get("bids") else 0.0
         ask  = float(book["asks"][0][0]) if book.get("asks") else 0.0
@@ -133,6 +140,7 @@ class BinanceAccountClient:
         if qty is None and notional is None:
             raise ValueError("qty or notional required")
 
+        self._ensure_markets()
         ccxt_sym = _to_ccxt(symbol)
         params: dict = {}
         if client_order_id:
@@ -155,6 +163,7 @@ class BinanceAccountClient:
     def submit_limit_order(self, symbol: str, side: Literal["buy", "sell"],
                            qty: float, limit_price: float,
                            client_order_id: str | None = None) -> dict:
+        self._ensure_markets()
         ccxt_sym = _to_ccxt(symbol)
         params: dict = {}
         if client_order_id:
