@@ -1113,8 +1113,9 @@ function escHtml(s) {
 
 async function toggleExplanation(signalId, btnEl) {
   const parentTr = btnEl.closest('tr');
-  const existing = parentTr.nextElementSibling;
-  if (existing && existing.classList.contains('explanation-row') && existing.dataset.signalId === String(signalId)) {
+  const tbody = parentTr.closest('tbody') || parentTr.parentElement;
+  const existing = tbody.querySelector(`.explanation-row[data-signal-id="${signalId}"]`);
+  if (existing) {
     existing.remove();
     return;
   }
@@ -2052,9 +2053,50 @@ async function initPerformance() {
     }
   }
 
+  async function fetchComparison() {
+    const paperBody = document.getElementById('compare-paper-body');
+    const liveBody  = document.getElementById('compare-live-body');
+    if (!paperBody || !liveBody) return;
+    try {
+      const d = await api('/api/performance/compare', { key: 'perf-compare' });
+
+      function renderBucket(el, bucket, type) {
+        const hasData = bucket && (bucket.total_signals > 0 || bucket.equity != null);
+        if (!hasData) {
+          el.innerHTML = `<div class="compare-row"><span class="compare-na">No ${type} account activity yet.</span></div>`;
+          return;
+        }
+        const rows = [
+          ['Equity',           bucket.equity        != null ? fmt.usd(bucket.equity)       : null],
+          ['Day P&L',          bucket.day_pl_pct    != null ? (bucket.day_pl_pct >= 0 ? '+' : '') + bucket.day_pl_pct.toFixed(2) + '%' : null],
+          ['Buying Power',     bucket.buying_power  != null ? fmt.usd(bucket.buying_power) : null],
+          ['Total Signals',    bucket.total_signals ?? 0],
+          ['Executed',         bucket.executed      ?? 0],
+          ['Blocked',          bucket.blocked       ?? 0],
+          ['Buys',             bucket.buys          ?? 0],
+          ['Sells',            bucket.sells         ?? 0],
+          ['Strategies Used',  bucket.strategies_active ?? 0],
+          ['Unique Symbols',   bucket.unique_symbols    ?? 0],
+        ];
+        el.innerHTML = rows.map(([label, val]) => {
+          const display = val != null
+            ? `<span class="compare-val">${val}</span>`
+            : `<span class="compare-na">—</span>`;
+          return `<div class="compare-row"><span class="compare-label">${label}</span>${display}</div>`;
+        }).join('');
+      }
+
+      renderBucket(paperBody, d.paper, 'paper');
+      renderBucket(liveBody,  d.live,  'live');
+    } catch (e) {
+      if (e.name === 'AbortError') return;
+    }
+  }
+
   createPoller(fetchPerformance, 60_000).start();
   createPoller(fetchSignals,     30_000).start();
   createPoller(fetchAttribution, 60_000).start();
+  createPoller(fetchComparison,  60_000).start();
   initStrategyHealth();
 }
 
