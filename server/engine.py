@@ -1,10 +1,11 @@
 """Strategy engine: periodically evaluates enabled strategies and submits orders."""
 import logging
+import threading
 import uuid
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 
-from . import alpaca_client, crypto, db, notifications, risk, strategies
+from . import ai_explainer, ai_tuner, alpaca_client, crypto, db, notifications, risk, strategies
 from .broker_factory import get_account_client
 
 log = logging.getLogger("engine")
@@ -232,8 +233,20 @@ def run_tick():
                         client_order_id=client_oid,
                     )
                     display_qty = final_qty if not sig.notional else sig.notional
-                    db.log_signal(s["name"], sig.symbol, sig.side, display_qty,
-                                  sig.reason, order["id"], order["status"], account_id=acct_id)
+                    sig_id = db.log_signal(s["name"], sig.symbol, sig.side, display_qty,
+                                           sig.reason, order["id"], order["status"],
+                                           account_id=acct_id)
+                    try:
+                        ai_explainer.enqueue({
+                            "id": sig_id,
+                            "ts": db.now_iso(),
+                            "strategy": s["name"],
+                            "symbol": sig.symbol,
+                            "side": sig.side,
+                            "reason": sig.reason,
+                        })
+                    except Exception:
+                        pass
                     notifications.notify_trade(
                         s["name"], sig.symbol, sig.side,
                         final_qty, sig.notional, sig.reason, order["id"]
@@ -332,6 +345,8 @@ def start(interval_seconds: int = 60):
     _scheduler.add_job(run_tick, IntervalTrigger(seconds=interval_seconds),
                        id="tick", max_instances=1, coalesce=True)
     _scheduler.start()
+    ai_explainer.start()       # start the explanation daemon
+    _schedule_weekly_tuner()   # schedule weekly tuning
     log.info("engine started, tick every %ss", interval_seconds)
 
 
@@ -340,3 +355,27 @@ def shutdown():
     if _scheduler:
         _scheduler.shutdown(wait=False)
         _scheduler = None
+
+
+def _schedule_weekly_tuner():
+    """Fire ai_tuner.run_tuning() every Sunday at 11 PM ET, then reschedule."""
+    import zoneinfo
+    from datetime import datetime, timedelta, timezone
+    now_et = datetime.now(timezone.utc).astimezone(zoneinfo.ZoneInfo("America/New_York"))
+    # Find next Sunday 23:00 ET
+    days_until_sunday = (6 - now_et.weekday()) % 7  # Monday=0, Sunday=6
+    if days_until_sunday == 0 and now_et.hour >= 23:
+        days_until_sunday = 7  # already past 11pm Sunday — wait for next week
+    next_run = now_et.replace(hour=23, minute=0, second=0, microsecond=0) + timedelta(days=days_until_sunday)
+    delay_s = (next_run - now_et).total_seconds()
+    log.info("Weekly tuner scheduled in %.0f seconds (next Sunday 11pm ET)", delay_s)
+
+    def _fire():
+        try:
+            result = ai_tuner.run_tuning()
+            log.info("Weekly tuner complete: %s", result)
+        except Exception:
+            log.exception("Weekly tuner failed")
+        _schedule_weekly_tuner()  # reschedule for next week
+
+    threading.Timer(delay_s, _fire).start()
