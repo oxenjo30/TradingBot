@@ -169,3 +169,49 @@ class BinanceAccountClient:
             "limit_price": round(float(limit_price), 8),
             "status":      str(order.get("status", "open")),
         }
+
+    def get_orders(self, limit: int = 50, status: str = "all") -> list[dict]:
+        from datetime import datetime, timezone
+        try:
+            if status == "open":
+                raw = self._exchange.fetch_open_orders()
+            else:
+                raw = self._exchange.fetch_orders()
+        except Exception:
+            return []
+
+        out = []
+        for o in raw[:limit]:
+            ts = o.get("datetime") or ""
+            filled_ts = o.get("lastTradeTimestamp")
+            filled_at = (datetime.fromtimestamp(filled_ts / 1000, tz=timezone.utc).isoformat()
+                         if filled_ts else None)
+            out.append({
+                "id":               str(o.get("id", "")),
+                "client_order_id":  o.get("clientOrderId", ""),
+                "symbol":           _from_ccxt(o.get("symbol", "")),
+                "side":             str(o.get("side", "")).lower(),
+                "qty":              float(o.get("amount") or 0),
+                "filled_qty":       float(o.get("filled") or 0),
+                "filled_avg_price": float(o.get("average") or 0) or None,
+                "type":             str(o.get("type", "market")).lower(),
+                "status":           str(o.get("status", "")).lower(),
+                "submitted_at":     ts,
+                "filled_at":        filled_at,
+            })
+        return out
+
+    def cancel_order(self, order_id: str) -> dict:
+        result = self._exchange.cancel_order(order_id)
+        return {
+            "id":     str(result.get("id", order_id)),
+            "status": str(result.get("status", "canceled")),
+        }
+
+    def close_position(self, symbol: str) -> None:
+        positions = self.get_positions()
+        for p in positions:
+            if p["symbol"].upper() == symbol.upper():
+                self.submit_market_order(symbol, "sell", qty=p["qty"])
+                return
+        raise ValueError(f"No open position for {symbol}")

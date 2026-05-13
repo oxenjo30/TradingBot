@@ -270,3 +270,53 @@ class TestOrders:
         client = self._make(mock_ex)
         with pytest.raises(ValueError, match="qty or notional required"):
             client.submit_market_order("BTC", "buy")
+
+
+class TestOrderManagement:
+    def setup_method(self):
+        import importlib, server.binance_client as m
+        importlib.reload(m)
+        self.BinanceAccountClient = m.BinanceAccountClient
+
+    def _make(self, mock_ex):
+        mock_ex.load_markets.return_value = {}
+        with patch("ccxt.binance", return_value=mock_ex):
+            c = self.BinanceAccountClient.__new__(self.BinanceAccountClient)
+            c._paper = True
+            c._exchange = mock_ex
+            return c
+
+    def test_get_orders_returns_list(self):
+        mock_ex = MagicMock()
+        mock_ex.fetch_orders.return_value = [
+            {
+                "id": "111", "symbol": "BTC/USDT", "side": "buy",
+                "amount": 0.01, "filled": 0.01, "type": "market",
+                "status": "closed", "datetime": "2026-05-12T09:00:00Z",
+                "lastTradeTimestamp": 1715508000000,
+                "clientOrderId": "",
+                "average": 60000.0,
+            }
+        ]
+        client = self._make(mock_ex)
+        orders = client.get_orders()
+        assert len(orders) == 1
+        o = orders[0]
+        assert o["id"] == "111"
+        assert o["symbol"] == "BTC"
+        assert o["side"] == "buy"
+        assert o["qty"] == 0.01
+        assert o["status"] == "closed"
+
+    def test_get_orders_empty(self):
+        mock_ex = MagicMock()
+        mock_ex.fetch_orders.return_value = []
+        client = self._make(mock_ex)
+        assert client.get_orders() == []
+
+    def test_cancel_order_calls_exchange(self):
+        mock_ex = MagicMock()
+        mock_ex.cancel_order.return_value = {"id": "999", "status": "canceled"}
+        client = self._make(mock_ex)
+        result = client.cancel_order("999")
+        assert result["status"] == "canceled"
