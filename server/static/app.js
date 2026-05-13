@@ -3275,11 +3275,13 @@ async function initApiKeys() {
       const accountType = document.getElementById('add-account-type').value;
       const broker      = document.getElementById('add-broker').value || 'alpaca';
       const errEl       = document.getElementById('add-error');
+      const confBtn     = document.querySelector('#modal-add-account [data-action="confirm"]');
       if (!label || !apiKey || !apiSecret) {
         errEl.textContent = 'All fields are required.';
         errEl.classList.remove('hidden');
-        return;
+        throw new Error('fields required');
       }
+      if (confBtn) { confBtn.disabled = true; confBtn.textContent = 'Adding…'; }
       try {
         await api('/api/broker-accounts', {
           method: 'POST',
@@ -3291,6 +3293,7 @@ async function initApiKeys() {
       } catch (e) {
         errEl.textContent = 'Add failed: ' + (e.message || 'unknown error');
         errEl.classList.remove('hidden');
+        if (confBtn) { confBtn.disabled = false; confBtn.textContent = 'Add Account'; }
         throw e;
       }
     });
