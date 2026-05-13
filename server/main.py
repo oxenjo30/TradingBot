@@ -202,6 +202,9 @@ def setup_page():
 
 @app.get("/login")
 def login_page():
+    from .license import check_stored_license
+    if not check_stored_license()["valid"]:
+        return RedirectResponse("/static/license.html")
     return FileResponse(str(STATIC_DIR / "login.html"))
 
 @app.post("/api/auth/login")
@@ -1167,6 +1170,10 @@ def index(request: Request):
     # redirect to setup if not configured
     if not auth.setup_complete():
         return RedirectResponse("/setup")
+    # redirect to license page if license is missing or invalid
+    from .license import check_stored_license
+    if not check_stored_license()["valid"]:
+        return RedirectResponse("/static/license.html")
     # redirect to login if password set and not authenticated
     if auth.password_is_set() and not auth.validate_session(_get_token(request)):
         return RedirectResponse("/login")
