@@ -675,7 +675,7 @@ def get_strategy_accounts(strategy_name: str) -> list[dict]:
     """Return enabled (strategy, account) pairs with ciphertext credentials. Used by engine."""
     with get_conn() as c:
         return [dict(r) for r in c.execute(
-            """SELECT sa.account_id AS id, ba.label, ba.api_key, ba.api_secret, ba.account_type
+            """SELECT sa.account_id AS id, ba.label, ba.api_key, ba.api_secret, ba.account_type, ba.broker
                FROM strategy_accounts sa
                JOIN broker_accounts ba ON ba.id = sa.account_id
                WHERE sa.strategy_name = ? AND sa.enabled = 1""",
