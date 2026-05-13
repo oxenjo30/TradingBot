@@ -24,13 +24,6 @@ log = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     crypto.init_crypto()  # must run before db.init_db() — migration calls crypto.encrypt()
     db.init_db()
-    # License check on startup
-    from .license import check_stored_license
-    lic = check_stored_license()
-    if not lic["valid"]:
-        log.warning("No valid license key. Dashboard will show license activation page.")
-    else:
-        log.info("License valid — %d days remaining.", lic["days_remaining"])
     existing = {s["name"] for s in db.get_strategies()}
     for cls in strategies.REGISTRY.values():
         if cls.name not in existing:
@@ -51,12 +44,6 @@ def _get_token(request: Request) -> str | None:
     return request.cookies.get("tb_session")
 
 def _require_auth(request: Request):
-    # License check first — returns 402 if no valid license
-    from .license import check_stored_license
-    lic = check_stored_license()
-    if not lic["valid"]:
-        raise HTTPException(402, f"License required: {lic['reason']}")
-    # Existing auth check below (keep as-is)
     if not auth.password_is_set():
         return
     if not auth.validate_session(_get_token(request)):
@@ -208,9 +195,6 @@ def setup_page():
 
 @app.get("/login")
 def login_page():
-    from .license import check_stored_license
-    if not check_stored_license()["valid"]:
-        return RedirectResponse("/static/license.html")
     return FileResponse(str(STATIC_DIR / "login.html"))
 
 @app.post("/api/auth/login")
@@ -1237,10 +1221,6 @@ def index(request: Request):
     # redirect to setup if not configured
     if not auth.setup_complete():
         return RedirectResponse("/setup")
-    # redirect to license page if license is missing or invalid
-    from .license import check_stored_license
-    if not check_stored_license()["valid"]:
-        return RedirectResponse("/static/license.html")
     # redirect to login if password set and not authenticated
     if auth.password_is_set() and not auth.validate_session(_get_token(request)):
         return RedirectResponse("/login")
