@@ -43,7 +43,8 @@ class BinanceAccountClient:
             "options": {"defaultType": "spot"},
         })
         if paper:
-            self._exchange.set_sandbox_mode(True)
+            # Use demo.binance.com (keys from demo.binance.com), not testnet.binance.vision
+            self._exchange.urls["api"] = self._exchange.urls["demo"]
 
     def _ensure_markets(self):
         """Load markets on first use — avoids slow network call on construction."""
