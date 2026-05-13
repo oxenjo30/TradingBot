@@ -390,11 +390,36 @@ def close_all(request: Request, account_id: int | None = None):
     return {"ok": True}
 
 @app.get("/api/quote/{symbol}")
-def quote(symbol: str):
+def quote(symbol: str, request: Request, account_id: int | None = None):
+    # If a specific account is requested, use that broker's quote
+    if account_id is not None:
+        try:
+            client = _get_broker_client(account_id)
+            return client.get_latest_quote(symbol)
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(400, str(e))
+    # Default: try Alpaca, fall back to Binance
     try:
         return alpaca_client.get_latest_quote(symbol)
-    except Exception as e:
-        raise HTTPException(400, str(e))
+    except Exception:
+        pass
+    binance_accts = [a for a in db.get_broker_accounts() if a.get("broker") == "binance"]
+    if binance_accts:
+        try:
+            from .broker_factory import get_account_client
+            creds = db.get_broker_account_credentials(binance_accts[0]["id"])
+            bclient = get_account_client(
+                broker="binance",
+                api_key=creds.get("api_key", ""),
+                api_secret=creds.get("api_secret", ""),
+                paper=binance_accts[0].get("paper", False),
+            )
+            return bclient.get_latest_quote(symbol)
+        except Exception as e:
+            raise HTTPException(400, str(e))
+    raise HTTPException(400, f"No quote available for {symbol}")
 
 @app.get("/api/quotes/snapshot")
 def quotes_snapshot(symbols: str, request: Request):
