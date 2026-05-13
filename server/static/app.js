@@ -1675,40 +1675,66 @@ async function initPositions() {
   // Account selector for positions/orders
   let posAccountId = null;
   let moAccountId  = null;
-  let moIsCrypto   = false; // true when selected account is Binance
+  let cmoAccountId = null;
 
   async function buildAccountSelectors() {
     try {
       const accounts = await api('/api/broker-accounts', { key: 'pos-acct-list' });
-      if (!accounts || accounts.length < 2) return;
+      if (!accounts || !accounts.length) return;
 
-      function makeSelect(wrapId, onChange) {
-        const wrap = document.getElementById(wrapId);
-        if (!wrap) return;
-        const sel = document.createElement('select');
-        sel.className = 'acct-sel';
-        const all = document.createElement('option');
-        all.value = ''; all.textContent = 'All accounts';
-        sel.appendChild(all);
-        accounts.forEach(a => {
-          const opt = document.createElement('option');
-          opt.value = a.id; opt.textContent = a.label || `Account ${a.id}`;
-          sel.appendChild(opt);
-        });
-        sel.addEventListener('change', () => onChange(sel.value ? parseInt(sel.value) : null));
-        wrap.appendChild(sel);
+      // Positions table — all accounts
+      if (accounts.length > 1) {
+        const wrap = document.getElementById('pos-account-wrap');
+        if (wrap) {
+          const sel = document.createElement('select');
+          sel.className = 'acct-sel';
+          const all = document.createElement('option'); all.value = ''; all.textContent = 'All accounts';
+          sel.appendChild(all);
+          accounts.forEach(a => { const o = document.createElement('option'); o.value = a.id; o.textContent = a.label || `Account ${a.id}`; sel.appendChild(o); });
+          sel.addEventListener('change', () => { posAccountId = sel.value ? parseInt(sel.value) : null; fetchPositions(); fetchOrders(); });
+          wrap.appendChild(sel);
+        }
       }
 
-      makeSelect('pos-account-wrap', id => { posAccountId = id; fetchPositions(); fetchOrders(); });
-      makeSelect('mo-account-wrap', id => {
-        moAccountId = id;
-        const acct = id ? accounts.find(a => a.id === id) : null;
-        moIsCrypto = !!(acct && acct.broker === 'binance');
-        applyMoMarketType();
-        // Re-fetch quote with new account context if symbol already entered
-        const sym = symInput?.value.trim();
-        if (sym) fetchQuote(sym);
-      });
+      // Stock order panel — non-Binance accounts
+      const stockAccts = accounts.filter(a => a.broker !== 'binance');
+      if (stockAccts.length) {
+        const wrap = document.getElementById('mo-account-wrap');
+        if (wrap) {
+          const sel = document.createElement('select');
+          sel.className = 'acct-sel';
+          if (stockAccts.length > 1) {
+            const all = document.createElement('option'); all.value = ''; all.textContent = 'All stock accounts'; sel.appendChild(all);
+          }
+          stockAccts.forEach(a => { const o = document.createElement('option'); o.value = a.id; o.textContent = a.label || `Account ${a.id}`; sel.appendChild(o); });
+          if (stockAccts.length === 1) { moAccountId = stockAccts[0].id; }
+          sel.addEventListener('change', () => {
+            moAccountId = sel.value ? parseInt(sel.value) : null;
+            const sym = symInput?.value.trim();
+            if (sym) fetchQuote(sym);
+          });
+          wrap.appendChild(sel);
+        }
+      }
+
+      // Crypto order panel — Binance accounts only
+      const cryptoAccts = accounts.filter(a => a.broker === 'binance');
+      if (cryptoAccts.length) {
+        const wrap = document.getElementById('cmo-account-wrap');
+        if (wrap) {
+          const sel = document.createElement('select');
+          sel.className = 'acct-sel';
+          sel.style.borderColor = 'rgba(240,185,11,.3)';
+          cryptoAccts.forEach(a => { const o = document.createElement('option'); o.value = a.id; o.textContent = a.label || `Binance ${a.id}`; sel.appendChild(o); });
+          cmoAccountId = cryptoAccts[0].id;
+          sel.addEventListener('change', () => {
+            cmoAccountId = parseInt(sel.value);
+            const sym = cmoAssetInput?.value.trim();
+            if (sym) fetchCmoQuote(sym);
+          });
+          wrap.appendChild(sel);
+        }
+      }
     } catch {}
   }
   buildAccountSelectors();
@@ -1827,6 +1853,14 @@ async function initPositions() {
   async function fetchCryptoOrders() {
     const tbody = document.getElementById('crypto-orders-body');
     if (!tbody) return;
+    // Discover Binance account if not yet set (buildAccountSelectors may not have run yet)
+    if (!cmoAccountId) {
+      try {
+        const accts = await api('/api/broker-accounts', { key: 'pos-binance-acct-lookup' });
+        const binance = (accts || []).find(a => a.broker === 'binance');
+        if (binance) cmoAccountId = binance.id;
+      } catch {}
+    }
     if (!cmoAccountId) {
       tbody.innerHTML = '<tr><td colspan="6" class="state-empty">No Binance account connected.</td></tr>';
       return;
@@ -1962,10 +1996,7 @@ async function initPositions() {
   }
 
   function applyMoMarketType() {
-    // Update labels and toggle button text based on market type
-    if (modeQtyBtn) modeQtyBtn.textContent = moIsCrypto ? 'Qty' : 'Shares';
-    if (modeNotionalBtn) modeNotionalBtn.textContent = moIsCrypto ? 'USDT Value' : 'USD Value';
-    setMoMode(modeIsQty); // refresh current mode labels
+    setMoMode(modeIsQty);
   }
 
   modeQtyBtn?.addEventListener('click',      () => setMoMode(true));
@@ -2017,8 +2048,7 @@ async function initPositions() {
     updateEstTotal();
     setMoSide(moSide); // refresh button label as symbol changes
     const sym = symInput.value.trim();
-    const minLen = moIsCrypto ? 2 : 1;
-    if (sym.length >= minLen) quoteTimer = setTimeout(() => fetchQuote(sym), 600);
+    if (sym.length >= 1) quoteTimer = setTimeout(() => fetchQuote(sym), 600);
   });
 
   submitBtn?.addEventListener('click', () => {
@@ -2030,7 +2060,7 @@ async function initPositions() {
     const qty        = modeIsQty ? parseFloat(rawVal) : null;
     const notional   = !modeIsQty ? parseFloat(rawVal) : null;
     const limitPrice = modeIsQty && rawPrice ? parseFloat(rawPrice) : null;
-    const unitLabel  = modeIsQty ? (moIsCrypto ? 'units' : 'shares') : (moIsCrypto ? 'USDT' : 'USD');
+    const unitLabel  = modeIsQty ? 'shares' : 'USD';
     const sideLabel  = moSide === 'buy' ? 'BUY' : 'SELL';
     const priceLabel = limitPrice ? ` @ $${limitPrice.toFixed(2)} limit` : ' at market price';
 
@@ -2065,6 +2095,208 @@ async function initPositions() {
       }
     });
   });
+
+  // ── Stock order Market/Limit tabs ────────────────────────────────────────────
+  document.getElementById('mo-otype-market')?.addEventListener('click', () => {
+    moIsLimit = false;
+    document.getElementById('mo-otype-market')?.classList.add('mot-otype-active');
+    document.getElementById('mo-otype-limit')?.classList.remove('mot-otype-active');
+    if (priceWrap) priceWrap.style.display = 'none';
+    if (priceInput) priceInput.value = '';
+  });
+  document.getElementById('mo-otype-limit')?.addEventListener('click', () => {
+    moIsLimit = true;
+    document.getElementById('mo-otype-limit')?.classList.add('mot-otype-active');
+    document.getElementById('mo-otype-market')?.classList.remove('mot-otype-active');
+    if (priceWrap && modeIsQty) priceWrap.style.display = '';
+  });
+
+  // ── Crypto order panel ───────────────────────────────────────────────────────
+  const cmoAssetInput = document.getElementById('cmo-asset-input');
+  const cmoQuoteEl    = document.getElementById('cmo-quote-display');
+  let cmoBuyPrice  = 0;
+  let cmoSellPrice = 0;
+  let cmoAssetQty  = 0;
+  let cmoUsdtAvbl  = 0;
+
+  document.getElementById('cmo-otype-limit')?.addEventListener('click', () => {
+    document.getElementById('cmo-otype-limit')?.classList.add('cmo-otype-active');
+    document.getElementById('cmo-otype-market')?.classList.remove('cmo-otype-active');
+    const bp = document.getElementById('cmo-buy-price-wrap');
+    const sp = document.getElementById('cmo-sell-price-wrap');
+    if (bp) bp.style.display = '';
+    if (sp) sp.style.display = '';
+  });
+  document.getElementById('cmo-otype-market')?.addEventListener('click', () => {
+    document.getElementById('cmo-otype-market')?.classList.add('cmo-otype-active');
+    document.getElementById('cmo-otype-limit')?.classList.remove('cmo-otype-active');
+    const bp = document.getElementById('cmo-buy-price-wrap');
+    const sp = document.getElementById('cmo-sell-price-wrap');
+    if (bp) bp.style.display = 'none';
+    if (sp) sp.style.display = 'none';
+    const bpI = document.getElementById('cmo-buy-price');
+    const spI = document.getElementById('cmo-sell-price');
+    if (bpI) bpI.value = ''; if (spI) spI.value = '';
+  });
+
+  async function fetchCmoQuote(sym) {
+    if (!sym || sym.length < 2) return;
+    if (cmoQuoteEl) { cmoQuoteEl.style.display = ''; cmoQuoteEl.textContent = 'Fetching…'; }
+    try {
+      const qs = cmoAccountId ? `?account_id=${cmoAccountId}` : '';
+      const res = await fetch('/api/quote/' + encodeURIComponent(sym + 'USDT') + qs);
+      if (!res.ok) throw new Error();
+      const q = await res.json();
+      const bid = parseFloat(q.bid) || 0;
+      const ask = parseFloat(q.ask) || 0;
+      const mid = bid && ask ? (bid + ask) / 2 : bid || ask;
+      const chPct = q.change_pct != null ? parseFloat(q.change_pct) : null;
+      const chStr = chPct != null ? (chPct >= 0 ? '+' : '') + chPct.toFixed(2) + '%' : '';
+      if (cmoQuoteEl) {
+        cmoQuoteEl.innerHTML = `<span style="color:var(--muted)">Bid </span><b>${bid.toFixed(4)}</b>&ensp;<span style="color:var(--muted)">Ask </span><b>${ask.toFixed(4)}</b>&ensp;<span style="color:var(--muted)">Mid </span><b style="color:#F0B90B">${mid.toFixed(4)}</b>`
+          + (chStr ? `&ensp;<b style="color:${chPct>=0?'var(--green)':'var(--red)'}">${chStr}</b>` : '');
+      }
+      cmoBuyPrice  = ask || mid;
+      cmoSellPrice = bid || mid;
+      const isLimitOn = document.getElementById('cmo-otype-limit')?.classList.contains('cmo-otype-active');
+      if (isLimitOn) {
+        const bp = document.getElementById('cmo-buy-price');
+        const sp = document.getElementById('cmo-sell-price');
+        if (bp && !bp.value) bp.value = cmoBuyPrice.toFixed(4);
+        if (sp && !sp.value) sp.value = cmoSellPrice.toFixed(4);
+      }
+      updateCmoBuyLabel(sym);
+      updateCmoSellLabel(sym);
+    } catch {
+      if (cmoQuoteEl) { cmoQuoteEl.style.display = ''; cmoQuoteEl.textContent = 'Symbol not found'; }
+    }
+  }
+
+  function updateCmoBuyLabel(sym) {
+    const lbl = document.getElementById('cmo-buy-asset-label');
+    if (lbl) lbl.textContent = sym || 'Coin';
+    const btn = document.getElementById('cmo-buy-submit');
+    if (btn) btn.textContent = sym ? `Buy ${sym}` : 'Buy';
+  }
+  function updateCmoSellLabel(sym) {
+    const lbl = document.getElementById('cmo-sell-asset-label');
+    if (lbl) lbl.textContent = sym || 'Coin';
+    const btn = document.getElementById('cmo-sell-submit');
+    if (btn) btn.textContent = sym ? `Sell ${sym}` : 'Sell';
+  }
+
+  let cmoQuoteTimer = null;
+  cmoAssetInput?.addEventListener('input', () => {
+    cmoAssetInput.value = cmoAssetInput.value.toUpperCase();
+    clearTimeout(cmoQuoteTimer);
+    const sym = cmoAssetInput.value.trim();
+    if (cmoQuoteEl) { cmoQuoteEl.style.display = sym ? '' : 'none'; cmoQuoteEl.textContent = ''; }
+    const bp = document.getElementById('cmo-buy-price');
+    const sp = document.getElementById('cmo-sell-price');
+    if (bp) bp.value = ''; if (sp) sp.value = '';
+    cmoBuyPrice = 0; cmoSellPrice = 0;
+    updateCmoBuyLabel(sym);
+    updateCmoSellLabel(sym);
+    if (sym.length >= 2) cmoQuoteTimer = setTimeout(() => fetchCmoQuote(sym), 700);
+  });
+
+  function updateCmoBuyFee() {
+    const total = parseFloat(document.getElementById('cmo-buy-total')?.value) || 0;
+    const feeEl = document.getElementById('cmo-buy-fee');
+    if (feeEl) feeEl.textContent = total ? `~${(total * 0.001).toFixed(4)} USDT (0.1%)` : '—';
+  }
+  function updateCmoSellFee() {
+    const total = parseFloat(document.getElementById('cmo-sell-total')?.value) || 0;
+    const feeEl = document.getElementById('cmo-sell-fee');
+    if (feeEl) feeEl.textContent = total ? `~${(total * 0.001).toFixed(4)} USDT (0.1%)` : '—';
+  }
+
+  document.getElementById('cmo-buy-amount')?.addEventListener('input', () => {
+    const amt   = parseFloat(document.getElementById('cmo-buy-amount').value) || 0;
+    const price = parseFloat(document.getElementById('cmo-buy-price')?.value) || cmoBuyPrice;
+    const totalEl = document.getElementById('cmo-buy-total');
+    if (totalEl && price) totalEl.value = (amt * price).toFixed(2);
+    updateCmoBuyFee();
+  });
+  document.getElementById('cmo-buy-total')?.addEventListener('input', () => {
+    const total = parseFloat(document.getElementById('cmo-buy-total').value) || 0;
+    const price = parseFloat(document.getElementById('cmo-buy-price')?.value) || cmoBuyPrice;
+    const amtEl = document.getElementById('cmo-buy-amount');
+    if (amtEl && price) amtEl.value = (total / price).toFixed(8).replace(/\.?0+$/, '');
+    updateCmoBuyFee();
+  });
+  document.getElementById('cmo-sell-amount')?.addEventListener('input', () => {
+    const amt   = parseFloat(document.getElementById('cmo-sell-amount').value) || 0;
+    const price = parseFloat(document.getElementById('cmo-sell-price')?.value) || cmoSellPrice;
+    const totalEl = document.getElementById('cmo-sell-total');
+    if (totalEl && price) totalEl.value = (amt * price).toFixed(2);
+    updateCmoSellFee();
+  });
+  document.getElementById('cmo-sell-total')?.addEventListener('input', () => {
+    const total = parseFloat(document.getElementById('cmo-sell-total').value) || 0;
+    const price = parseFloat(document.getElementById('cmo-sell-price')?.value) || cmoSellPrice;
+    const amtEl = document.getElementById('cmo-sell-amount');
+    if (amtEl && price) amtEl.value = (total / price).toFixed(8).replace(/\.?0+$/, '');
+    updateCmoSellFee();
+  });
+
+  document.querySelectorAll('.cmo-pct-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const side = btn.dataset.side;
+      const pct  = parseInt(btn.dataset.pct) / 100;
+      if (side === 'buy') {
+        const price    = parseFloat(document.getElementById('cmo-buy-price')?.value) || cmoBuyPrice;
+        const total    = cmoUsdtAvbl * pct;
+        const amount   = price ? total / price : 0;
+        const totalEl  = document.getElementById('cmo-buy-total');
+        const amountEl = document.getElementById('cmo-buy-amount');
+        if (totalEl)  totalEl.value  = total.toFixed(2);
+        if (amountEl) amountEl.value = amount ? amount.toFixed(8).replace(/\.?0+$/, '') : '';
+        updateCmoBuyFee();
+      } else {
+        const price    = parseFloat(document.getElementById('cmo-sell-price')?.value) || cmoSellPrice;
+        const amount   = cmoAssetQty * pct;
+        const total    = price ? amount * price : 0;
+        const amountEl = document.getElementById('cmo-sell-amount');
+        const totalEl  = document.getElementById('cmo-sell-total');
+        if (amountEl) amountEl.value = amount ? amount.toFixed(8).replace(/\.?0+$/, '') : '';
+        if (totalEl)  totalEl.value  = total.toFixed(2);
+        updateCmoSellFee();
+      }
+    });
+  });
+
+  async function submitCmoOrder(side) {
+    const sym     = cmoAssetInput?.value.trim().toUpperCase();
+    const isLimit = document.getElementById('cmo-otype-limit')?.classList.contains('cmo-otype-active');
+    const price   = isLimit ? (parseFloat(document.getElementById(`cmo-${side}-price`)?.value) || null) : null;
+    const amount  = parseFloat(document.getElementById(`cmo-${side}-amount`)?.value) || null;
+    const total   = parseFloat(document.getElementById(`cmo-${side}-total`)?.value) || null;
+    const rEl     = document.getElementById(`cmo-${side}-result`);
+
+    if (!sym)             { if (rEl) { rEl.textContent = 'Enter asset symbol.';       rEl.style.color = 'var(--red)'; } return; }
+    if (!amount && !total){ if (rEl) { rEl.textContent = 'Enter amount or total.';    rEl.style.color = 'var(--red)'; } return; }
+
+    const btn = document.getElementById(`cmo-${side}-submit`);
+    if (btn) btn.disabled = true;
+    if (rEl) { rEl.textContent = 'Submitting…'; rEl.style.color = 'var(--muted)'; }
+    try {
+      const body = { symbol: sym + 'USDT', side, account_id: cmoAccountId ?? null };
+      if (amount) body.qty = amount;
+      if (!amount && total) body.notional = total;
+      if (price)  body.limit_price = price;
+      const res = await api('/api/orders', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+      if (rEl) { rEl.textContent = `✓ ${side === 'buy' ? 'Bought' : 'Sold'}: ${(res.id || '').slice(0,8) || 'OK'}`; rEl.style.color = side === 'buy' ? 'var(--green)' : 'var(--red)'; }
+      setTimeout(() => { if (ordBrokerActive === 'crypto') fetchCryptoOrders(); }, 1000);
+    } catch (err) {
+      if (rEl) { rEl.textContent = `✕ ${err.message}`; rEl.style.color = 'var(--red)'; }
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  }
+
+  document.getElementById('cmo-buy-submit')?.addEventListener('click',  () => submitCmoOrder('buy'));
+  document.getElementById('cmo-sell-submit')?.addEventListener('click', () => submitCmoOrder('sell'));
 
   createPoller(fetchPositions, 30_000).start();
   createPoller(fetchOrders,    30_000).start();
@@ -2252,10 +2484,69 @@ async function initPerformance() {
     }
   }
 
+  // ── Crypto performance section ──
+  const CRYPTO_STRATEGY_NAMES = ['crypto_trend','crypto_rsi_bounce','crypto_volatility_breakout','crypto_grid'];
+
+  async function fetchCryptoPerf() {
+    const section = document.querySelector('[data-section="crypto-perf"]');
+
+    // Resolve Binance account id
+    let binanceId;
+    try {
+      const accounts = await api('/api/broker-accounts', { key: 'perf-binance-accts' });
+      const b = (accounts || []).find(a => a.broker === 'binance');
+      binanceId = b ? b.id : null;
+    } catch { binanceId = null; }
+
+    if (!binanceId) {
+      if (section) section.style.display = 'none';
+      return;
+    }
+    if (section) section.style.display = '';
+
+    try {
+      const sigs = await api('/api/signals?limit=500', { key: 'perf-crypto-sigs' });
+      const cryptoSigs = (sigs || []).filter(s => CRYPTO_STRATEGY_NAMES.includes(s.strategy));
+
+      const total  = cryptoSigs.length;
+      const filled = cryptoSigs.filter(s => s.status === 'filled').length;
+
+      // Realized P&L: sum qty * price for sells minus buys (best-effort from reason text)
+      // We don't store P&L per signal so show filled sell count as proxy, or 0
+      const realizedPnl = 0; // placeholder — Binance unrealized_pl is always 0 from API
+
+      // Best asset: symbol with most filled signals
+      const symCounts = {};
+      cryptoSigs.filter(s => s.status === 'filled').forEach(s => {
+        symCounts[s.symbol] = (symCounts[s.symbol] || 0) + 1;
+      });
+      const bestAsset = Object.entries(symCounts).sort((a,b) => b[1]-a[1])[0]?.[0] || '—';
+
+      const sigEl = document.getElementById('crypto-signals');
+      if (sigEl) sigEl.textContent = total || '0';
+
+      const fillEl = document.getElementById('crypto-filled');
+      if (fillEl) fillEl.textContent = filled || '0';
+
+      const pnlEl = document.getElementById('crypto-realized-pnl');
+      if (pnlEl) pnlEl.textContent = filled > 0 ? filled + ' sells' : '—';
+
+      const bestEl = document.getElementById('crypto-best-asset');
+      if (bestEl) bestEl.textContent = bestAsset;
+
+      const nameEl = document.getElementById('crypto-perf-account-name');
+      if (nameEl) nameEl.textContent = '(paper)';
+
+    } catch (e) {
+      if (e.name === 'AbortError') return;
+    }
+  }
+
   createPoller(fetchPerformance, 60_000).start();
   createPoller(fetchSignals,     30_000).start();
   createPoller(fetchAttribution, 60_000).start();
   createPoller(fetchComparison,  60_000).start();
+  createPoller(fetchCryptoPerf,  60_000).start();
   initStrategyHealth();
 }
 
@@ -3181,10 +3472,10 @@ async function initApiKeys() {
     const info = document.createElement('div');
     info.style.cssText = 'flex:1;min-width:0;';
     const brokerNameEl = document.createElement('div');
-    brokerNameEl.style.cssText = 'font-size:15px;font-weight:700;line-height:1.2;color:#E6EBF5;';
+    brokerNameEl.style.cssText = 'font-size:15px;font-weight:700;line-height:1.2;color:var(--text);';
     brokerNameEl.textContent = broker.name;
     const acctLabelEl = document.createElement('div');
-    acctLabelEl.style.cssText = 'font-size:12px;color:#94A3B8;margin-top:3px;';
+    acctLabelEl.style.cssText = 'font-size:12px;color:var(--muted);margin-top:3px;';
     acctLabelEl.textContent = acct.label;
     info.append(brokerNameEl, acctLabelEl);
 
