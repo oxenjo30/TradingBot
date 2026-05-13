@@ -1111,6 +1111,31 @@ function escHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+async function toggleExplanation(signalId, btnEl) {
+  const parentTr = btnEl.closest('tr');
+  const existing = parentTr.nextElementSibling;
+  if (existing && existing.classList.contains('explanation-row') && existing.dataset.signalId === String(signalId)) {
+    existing.remove();
+    return;
+  }
+  btnEl.disabled = true;
+  btnEl.textContent = 'Loading…';
+  let text;
+  try {
+    const data = await api(`/api/signals/${signalId}/explanation`);
+    text = (data.explanation) ? escHtml(data.explanation) : 'No AI explanation available for this trade.';
+  } catch (e) {
+    text = 'Failed to load explanation.';
+  }
+  btnEl.disabled = false;
+  btnEl.textContent = 'Explain';
+  const expTr = document.createElement('tr');
+  expTr.className = 'explanation-row';
+  expTr.dataset.signalId = String(signalId);
+  expTr.innerHTML = `<td colspan="8"><div class="explanation-text">${text}</div></td>`;
+  parentTr.insertAdjacentElement('afterend', expTr);
+}
+
 // initBots — bots.html
 // ─────────────────────────────────────────
 async function initBots() {
@@ -2674,13 +2699,13 @@ async function initLogs() {
       const filtered = currentFilter === 'all' ? sigs : sigs.filter(s => s.status === currentFilter);
       tbody.innerHTML = '';
       if (!filtered.length) {
-        tbody.innerHTML = '<tr><td colspan="7" class="state-empty">No signals.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" class="state-empty">No signals.</td></tr>';
         return;
       }
       const statusCls = { filled: 'b-enabled', blocked: 'b-notrun', error: 'b-error', pending: 'b-disabled' };
       filtered.slice(0, 100).forEach(s => {
         const tr = document.createElement('tr');
-        const fields = [fmt.time(s.ts), s.strategy, s.symbol, '', (s.qty||0).toFixed(2), s.reason, ''];
+        const fields = [fmt.time(s.ts), s.strategy, s.symbol, '', (s.qty||0).toFixed(2), s.reason, '', ''];
         fields.forEach((v, i) => {
           const td = document.createElement('td');
           if (i === 3) {
@@ -2693,6 +2718,12 @@ async function initLogs() {
             badge.className = 'badge ' + (statusCls[s.status] || 'b-disabled');
             badge.textContent = s.status;
             td.appendChild(badge);
+          } else if (i === 7) {
+            const btn = document.createElement('button');
+            btn.className = 'btn-explain';
+            btn.textContent = 'Explain';
+            btn.onclick = function() { toggleExplanation(s.id, this); };
+            td.appendChild(btn);
           } else { td.textContent = v; }
           tr.appendChild(td);
         });
@@ -2700,7 +2731,7 @@ async function initLogs() {
       });
     } catch (e) {
       if (e.name === 'AbortError') return;
-      tbody.innerHTML = '<tr><td colspan="7" class="state-error">Failed to load — retrying in 30s</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="8" class="state-error">Failed to load — retrying in 30s</td></tr>';
       throw e;
     }
   }
