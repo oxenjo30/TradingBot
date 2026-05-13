@@ -1,9 +1,11 @@
+from typing import ClassVar
 from .base import Strategy, Signal
 
 
 class CryptoGrid(Strategy):
     name = "crypto_grid"
     label = "Crypto Grid Trading"
+    brokers: ClassVar[list[str]] = ["binance"]
     description = (
         "Replicates Binance's grid trading strategy. Divides a price range into equal bands "
         "and buys when price is in the lower portion of a band, sells when it reaches the upper "

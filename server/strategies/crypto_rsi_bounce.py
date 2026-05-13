@@ -1,3 +1,4 @@
+from typing import ClassVar
 from .base import Strategy, Signal
 
 
@@ -23,6 +24,7 @@ def _rsi(closes: list[float], period: int) -> float | None:
 class CryptoRSIBounce(Strategy):
     name = "crypto_rsi_bounce"
     label = "Crypto RSI Bounce"
+    brokers: ClassVar[list[str]] = ["binance"]
     description = (
         "Mean-reversion strategy for crypto. Buys when RSI bounces back above the oversold "
         "level (confirms the bottom, not just the dip). Sells when RSI reaches overbought. "

@@ -1,4 +1,5 @@
 import math
+from typing import ClassVar
 from .base import Strategy, Signal
 
 
@@ -15,6 +16,7 @@ def _bollinger(closes: list[float], period: int, num_std: float):
 class CryptoVolatilityBreakout(Strategy):
     name = "crypto_volatility_breakout"
     label = "Crypto Volatility Breakout"
+    brokers: ClassVar[list[str]] = ["binance"]
     description = (
         "Buys when price closes above the upper Bollinger Band — a momentum breakout signal. "
         "Sells when price drops back below the middle band (SMA), locking in gains early. "
