@@ -3586,6 +3586,66 @@ async function initSettings() {
   });
 
   loadAlerts();
+
+  // ── AI settings ───────────────────────────────────────────────────────────
+  async function loadAiSettings() {
+    try {
+      const [s, status] = await Promise.all([
+        api('/api/ai/settings'),
+        api('/api/ai/status'),
+      ]);
+      const urlEl   = document.getElementById('ai-ollama-url');
+      const modelEl = document.getElementById('ai-ollama-model');
+      const expEl   = document.getElementById('ai-explanations-enabled');
+      const tunEl   = document.getElementById('ai-tuner-enabled');
+      const dot     = document.getElementById('ai-dot');
+      const dotLbl  = document.getElementById('ai-dot-label');
+      if (urlEl)   urlEl.value   = s.ollama_url;
+      if (modelEl) modelEl.value = s.ollama_model;
+      if (expEl)   expEl.checked = s.explanations_enabled;
+      if (tunEl)   tunEl.checked = s.tuner_enabled;
+      if (dot)     dot.style.background = status.reachable ? '#10B981' : '#EF4444';
+      if (dotLbl)  dotLbl.textContent   = status.reachable ? 'Connected' : 'Offline';
+    } catch (_) {}
+  }
+
+  document.getElementById('ai-save-btn')?.addEventListener('click', async () => {
+    const msg = document.getElementById('ai-save-msg');
+    try {
+      await api('/api/ai/settings', {
+        method: 'PATCH',
+        body: JSON.stringify({
+          ollama_url:           document.getElementById('ai-ollama-url')?.value?.trim(),
+          ollama_model:         document.getElementById('ai-ollama-model')?.value?.trim(),
+          explanations_enabled: document.getElementById('ai-explanations-enabled')?.checked,
+          tuner_enabled:        document.getElementById('ai-tuner-enabled')?.checked,
+        }),
+      });
+      if (msg) { msg.textContent = 'Saved'; msg.classList.remove('hidden'); setTimeout(() => msg.classList.add('hidden'), 2500); }
+    } catch (e) {
+      if (msg) { msg.textContent = e.message; msg.classList.remove('hidden'); }
+    }
+  });
+
+  document.getElementById('ai-tune-now-btn')?.addEventListener('click', async () => {
+    const btn = document.getElementById('ai-tune-now-btn');
+    const msg = document.getElementById('ai-save-msg');
+    btn.disabled = true; btn.textContent = 'Running…';
+    try {
+      const result = await api('/api/ai/tune-now', { method: 'POST' });
+      if (msg) {
+        msg.textContent = result.error ? `Error: ${result.error}` : `Done — ${result.tuned} updated`;
+        msg.classList.remove('hidden');
+        setTimeout(() => msg.classList.add('hidden'), 4000);
+      }
+    } catch (e) {
+      if (msg) { msg.textContent = e.message; msg.classList.remove('hidden'); }
+    } finally {
+      btn.disabled = false; btn.textContent = 'Run Tuning Now';
+    }
+  });
+
+  loadAiSettings();
 }
 
 // ─────────────────────────────────────────

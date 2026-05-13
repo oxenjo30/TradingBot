@@ -302,6 +302,42 @@
       </div>
     </div>
 
+    <!-- AI Assistant card -->
+    <div class="card" id="ai-card" style="margin-top:1rem;">
+      <div class="flex items-center justify-between mb-3">
+        <div style="font-size:14px;font-weight:600;">AI Assistant</div>
+        <div style="display:flex;align-items:center;gap:.5rem;">
+          <span id="ai-dot" style="width:8px;height:8px;border-radius:50%;background:#64748B;display:inline-block;"></span>
+          <span id="ai-dot-label" style="font-size:11px;color:var(--muted);">Checking…</span>
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-3 mb-3">
+        <div>
+          <label class="field-label" for="ai-ollama-url">Ollama URL</label>
+          <input id="ai-ollama-url" class="input-field" placeholder="http://localhost:11434">
+        </div>
+        <div>
+          <label class="field-label" for="ai-ollama-model">Model</label>
+          <input id="ai-ollama-model" class="input-field" placeholder="llama3">
+        </div>
+      </div>
+      <div class="flex gap-4 mb-3" style="flex-wrap:wrap;">
+        <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-size:13px;">
+          <input type="checkbox" id="ai-explanations-enabled" style="width:15px;height:15px;accent-color:#3B82F6;">
+          Enable trade explanations
+        </label>
+        <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-size:13px;">
+          <input type="checkbox" id="ai-tuner-enabled" style="width:15px;height:15px;accent-color:#3B82F6;">
+          Enable weekly parameter tuning
+        </label>
+      </div>
+      <div class="flex gap-2 items-center flex-wrap">
+        <button id="ai-save-btn" class="btn btn-sm btn-primary">Save AI Settings</button>
+        <button id="ai-tune-now-btn" class="btn btn-sm">Run Tuning Now</button>
+        <span id="ai-save-msg" class="field-msg hidden"></span>
+      </div>
+    </div>
+
     <!-- License card -->
     <div class="card" id="lic-card" style="margin-top:1rem;">
       <div style="font-size:14px;font-weight:600;margin-bottom:.75rem;">License</div>
