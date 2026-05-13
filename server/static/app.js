@@ -3114,9 +3114,9 @@ async function initApiKeys() {
       const result = await api(`/api/broker-accounts/${accountId}/status`, { key: `test-${accountId}` });
       statusEl.style.color = '#10B981';
       statusEl.textContent = `✓ ${result.account_type} · equity ${fmt.usd(result.equity)}`;
-    } catch {
+    } catch (e) {
       statusEl.style.color = '#EF4444';
-      statusEl.textContent = '✗ Connection failed';
+      statusEl.textContent = '✗ ' + (e.message || 'Connection failed');
     }
   }
 
@@ -3290,6 +3290,15 @@ async function initApiKeys() {
           key: 'add-account',
         });
         await loadAccounts();
+        // Show brief success banner above the grid
+        const grid = document.getElementById('accounts-grid');
+        if (grid) {
+          const ok = document.createElement('div');
+          ok.style.cssText = 'background:rgba(16,185,129,.12);border:1px solid rgba(16,185,129,.3);border-radius:8px;padding:.6rem 1rem;font-size:13px;color:#10B981;margin-bottom:.75rem;';
+          ok.textContent = `✓ ${label} added successfully.`;
+          grid.parentElement.insertBefore(ok, grid);
+          setTimeout(() => ok.remove(), 4000);
+        }
       } catch (e) {
         errEl.textContent = 'Add failed: ' + (e.message || 'unknown error');
         errEl.classList.remove('hidden');

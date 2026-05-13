@@ -587,6 +587,7 @@ def broker_account_status(account_id: int, request: Request):
         )
         return client.get_account_summary()
     except Exception as e:
+        log.warning("broker_account_status %d failed: %s", account_id, e)
         raise HTTPException(400, str(e))
 
 
