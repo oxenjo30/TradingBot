@@ -327,8 +327,8 @@ def orders(request: Request, status: str = "all", limit: int = 50, account_id: i
 @app.post("/api/orders")
 def submit_order(o: OrderIn, request: Request):
     _require_auth(request)
-    client = _get_broker_client(o.account_id)
     try:
+        client = _get_broker_client(o.account_id)
         sym = o.symbol.upper()
         if o.limit_price and o.qty:
             result = client.submit_limit_order(sym, o.side, o.qty, o.limit_price)
@@ -337,14 +337,16 @@ def submit_order(o: OrderIn, request: Request):
             result = client.submit_market_order(sym, o.side, qty=o.qty, notional=o.notional)
             label = f"manual ${o.notional:.2f}" if o.notional else "manual order"
         display = o.notional if o.notional else o.qty
-        db.log_signal("manual", sym, o.side, display, label, result["id"], result["status"],
+        db.log_signal("manual", sym, o.side, display, label, result.get("id", ""), result.get("status", ""),
                       account_id=o.account_id)
         if o.notional:
-            notifications.notify_trade("manual", sym, o.side, None, o.notional, label, result["id"])
+            notifications.notify_trade("manual", sym, o.side, None, o.notional, label, result.get("id", ""))
         return result
     except HTTPException:
         raise
-    except Exception as e:
+    except BaseException as e:
+        import logging, traceback
+        logging.error("submit_order error: %s\n%s", e, traceback.format_exc())
         raise HTTPException(400, str(e))
 
 @app.delete("/api/orders/{order_id}")
