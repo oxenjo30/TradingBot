@@ -125,3 +125,47 @@ class BinanceAccountClient:
         ask  = float(book["asks"][0][0]) if book.get("asks") else 0.0
         mid  = (bid + ask) / 2 if (bid and ask) else (bid or ask)
         return {"symbol": _from_ccxt(_to_ccxt(symbol)), "bid": bid, "ask": ask, "price": mid}
+
+    def submit_market_order(self, symbol: str, side: Literal["buy", "sell"],
+                            qty: float | None = None,
+                            notional: float | None = None,
+                            client_order_id: str | None = None) -> dict:
+        if qty is None and notional is None:
+            raise ValueError("qty or notional required")
+
+        ccxt_sym = _to_ccxt(symbol)
+        params: dict = {}
+        if client_order_id:
+            params["newClientOrderId"] = client_order_id[:36]
+
+        if notional is not None and qty is None:
+            params["quoteOrderQty"] = float(notional)
+            order = self._exchange.create_order(ccxt_sym, "market", side, None, params=params)
+        else:
+            order = self._exchange.create_order(ccxt_sym, "market", side, float(qty), params=params)
+
+        return {
+            "id":     str(order.get("id", "")),
+            "symbol": _from_ccxt(ccxt_sym),
+            "side":   side,
+            "qty":    float(order.get("filled") or order.get("amount") or qty or 0),
+            "status": "filled" if order.get("status") in ("closed", "filled") else str(order.get("status", "")),
+        }
+
+    def submit_limit_order(self, symbol: str, side: Literal["buy", "sell"],
+                           qty: float, limit_price: float,
+                           client_order_id: str | None = None) -> dict:
+        ccxt_sym = _to_ccxt(symbol)
+        params: dict = {}
+        if client_order_id:
+            params["newClientOrderId"] = client_order_id[:36]
+
+        order = self._exchange.create_order(ccxt_sym, "limit", side, float(qty), limit_price, params=params)
+        return {
+            "id":          str(order.get("id", "")),
+            "symbol":      _from_ccxt(ccxt_sym),
+            "side":        side,
+            "qty":         float(qty),
+            "limit_price": round(float(limit_price), 8),
+            "status":      str(order.get("status", "open")),
+        }

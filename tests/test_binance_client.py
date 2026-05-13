@@ -205,3 +205,68 @@ class TestMarketData:
         assert quote["bid"] == 0.0
         assert quote["ask"] == 0.0
         assert quote["price"] == 0.0
+
+
+class TestOrders:
+    def setup_method(self):
+        import importlib, server.binance_client as m
+        importlib.reload(m)
+        self.BinanceAccountClient = m.BinanceAccountClient
+
+    def _make(self, mock_ex):
+        mock_ex.load_markets.return_value = {}
+        with patch("ccxt.binance", return_value=mock_ex):
+            c = self.BinanceAccountClient.__new__(self.BinanceAccountClient)
+            c._paper = True
+            c._exchange = mock_ex
+            return c
+
+    def _order_response(self, symbol="BTC/USDT", side="buy", qty=0.01, status="closed"):
+        return {
+            "id": "12345", "symbol": symbol, "side": side,
+            "amount": qty, "filled": qty, "status": status,
+            "type": "market", "datetime": "2026-05-12T09:00:00Z",
+        }
+
+    def test_market_order_buy_with_qty(self):
+        mock_ex = MagicMock()
+        mock_ex.create_order.return_value = self._order_response()
+        client = self._make(mock_ex)
+        result = client.submit_market_order("BTC", "buy", qty=0.01)
+        mock_ex.create_order.assert_called_once_with("BTC/USDT", "market", "buy", 0.01, params={})
+        assert result["symbol"] == "BTC"
+        assert result["side"] == "buy"
+        assert result["qty"] == 0.01
+        assert result["status"] == "filled"
+
+    def test_market_order_sell_with_qty(self):
+        mock_ex = MagicMock()
+        mock_ex.create_order.return_value = self._order_response(side="sell")
+        client = self._make(mock_ex)
+        result = client.submit_market_order("ETH", "sell", qty=1.0)
+        mock_ex.create_order.assert_called_once_with("ETH/USDT", "market", "sell", 1.0, params={})
+        assert result["symbol"] == "ETH"
+
+    def test_market_order_buy_with_notional(self):
+        mock_ex = MagicMock()
+        mock_ex.create_order.return_value = self._order_response()
+        client = self._make(mock_ex)
+        client.submit_market_order("BTC", "buy", notional=100.0)
+        mock_ex.create_order.assert_called_once_with(
+            "BTC/USDT", "market", "buy", None,
+            params={"quoteOrderQty": 100.0}
+        )
+
+    def test_limit_order(self):
+        mock_ex = MagicMock()
+        mock_ex.create_order.return_value = {**self._order_response(), "type": "limit", "price": 59000.0}
+        client = self._make(mock_ex)
+        result = client.submit_limit_order("BTC", "buy", qty=0.01, limit_price=59000.0)
+        mock_ex.create_order.assert_called_once_with("BTC/USDT", "limit", "buy", 0.01, 59000.0, params={})
+        assert result["limit_price"] == 59000.0
+
+    def test_raises_if_neither_qty_nor_notional(self):
+        mock_ex = MagicMock()
+        client = self._make(mock_ex)
+        with pytest.raises(ValueError, match="qty or notional required"):
+            client.submit_market_order("BTC", "buy")
