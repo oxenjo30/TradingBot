@@ -2721,7 +2721,47 @@ async function initLogs() {
     a.click();
   });
 
+  async function fetchAudit() {
+    const tbody = document.getElementById('audit-body');
+    if (!tbody) return;
+    try {
+      const rows = await api('/api/audit?limit=200', { key: 'logs-audit' });
+      tbody.innerHTML = '';
+      if (!rows.length) {
+        tbody.innerHTML = '<tr><td colspan="4" class="state-empty">No audit entries yet.</td></tr>';
+        return;
+      }
+      const catCls = {
+        risk:       'b-notrun',
+        kill_switch:'b-error',
+        strategy:   'b-buy',
+        account:    'b-sell',
+        position:   'b-disabled',
+      };
+      rows.forEach(r => {
+        const tr = document.createElement('tr');
+        [fmt.time(r.ts), '', r.action, r.detail].forEach((v, i) => {
+          const td = document.createElement('td');
+          if (i === 1) {
+            const badge = document.createElement('span');
+            badge.className = 'badge ' + (catCls[r.category] || 'b-disabled');
+            badge.textContent = r.category;
+            td.appendChild(badge);
+          } else {
+            td.textContent = v;
+          }
+          tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+      });
+    } catch (e) {
+      if (e.name === 'AbortError') return;
+      tbody.innerHTML = '<tr><td colspan="4" class="state-error">Failed to load — retrying</td></tr>';
+    }
+  }
+
   createPoller(fetchSignals, 30_000).start();
+  createPoller(fetchAudit,   60_000).start();
 }
 
 // initApiKeys — apikeys.html
