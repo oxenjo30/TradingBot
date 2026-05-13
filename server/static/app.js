@@ -1891,7 +1891,8 @@ async function initPositions() {
     updateEstTotal();
     setMoSide(moSide); // refresh button label as symbol changes
     const sym = symInput.value.trim();
-    if (sym.length >= 1) quoteTimer = setTimeout(() => fetchQuote(sym), 600);
+    const minLen = moIsCrypto ? 2 : 1;
+    if (sym.length >= minLen) quoteTimer = setTimeout(() => fetchQuote(sym), 600);
   });
 
   submitBtn?.addEventListener('click', () => {

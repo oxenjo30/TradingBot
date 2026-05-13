@@ -622,10 +622,10 @@ def get_broker_account(account_id: int) -> dict | None:
 
 
 def get_broker_account_credentials(account_id: int) -> dict | None:
-    """Return encrypted api_key + api_secret for internal use (status check, engine). Never send to clients."""
+    """Return encrypted api_key + api_secret plus metadata for internal use. Never send to clients."""
     with get_conn() as c:
         r = c.execute(
-            "SELECT api_key, api_secret FROM broker_accounts WHERE id=?", (account_id,)
+            "SELECT api_key, api_secret, account_type, broker FROM broker_accounts WHERE id=?", (account_id,)
         ).fetchone()
         return dict(r) if r else None
 
