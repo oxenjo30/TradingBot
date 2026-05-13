@@ -178,7 +178,7 @@ def _load_asset_cache():
         assets = trading().get_all_assets()
         _asset_cache = [
             {"symbol": a.symbol, "name": a.name or "", "tradable": a.tradable}
-            for a in assets if a.status.value == "active"
+            for a in assets if a.status.value == "active" and "/" not in a.symbol
         ]
     except Exception:
         _asset_cache = []
