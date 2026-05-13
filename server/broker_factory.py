@@ -6,7 +6,8 @@ Add new brokers here — engine.py and main.py stay unchanged.
 from typing import Literal
 
 
-def get_account_client(broker: str, api_key: str, api_secret: str, paper: bool):
+def get_account_client(broker: str, api_key: str, api_secret: str, paper: bool,
+                       account_id: int | None = None):
     """Return an AccountClient instance for the given broker."""
     broker = (broker or "alpaca").lower()
 
@@ -20,6 +21,7 @@ def get_account_client(broker: str, api_key: str, api_secret: str, paper: bool):
 
     if broker == "binance":
         from .binance_client import BinanceAccountClient
-        return BinanceAccountClient(api_key=api_key, api_secret=api_secret, paper=paper)
+        return BinanceAccountClient(api_key=api_key, api_secret=api_secret, paper=paper,
+                                    account_id=account_id)
 
     raise ValueError(f"Unsupported broker: {broker!r}. Supported: alpaca, tradier, binance")

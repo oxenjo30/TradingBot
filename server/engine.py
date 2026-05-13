@@ -144,6 +144,7 @@ def run_tick():
                         api_key=crypto.decrypt(acct["api_key"]),
                         api_secret=crypto.decrypt(acct["api_secret"]),
                         paper=(acct["account_type"] == "paper"),
+                        account_id=acct_id,
                     )
                     acct_summary = acct_client.get_account_summary()
                     acct_dtc = acct_client.get_day_trade_count()
@@ -260,6 +261,16 @@ def run_tick():
                         final_qty, sig.notional, sig.reason, order["id"]
                     )
                     db.reset_consecutive_losses()
+                    # Track cost basis for crypto brokers so P&L can be computed
+                    if broker in CRYPTO_BROKERS:
+                        filled_qty   = float(order.get("qty") or final_qty or 0)
+                        filled_price = float(order.get("filled_avg_price") or price or 0)
+                        if filled_qty > 0 and filled_price > 0:
+                            cost = filled_qty * filled_price
+                            if sig.side == "buy":
+                                db.crypto_record_buy(acct_id, sig.symbol, filled_qty, cost)
+                            else:
+                                db.crypto_record_sell(acct_id, sig.symbol, filled_qty, cost)
                     _last_run["signals"].append({
                         "strategy": s["name"], "symbol": sig.symbol, "side": sig.side,
                         "qty": final_qty, "reason": sig.reason, "order_id": order["id"],

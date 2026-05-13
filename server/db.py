@@ -131,6 +131,16 @@ CREATE TABLE IF NOT EXISTS audit_log (
 );
 
 CREATE INDEX IF NOT EXISTS idx_audit_ts ON audit_log(ts DESC);
+
+CREATE TABLE IF NOT EXISTS crypto_cost_basis (
+  account_id  INTEGER NOT NULL REFERENCES broker_accounts(id) ON DELETE CASCADE,
+  symbol      TEXT NOT NULL,
+  qty         REAL NOT NULL DEFAULT 0,
+  cost        REAL NOT NULL DEFAULT 0,
+  realized_pnl REAL NOT NULL DEFAULT 0,
+  updated_at  TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (account_id, symbol)
+);
 """
 
 RISK_DEFAULTS = {
@@ -840,6 +850,65 @@ def increment_consecutive_losses() -> int:
 
 def reset_consecutive_losses() -> None:
     set_app_config("consecutive_losses", "0")
+
+
+# ── Crypto Cost Basis ─────────────────────────────────────────────────────────
+
+def crypto_record_buy(account_id: int, symbol: str, qty: float, cost: float) -> None:
+    """Update avg cost basis when a buy fills. Uses running weighted average."""
+    with get_conn() as c:
+        c.execute(
+            """INSERT INTO crypto_cost_basis (account_id, symbol, qty, cost, realized_pnl, updated_at)
+               VALUES (?, ?, ?, ?, 0, ?)
+               ON CONFLICT(account_id, symbol) DO UPDATE SET
+                 cost       = (cost * qty + excluded.cost) / (qty + excluded.qty),
+                 qty        = qty + excluded.qty,
+                 updated_at = excluded.updated_at""",
+            (account_id, symbol.upper(), qty, cost, now_iso()),
+        )
+
+
+def crypto_record_sell(account_id: int, symbol: str, qty: float, proceeds: float) -> float:
+    """Record a sell, compute realized P&L, reduce qty. Returns realized P&L."""
+    with get_conn() as c:
+        row = c.execute(
+            "SELECT qty, cost, realized_pnl FROM crypto_cost_basis WHERE account_id=? AND symbol=?",
+            (account_id, symbol.upper()),
+        ).fetchone()
+        if not row or row["qty"] <= 0:
+            return 0.0
+        avg_cost   = float(row["cost"])
+        held_qty   = float(row["qty"])
+        sell_qty   = min(qty, held_qty)
+        pnl        = (proceeds / sell_qty - avg_cost) * sell_qty if sell_qty > 0 else 0.0
+        new_qty    = max(0.0, held_qty - sell_qty)
+        new_rpnl   = float(row["realized_pnl"]) + pnl
+        c.execute(
+            """UPDATE crypto_cost_basis SET qty=?, realized_pnl=?, updated_at=?
+               WHERE account_id=? AND symbol=?""",
+            (new_qty, new_rpnl, now_iso(), account_id, symbol.upper()),
+        )
+        return pnl
+
+
+def crypto_get_cost_basis(account_id: int) -> list[dict]:
+    """Return all cost basis rows for a Binance account."""
+    with get_conn() as c:
+        rows = c.execute(
+            "SELECT symbol, qty, cost, realized_pnl FROM crypto_cost_basis WHERE account_id=?",
+            (account_id,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def crypto_get_realized_pnl(account_id: int) -> float:
+    """Total realized P&L across all symbols for a Binance account."""
+    with get_conn() as c:
+        row = c.execute(
+            "SELECT COALESCE(SUM(realized_pnl), 0) AS total FROM crypto_cost_basis WHERE account_id=?",
+            (account_id,),
+        ).fetchone()
+        return float(row["total"]) if row else 0.0
 
 
 # ── Backtest Runs ─────────────────────────────────────────────────────────────
