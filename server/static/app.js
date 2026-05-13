@@ -1090,15 +1090,15 @@ async function initDashboard() {
       const usdtEl = document.getElementById('crypto-usdt-bal');
       if (usdtEl) usdtEl.textContent = fmt.usd(summary.cash ?? summary.buying_power ?? 0);
 
-      // Total bought = USDT spent on buys
-      const totalBuy = summary.total_buy ?? null;
+      // Unrealized P&L = current market value of holdings minus avg cost basis
+      const unrealizedPnl = (positions || []).reduce((s, p) => s + (p.unrealized_pl || 0), 0);
       const upnlEl = document.getElementById('crypto-upnl');
       if (upnlEl) {
-        upnlEl.textContent = totalBuy !== null ? fmt.usd(totalBuy) : '—';
-        upnlEl.style.color = '#F0B90B';
+        upnlEl.textContent = fmt.usdSigned(unrealizedPnl, '$0.00');
+        upnlEl.style.color = unrealizedPnl >= 0 ? '#16c784' : '#ef4444';
       }
 
-      // Realized P&L = sell proceeds - buy cost
+      // Realized P&L = profit/loss on fully or partially closed trades
       const realizedPnl = summary.realized_pnl ?? null;
       const ch24El = document.getElementById('crypto-24h');
       if (ch24El) {
@@ -3260,12 +3260,15 @@ async function initBalances() {
       const usdtEl = document.getElementById('crypto-bal-usdt');
       if (usdtEl) usdtEl.textContent = summary.cash != null ? fmt.usd(summary.cash) : '—';
 
-      // Total bought = USDT spent on buys across all trades
-      const totalBuy = summary.total_buy ?? null;
+      // Unrealized P&L = current value of holdings minus avg cost
+      const unrealizedPnl = (positions || []).reduce((s, p) => s + (p.unrealized_pl || 0), 0);
       const assetsEl = document.getElementById('crypto-bal-assets');
-      if (assetsEl) assetsEl.textContent = totalBuy !== null ? fmt.usd(totalBuy) : '—';
+      if (assetsEl) {
+        assetsEl.textContent = fmt.usdSigned(unrealizedPnl, '$0.00');
+        assetsEl.style.color = unrealizedPnl >= 0 ? 'var(--green)' : 'var(--red)';
+      }
       const assetsSub = document.getElementById('crypto-bal-assets-sub');
-      if (assetsSub) assetsSub.textContent = 'USDT spent';
+      if (assetsSub) assetsSub.textContent = 'open positions';
 
       // Realized P&L = sell proceeds - buy cost
       const realizedPnl = summary.realized_pnl ?? null;

@@ -58,16 +58,98 @@ class BinanceAccountClient:
         if not self._exchange.markets:
             self._exchange.load_markets()
 
+    def _compute_pnl_from_trades(self) -> dict:
+        """
+        Fetch all trade history from Binance and compute per-asset P&L.
+
+        Returns:
+            {
+              "by_asset": {
+                "ETH": {
+                  "avg_cost": float,      # avg buy price of currently held qty
+                  "total_bought": float,  # total USDT spent buying
+                  "total_sold": float,    # total USDT received from selling
+                  "realized_pnl": float,  # profit/loss on closed portions
+                },
+                ...
+              },
+              "total_realized_pnl": float,
+              "total_bought": float,
+              "total_sold": float,
+            }
+        """
+        self._ensure_markets()
+        balance = self._exchange.fetch_balance()
+        held_assets = [
+            a for a, q in (balance.get("total") or {}).items()
+            if a not in ("USDT", "USDC") and q and float(q) > 0.000001
+        ]
+        # Also include assets that had trades but may be fully sold
+        traded_assets = set(held_assets)
+
+        by_asset: dict = {}
+
+        for asset in traded_assets:
+            sym = f"{asset}/USDT"
+            try:
+                trades = self._exchange.fetch_my_trades(sym, limit=500)
+            except Exception:
+                continue
+
+            total_bought = 0.0   # total USDT spent
+            total_sold   = 0.0   # total USDT received
+            buy_qty      = 0.0   # running qty bought
+            buy_cost     = 0.0   # running cost of buys
+            realized_pnl = 0.0
+
+            for t in sorted(trades, key=lambda x: x.get("timestamp") or 0):
+                qty   = float(t.get("amount") or 0)
+                price = float(t.get("price")  or 0)
+                cost  = float(t.get("cost")   or qty * price)
+
+                if t["side"] == "buy":
+                    buy_qty   += qty
+                    buy_cost  += cost
+                    total_bought += cost
+                else:
+                    # Realized P&L = sell proceeds - proportional buy cost
+                    if buy_qty > 0:
+                        avg_buy = buy_cost / buy_qty
+                        sell_qty = min(qty, buy_qty)
+                        realized_pnl += (price - avg_buy) * sell_qty
+                        buy_cost -= avg_buy * sell_qty
+                        buy_qty  -= sell_qty
+                    total_sold += cost
+
+            avg_cost = (buy_cost / buy_qty) if buy_qty > 0.000001 else 0.0
+
+            by_asset[asset] = {
+                "avg_cost":      avg_cost,
+                "total_bought":  total_bought,
+                "total_sold":    total_sold,
+                "realized_pnl":  realized_pnl,
+            }
+
+        total_realized = sum(v["realized_pnl"] for v in by_asset.values())
+        total_bought   = sum(v["total_bought"]  for v in by_asset.values())
+        total_sold     = sum(v["total_sold"]    for v in by_asset.values())
+
+        return {
+            "by_asset":            by_asset,
+            "total_realized_pnl":  total_realized,
+            "total_bought":        total_bought,
+            "total_sold":          total_sold,
+        }
+
     def get_account_summary(self) -> dict:
-        from . import db as _db
         balance = self._exchange.fetch_balance()
         usdt_free  = float((balance.get("free")  or {}).get("USDT", 0) or 0)
         usdt_total = float((balance.get("total") or {}).get("USDT", 0) or 0)
 
-        # Value non-USDT holdings at current price (best-effort; skip on error)
+        # Value non-USDT/USDC holdings at current price
         crypto_value = 0.0
         for asset, qty in (balance.get("total") or {}).items():
-            if asset == "USDT" or not qty or float(qty) <= 0:
+            if asset in ("USDT", "USDC") or not qty or float(qty) <= 0.000001:
                 continue
             try:
                 ticker = self._exchange.fetch_ticker(_to_ccxt(asset))
@@ -77,13 +159,18 @@ class BinanceAccountClient:
 
         equity = usdt_total + crypto_value
 
-        # Realized P&L from our own cost basis tracking
-        realized_pnl = 0.0
-        if self._account_id is not None:
-            try:
-                realized_pnl = _db.crypto_get_realized_pnl(self._account_id)
-            except Exception:
-                pass
+        # Real P&L from trade history
+        try:
+            pnl = self._compute_pnl_from_trades()
+            realized_pnl = pnl["total_realized_pnl"]
+            total_bought = pnl["total_bought"]
+            total_sold   = pnl["total_sold"]
+            pnl_by_asset = pnl["by_asset"]
+        except Exception:
+            realized_pnl = 0.0
+            total_bought = 0.0
+            total_sold   = 0.0
+            pnl_by_asset = {}
 
         return {
             "status":             "active",
@@ -95,6 +182,9 @@ class BinanceAccountClient:
             "day_pl":             realized_pnl,
             "day_pl_pct":         0.0,
             "realized_pnl":       realized_pnl,
+            "total_bought":       total_bought,
+            "total_sold":         total_sold,
+            "pnl_by_symbol":      pnl_by_asset,
             "pattern_day_trader": False,
             "trading_blocked":    False,
             "account_type":       "paper" if self._paper else "live",
@@ -105,20 +195,20 @@ class BinanceAccountClient:
         return 0
 
     def get_positions(self) -> list[dict]:
-        from . import db as _db
         balance = self._exchange.fetch_balance()
         totals  = balance.get("total") or {}
 
-        # Load our own cost basis so we can compute real unrealized P&L
-        cost_rows = {}
-        if self._account_id is not None:
-            for cb in _db.crypto_get_cost_basis(self._account_id):
-                cost_rows[cb["symbol"].upper()] = cb
+        # Get trade-based cost basis for real avg price and unrealized P&L
+        try:
+            pnl = self._compute_pnl_from_trades()
+            cost_rows = pnl["by_asset"]
+        except Exception:
+            cost_rows = {}
 
         out = []
         for asset, qty in totals.items():
             qty = float(qty or 0)
-            if asset == "USDT" or qty < 0.000001:
+            if asset in ("USDT", "USDC") or qty < 0.000001:
                 continue
             try:
                 ticker       = self._exchange.fetch_ticker(_to_ccxt(asset))
@@ -128,15 +218,14 @@ class BinanceAccountClient:
                 price        = 0.0
                 market_value = 0.0
 
-            cb = cost_rows.get(asset.upper(), {})
-            avg_cost = float(cb.get("cost", 0) or 0)
-            cb_qty   = float(cb.get("qty", 0) or 0)
-            if avg_cost > 0 and cb_qty > 0:
-                cost_basis     = avg_cost * min(qty, cb_qty)
-                unrealized_pl  = market_value - cost_basis
+            cb       = cost_rows.get(asset, {})
+            avg_cost = float(cb.get("avg_cost", 0) or 0)
+            if avg_cost > 0:
+                cost_basis      = avg_cost * qty
+                unrealized_pl   = market_value - cost_basis
                 unrealized_plpc = (unrealized_pl / cost_basis * 100) if cost_basis else 0.0
             else:
-                unrealized_pl  = 0.0
+                unrealized_pl   = 0.0
                 unrealized_plpc = 0.0
 
             out.append({
