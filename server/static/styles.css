@@ -1937,6 +1937,46 @@ button { cursor: pointer; font-family: inherit; }
   color: #DC2626;
   opacity: 1;
 }
+
+/* Paper vs Live comparison */
+.compare-col {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.compare-col-hd {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  padding: .5rem .85rem;
+  text-transform: uppercase;
+}
+.compare-paper-hd {
+  background: rgba(59,130,246,.08);
+  border-bottom: 1px solid rgba(59,130,246,.15);
+  color: #3B82F6;
+}
+.compare-live-hd {
+  background: rgba(16,185,129,.08);
+  border-bottom: 1px solid rgba(16,185,129,.15);
+  color: #10B981;
+}
+.compare-body { padding: .6rem 0; }
+.compare-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: .35rem .85rem;
+  font-size: 13px;
+}
+.compare-row:hover { background: rgba(59,130,246,.04); }
+.compare-label { color: var(--muted); font-size: 12px; }
+.compare-val   { font-weight: 600; font-size: 13px; font-variant-numeric: tabular-nums; }
+.compare-na    { color: var(--muted); font-size: 12px; font-style: italic; }
+
+[data-theme="light"] .compare-paper-hd { background: rgba(59,130,246,.06); }
+[data-theme="light"] .compare-live-hd  { background: rgba(16,185,129,.06); }
+[data-theme="light"] .compare-row:hover { background: rgba(59,130,246,.04); }
 [data-theme="light"] .btn-close-all {
   background: rgba(239,68,68,.06);
   border-color: rgba(239,68,68,.2);
