@@ -1058,13 +1058,75 @@ async function initDashboard() {
   // ── Start pollers ──
   fetchPerfChart('1D', '5Min');
 
-  createPoller(fetchAccount,    30_000).start();
-  createPoller(fetchPerformance,30_000).start();
-  createPoller(fetchSignals,    60_000).start();
-  createPoller(fetchStrategies, 30_000).start();
-  createPoller(fetchPositions,  30_000).start();
-  createPoller(fetchOrders,     30_000).start();
-  createPoller(fetchClock,      10_000).start();
+  // ── Crypto (Binance) dashboard section ──
+  let _binanceAccountId = null;
+
+  async function fetchCryptoDashboard() {
+    if (_binanceAccountId === null) {
+      try {
+        const accounts = await api('/api/broker-accounts', { key: 'idx-binance-accts' });
+        const binance = (accounts || []).find(a => a.broker === 'binance');
+        _binanceAccountId = binance ? binance.id : undefined;
+      } catch { _binanceAccountId = undefined; }
+    }
+
+    const cryptoSection = document.querySelector('[data-section="crypto"]');
+    if (!_binanceAccountId) {
+      if (cryptoSection) cryptoSection.style.display = 'none';
+      return;
+    }
+    if (cryptoSection) cryptoSection.style.display = '';
+
+    try {
+      const [summary, positions, strats] = await Promise.all([
+        api(`/api/account?account_id=${_binanceAccountId}`, { key: 'idx-crypto-summary' }),
+        api(`/api/positions?account_id=${_binanceAccountId}`, { key: 'idx-crypto-positions' }),
+        api(`/api/broker-accounts/${_binanceAccountId}/strategies`, { key: 'idx-crypto-strats' }),
+      ]);
+
+      const pvEl = document.getElementById('crypto-portfolio-val');
+      if (pvEl) pvEl.textContent = fmt.usd(summary.equity ?? summary.portfolio_value ?? 0);
+
+      const usdtEl = document.getElementById('crypto-usdt-bal');
+      if (usdtEl) usdtEl.textContent = fmt.usd(summary.cash ?? summary.buying_power ?? 0);
+
+      const upnl = (positions || []).reduce((s, p) => s + (p.unrealized_pl || 0), 0);
+      const upnlEl = document.getElementById('crypto-upnl');
+      if (upnlEl) {
+        upnlEl.textContent = fmt.usdSigned(upnl, '$0.00');
+        upnlEl.style.color = upnl >= 0 ? '#16c784' : '#ef4444';
+      }
+
+      const change24h = (positions || []).reduce((s, p) => s + (p.change_today || 0), 0);
+      const ch24El = document.getElementById('crypto-24h');
+      if (ch24El) {
+        ch24El.textContent = change24h !== 0 ? fmt.usdSigned(change24h, '$0.00') : '—';
+        ch24El.style.color = change24h >= 0 ? '#16c784' : '#ef4444';
+      }
+
+      const posEl = document.getElementById('crypto-open-pos');
+      if (posEl) posEl.textContent = (positions || []).length;
+
+      const activeBots = (strats || []).filter(s => s.enabled).length;
+      const botsEl = document.getElementById('crypto-active-bots');
+      if (botsEl) botsEl.textContent = activeBots;
+
+      const nameEl = document.getElementById('crypto-account-name');
+      if (nameEl && summary.account_type) nameEl.textContent = `(${summary.account_type})`;
+
+    } catch (e) {
+      if (e.name === 'AbortError') return;
+    }
+  }
+
+  createPoller(fetchAccount,         30_000).start();
+  createPoller(fetchPerformance,     30_000).start();
+  createPoller(fetchSignals,         60_000).start();
+  createPoller(fetchStrategies,      30_000).start();
+  createPoller(fetchPositions,       30_000).start();
+  createPoller(fetchOrders,          30_000).start();
+  createPoller(fetchClock,           10_000).start();
+  createPoller(fetchCryptoDashboard, 30_000).start();
 }
 
 // ─────────────────────────────────────────
@@ -1724,44 +1786,85 @@ async function initPositions() {
     }
   }
 
-  let currentStatus = 'all';
+  let currentStatus   = 'all';
+  let ordBrokerActive = 'stock';
+
+  function renderOrderRows(orders, tbody, colCount) {
+    tbody.innerHTML = '';
+    if (!orders.length) {
+      tbody.innerHTML = `<tr><td colspan="${colCount}" class="state-empty">No orders.</td></tr>`;
+      return;
+    }
+    orders.forEach(o => {
+      const tr = document.createElement('tr');
+      const fields = [fmt.time(o.submitted_at), o.symbol, '', (o.qty || o.filled_qty || 0), o.status, fmt.time(o.filled_at)];
+      fields.forEach((v, i) => {
+        const td = document.createElement('td');
+        if (i === 2) {
+          const tag = document.createElement('span');
+          tag.className = 'badge ' + (o.side === 'buy' ? 'b-buy' : 'b-sell');
+          tag.textContent = o.side === 'buy' ? 'Buy' : 'Sell';
+          td.appendChild(tag);
+        } else { td.textContent = v; }
+        tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    });
+  }
+
   async function fetchOrders() {
     const tbody = document.getElementById('orders-body');
     const qs = posAccountId ? `&account_id=${posAccountId}` : '';
     try {
       const orders = await api(`/api/orders?status=${currentStatus}&limit=50${qs}`, { key: 'pos-orders' });
-      tbody.innerHTML = '';
-      if (!orders.length) {
-        tbody.innerHTML = '<tr><td colspan="6" class="state-empty">No orders.</td></tr>';
-        return;
-      }
-      orders.forEach(o => {
-        const tr = document.createElement('tr');
-        const fields = [fmt.time(o.submitted_at), o.symbol, '', (o.qty || o.filled_qty || 0), o.status, fmt.time(o.filled_at)];
-        fields.forEach((v, i) => {
-          const td = document.createElement('td');
-          if (i === 2) {
-            const tag = document.createElement('span');
-            tag.className = 'badge ' + (o.side === 'buy' ? 'b-buy' : 'b-sell');
-            tag.textContent = o.side === 'buy' ? 'Buy' : 'Sell';
-            td.appendChild(tag);
-          } else { td.textContent = v; }
-          tr.appendChild(td);
-        });
-        tbody.appendChild(tr);
-      });
+      renderOrderRows(orders, tbody, 6);
     } catch (e) {
       if (e.name === 'AbortError') return;
       tbody.innerHTML = '<tr><td colspan="6" class="state-error">Failed to load &mdash; retrying in 30s</td></tr>';
     }
   }
 
+  async function fetchCryptoOrders() {
+    const tbody = document.getElementById('crypto-orders-body');
+    if (!tbody) return;
+    if (!cmoAccountId) {
+      tbody.innerHTML = '<tr><td colspan="6" class="state-empty">No Binance account connected.</td></tr>';
+      return;
+    }
+    try {
+      const orders = await api(`/api/orders?status=${currentStatus}&limit=50&account_id=${cmoAccountId}`, { key: 'pos-crypto-orders' });
+      renderOrderRows(orders, tbody, 6);
+    } catch (e) {
+      if (e.name === 'AbortError') return;
+      tbody.innerHTML = '<tr><td colspan="6" class="state-error">Failed to load &mdash; retrying in 30s</td></tr>';
+    }
+  }
+
+  // Orders card — broker tab switching
+  document.getElementById('ord-tab-stock')?.addEventListener('click', () => {
+    ordBrokerActive = 'stock';
+    document.getElementById('ord-tab-stock')?.classList.add('ord-broker-active');
+    document.getElementById('ord-tab-crypto')?.classList.remove('ord-broker-active');
+    document.getElementById('ord-panel-stock').style.display  = '';
+    document.getElementById('ord-panel-crypto').style.display = 'none';
+    fetchOrders();
+  });
+  document.getElementById('ord-tab-crypto')?.addEventListener('click', () => {
+    ordBrokerActive = 'crypto';
+    document.getElementById('ord-tab-crypto')?.classList.add('ord-broker-active');
+    document.getElementById('ord-tab-stock')?.classList.remove('ord-broker-active');
+    document.getElementById('ord-panel-stock').style.display  = 'none';
+    document.getElementById('ord-panel-crypto').style.display = '';
+    fetchCryptoOrders();
+  });
+
   document.querySelectorAll('[data-status]').forEach(btn => {
     btn.addEventListener('click', () => {
       document.querySelectorAll('[data-status]').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       currentStatus = btn.dataset.status;
-      fetchOrders();
+      if (ordBrokerActive === 'stock') fetchOrders();
+      else fetchCryptoOrders();
     });
   });
 
@@ -1776,6 +1879,22 @@ async function initPositions() {
       a.click();
     });
   }
+
+  // ── Manual Order card — broker tab switching ─────────────────────────────────
+  function switchMoBroker(broker) {
+    const isStock = broker === 'stock';
+    document.getElementById('mo-tab-stock')?.classList.toggle('ord-broker-active', isStock);
+    document.getElementById('mo-tab-crypto')?.classList.toggle('ord-broker-active', !isStock);
+    document.getElementById('mo-panel-stock').style.display  = isStock ? '' : 'none';
+    document.getElementById('mo-panel-crypto').style.display = isStock ? 'none' : '';
+    const card = document.getElementById('mo-card');
+    if (card) {
+      card.style.borderColor = isStock ? '' : 'rgba(240,185,11,.22)';
+      card.style.background  = isStock ? '' : 'rgba(240,185,11,.04)';
+    }
+  }
+  document.getElementById('mo-tab-stock')?.addEventListener('click',  () => switchMoBroker('stock'));
+  document.getElementById('mo-tab-crypto')?.addEventListener('click', () => switchMoBroker('crypto'));
 
   // ── Manual order ticket ──────────────────────────────────────────────
   let moSide = 'buy';
@@ -1823,17 +1942,18 @@ async function initPositions() {
   buyBtn?.addEventListener('click',  () => setMoSide('buy'));
   sellBtn?.addEventListener('click', () => setMoSide('sell'));
 
-  let modeIsQty = true;
+  let modeIsQty  = true;
+  let moIsLimit  = false; // controlled by Market/Limit tab
   function setMoMode(isQty) {
     modeIsQty = isQty;
     modeQtyBtn?.classList.toggle('mot-toggle-active', isQty);
     modeNotionalBtn?.classList.toggle('mot-toggle-active', !isQty);
     if (isQty) {
-      if (qtyLabel) qtyLabel.textContent = moIsCrypto ? 'Qty' : 'Shares';
+      if (qtyLabel) qtyLabel.textContent = 'Shares';
       if (qtyInput) { qtyInput.placeholder = '0'; qtyInput.step = 'any'; }
-      if (priceWrap) priceWrap.style.display = '';
+      if (priceWrap) priceWrap.style.display = moIsLimit ? '' : 'none';
     } else {
-      if (qtyLabel) qtyLabel.textContent = moIsCrypto ? 'USDT Value' : 'USD Value';
+      if (qtyLabel) qtyLabel.textContent = 'USD Value';
       if (qtyInput) { qtyInput.placeholder = '0.00'; qtyInput.step = '0.01'; }
       if (priceWrap) priceWrap.style.display = 'none';
       if (priceInput) priceInput.value = '';
