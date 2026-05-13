@@ -399,14 +399,68 @@ def quotes_snapshot(symbols: str, request: Request):
     _require_auth(request)
     syms = [s.strip() for s in symbols.split(",") if s.strip()]
     try:
-        return alpaca_client.get_snapshots(syms)
+        results = alpaca_client.get_snapshots(syms)
     except Exception as e:
         raise HTTPException(400, str(e))
+
+    # Fall back to Binance for any symbols that Alpaca couldn't price
+    missing = [r["symbol"] for r in results if r.get("price") is None]
+    if missing:
+        binance_accts = [a for a in db.get_broker_accounts() if a.get("broker") == "binance"]
+        if binance_accts:
+            try:
+                from .broker_factory import get_account_client
+                creds = db.get_broker_account_credentials(binance_accts[0]["id"])
+                bclient = get_account_client(
+                    broker="binance",
+                    api_key=creds.get("api_key", ""),
+                    api_secret=creds.get("api_secret", ""),
+                    paper=binance_accts[0].get("paper", False),
+                )
+                price_map = {r["symbol"]: r for r in results}
+                for sym in missing:
+                    try:
+                        q = bclient.get_latest_quote(sym)
+                        price_map[sym]["price"] = q.get("price")
+                        price_map[sym]["bid"]   = q.get("bid")
+                        price_map[sym]["ask"]   = q.get("ask")
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+
+    return results
 
 @app.get("/api/assets/search")
 def assets_search(q: str = "", request: Request = None):
     _require_auth(request)
-    return alpaca_client.search_assets(q, limit=8)
+    results = alpaca_client.search_assets(q, limit=8)
+    if len(results) < 8 and q:
+        # Supplement with Binance markets for crypto search
+        binance_accts = [a for a in db.get_broker_accounts() if a.get("broker") == "binance"]
+        if binance_accts:
+            try:
+                from .broker_factory import get_account_client
+                creds = db.get_broker_account_credentials(binance_accts[0]["id"])
+                bclient = get_account_client(
+                    broker="binance",
+                    api_key=creds.get("api_key", ""),
+                    api_secret=creds.get("api_secret", ""),
+                    paper=binance_accts[0].get("paper", False),
+                )
+                bclient._ensure_markets()
+                q_up = q.upper()
+                existing_syms = {r["symbol"] for r in results}
+                for market in list(bclient._exchange.markets.values())[:2000]:
+                    base = str(market.get("base", "")).upper()
+                    if base.startswith(q_up) and base not in existing_syms:
+                        results.append({"symbol": base, "name": f"{base} (Binance)", "tradable": True})
+                        existing_syms.add(base)
+                    if len(results) >= 8:
+                        break
+            except Exception:
+                pass
+    return results
 
 @app.get("/api/portfolio_history")
 def portfolio_history(request: Request, period: str = "1M", timeframe: str = "1D"):
