@@ -121,7 +121,7 @@ class MACDVolume(Strategy):
 
             if crossed_up and volume_ok and held <= 0:
                 out.append(self._signal(sym, "buy",
-                    f"MACD({fast},{slow},{sig_n}) crossed up | vol {volume_today:,.0f} ≥ {vol_mult:.1f}× avg"))
+                    f"MACD({fast},{slow},{sig_n}) crossed up | vol {volume_today:,.0f} >= {vol_mult:.1f}x avg"))
             elif crossed_dn and held > 0:
                 out.append(Signal(symbol=sym, side="sell", qty=held,
                     reason=f"MACD({fast},{slow},{sig_n}) crossed down"))

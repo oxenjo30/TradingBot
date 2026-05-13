@@ -114,7 +114,7 @@ class BollingerBandMeanReversion(Strategy):
                 # exit: price recovered to middle band OR RSI normalised
                 if price >= mid or rsi > rsi_exit:
                     out.append(Signal(symbol=sym, side="sell", qty=held,
-                        reason=f"price {price:.2f} ≥ SMA{period} {mid:.2f} | RSI={rsi:.1f}"))
+                        reason=f"price {price:.2f} >= SMA{period} {mid:.2f} | RSI={rsi:.1f}"))
             else:
                 # entry: below lower band + oversold RSI
                 if price < lower and rsi < rsi_os:

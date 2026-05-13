@@ -141,7 +141,7 @@ class Breakout52Week(Strategy):
 
             if is_new_high and volume_surges:
                 out.append(self._signal(sym, "buy",
-                    f"New 52w high {price_today:.2f} ≥ {high_52w:.2f} | vol {volume_today:,.0f} ≥ {vol_mult:.1f}× avg"))
+                    f"New 52w high {price_today:.2f} >= {high_52w:.2f} | vol {volume_today:,.0f} >= {vol_mult:.1f}x avg"))
                 open_pos += 1
 
         return out
