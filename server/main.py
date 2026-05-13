@@ -3,6 +3,7 @@ import csv
 import io
 import logging
 import os
+import threading
 from contextlib import asynccontextmanager
 from datetime import date
 from typing import Literal
@@ -788,17 +789,25 @@ def ai_tuning_log_get(request: Request):
     return db.list_tuning_log()
 
 
+_tune_now_lock = threading.Lock()
+
 @app.post("/api/ai/tune-now")
 def ai_tune_now(request: Request):
     _require_auth(request)
-    import threading
+    if not _tune_now_lock.acquire(blocking=False):
+        return {"tuned": 0, "skipped": 0, "error": "already running"}
     result_holder: dict = {}
     def _run():
-        result_holder["result"] = ai_tuner.run_tuning()
+        try:
+            result_holder["result"] = ai_tuner.run_tuning()
+        finally:
+            _tune_now_lock.release()
     t = threading.Thread(target=_run, daemon=True)
     t.start()
     t.join(timeout=120)
-    return result_holder.get("result", {"tuned": 0, "skipped": 0, "error": "timeout"})
+    if t.is_alive():
+        return {"tuned": 0, "skipped": 0, "error": "timeout"}
+    return result_holder.get("result", {"tuned": 0, "skipped": 0, "error": "no result"})
 
 
 @app.post("/api/ai/tuning-log/{run_id}/revert")
