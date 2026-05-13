@@ -35,8 +35,9 @@ class BinanceAccountClient:
     and tradier_client.TradierAccountClient.
     """
 
-    def __init__(self, api_key: str, api_secret: str, paper: bool):
+    def __init__(self, api_key: str, api_secret: str, paper: bool, account_id: int | None = None):
         self._paper = paper
+        self._account_id = account_id
         self._exchange = ccxt.binance({
             "apiKey":  api_key,
             "secret":  api_secret,
@@ -58,6 +59,7 @@ class BinanceAccountClient:
             self._exchange.load_markets()
 
     def get_account_summary(self) -> dict:
+        from . import db as _db
         balance = self._exchange.fetch_balance()
         usdt_free  = float((balance.get("free")  or {}).get("USDT", 0) or 0)
         usdt_total = float((balance.get("total") or {}).get("USDT", 0) or 0)
@@ -74,6 +76,15 @@ class BinanceAccountClient:
                 pass
 
         equity = usdt_total + crypto_value
+
+        # Realized P&L from our own cost basis tracking
+        realized_pnl = 0.0
+        if self._account_id is not None:
+            try:
+                realized_pnl = _db.crypto_get_realized_pnl(self._account_id)
+            except Exception:
+                pass
+
         return {
             "status":             "active",
             "cash":               usdt_free,
@@ -81,8 +92,9 @@ class BinanceAccountClient:
             "last_equity":        equity,
             "buying_power":       usdt_free,
             "portfolio_value":    equity,
-            "day_pl":             0.0,
+            "day_pl":             realized_pnl,
             "day_pl_pct":         0.0,
+            "realized_pnl":       realized_pnl,
             "pattern_day_trader": False,
             "trading_blocked":    False,
             "account_type":       "paper" if self._paper else "live",
@@ -93,8 +105,16 @@ class BinanceAccountClient:
         return 0
 
     def get_positions(self) -> list[dict]:
+        from . import db as _db
         balance = self._exchange.fetch_balance()
         totals  = balance.get("total") or {}
+
+        # Load our own cost basis so we can compute real unrealized P&L
+        cost_rows = {}
+        if self._account_id is not None:
+            for cb in _db.crypto_get_cost_basis(self._account_id):
+                cost_rows[cb["symbol"].upper()] = cb
+
         out = []
         for asset, qty in totals.items():
             qty = float(qty or 0)
@@ -107,15 +127,27 @@ class BinanceAccountClient:
             except Exception:
                 price        = 0.0
                 market_value = 0.0
+
+            cb = cost_rows.get(asset.upper(), {})
+            avg_cost = float(cb.get("cost", 0) or 0)
+            cb_qty   = float(cb.get("qty", 0) or 0)
+            if avg_cost > 0 and cb_qty > 0:
+                cost_basis     = avg_cost * min(qty, cb_qty)
+                unrealized_pl  = market_value - cost_basis
+                unrealized_plpc = (unrealized_pl / cost_basis * 100) if cost_basis else 0.0
+            else:
+                unrealized_pl  = 0.0
+                unrealized_plpc = 0.0
+
             out.append({
                 "symbol":          asset,
                 "qty":             qty,
                 "side":            "long",
-                "avg_entry_price": 0.0,
+                "avg_entry_price": avg_cost,
                 "current_price":   price,
                 "market_value":    market_value,
-                "unrealized_pl":   0.0,
-                "unrealized_plpc": 0.0,
+                "unrealized_pl":   unrealized_pl,
+                "unrealized_plpc": unrealized_plpc,
                 "change_today":    0.0,
             })
         return out
@@ -188,21 +220,14 @@ class BinanceAccountClient:
 
     def get_orders(self, limit: int = 50, status: str = "all") -> list[dict]:
         from datetime import datetime, timezone
-        try:
-            if status == "open":
-                raw = self._exchange.fetch_open_orders()
-            else:
-                raw = self._exchange.fetch_orders()
-        except Exception:
-            return []
+        from . import db as _db
 
-        out = []
-        for o in raw[:limit]:
+        def _normalise(o: dict) -> dict:
             ts = o.get("datetime") or ""
             filled_ts = o.get("lastTradeTimestamp")
             filled_at = (datetime.fromtimestamp(filled_ts / 1000, tz=timezone.utc).isoformat()
                          if filled_ts else None)
-            out.append({
+            return {
                 "id":               str(o.get("id", "")),
                 "client_order_id":  o.get("clientOrderId", ""),
                 "symbol":           _from_ccxt(o.get("symbol", "")),
@@ -214,8 +239,50 @@ class BinanceAccountClient:
                 "status":           str(o.get("status", "")).lower(),
                 "submitted_at":     ts,
                 "filled_at":        filled_at,
-            })
-        return out
+            }
+
+        # open-only: Binance supports fetch_open_orders() without a symbol
+        if status == "open":
+            try:
+                raw = self._exchange.fetch_open_orders()
+                return [_normalise(o) for o in raw[:limit]]
+            except Exception:
+                return []
+
+        # all/closed: Binance requires a symbol for fetch_orders().
+        # Collect every symbol traded on this account from the signals log,
+        # then fan out one call per symbol and merge the results.
+        try:
+            acct_id = getattr(self, "_account_id", None)
+            with _db.get_conn() as c:
+                if acct_id is not None:
+                    rows = c.execute(
+                        "SELECT DISTINCT symbol FROM signals WHERE account_id=? ORDER BY id DESC",
+                        (acct_id,),
+                    ).fetchall()
+                else:
+                    rows = c.execute(
+                        "SELECT DISTINCT symbol FROM signals ORDER BY id DESC"
+                    ).fetchall()
+            symbols = [r["symbol"] for r in rows]
+        except Exception:
+            symbols = []
+
+        raw_all: list[dict] = []
+        for sym in symbols:
+            ccxt_sym = _to_ccxt(sym)
+            try:
+                orders = self._exchange.fetch_orders(ccxt_sym)
+                raw_all.extend(orders)
+            except Exception:
+                pass
+
+        # Sort newest-first and apply status filter
+        raw_all.sort(key=lambda o: o.get("timestamp") or 0, reverse=True)
+        if status == "closed":
+            raw_all = [o for o in raw_all if o.get("status") in ("closed", "canceled", "filled")]
+
+        return [_normalise(o) for o in raw_all[:limit]]
 
     def cancel_order(self, order_id: str) -> dict:
         result = self._exchange.cancel_order(order_id)

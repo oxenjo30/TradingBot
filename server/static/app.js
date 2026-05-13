@@ -1097,11 +1097,12 @@ async function initDashboard() {
         upnlEl.style.color = upnl >= 0 ? '#16c784' : '#ef4444';
       }
 
-      const change24h = (positions || []).reduce((s, p) => s + (p.change_today || 0), 0);
+      // Realized P&L from closed trades (tracked in our own DB)
+      const realizedPnl = summary.realized_pnl ?? null;
       const ch24El = document.getElementById('crypto-24h');
       if (ch24El) {
-        ch24El.textContent = change24h !== 0 ? fmt.usdSigned(change24h, '$0.00') : '—';
-        ch24El.style.color = change24h >= 0 ? '#16c784' : '#ef4444';
+        ch24El.textContent = realizedPnl !== null ? fmt.usdSigned(realizedPnl, '$0.00') : '—';
+        ch24El.style.color = realizedPnl !== null && realizedPnl >= 0 ? '#16c784' : '#ef4444';
       }
 
       const posEl = document.getElementById('crypto-open-pos');
@@ -2144,7 +2145,11 @@ async function initPositions() {
     if (cmoQuoteEl) { cmoQuoteEl.style.display = ''; cmoQuoteEl.textContent = 'Fetching…'; }
     try {
       const qs = cmoAccountId ? `?account_id=${cmoAccountId}` : '';
-      const res = await fetch('/api/quote/' + encodeURIComponent(sym + 'USDT') + qs);
+      const [res, acctData, posData] = await Promise.all([
+        fetch('/api/quote/' + encodeURIComponent(sym + 'USDT') + qs),
+        cmoAccountId ? api(`/api/account?account_id=${cmoAccountId}`, { key: 'cmo-acct' }).catch(() => null) : null,
+        cmoAccountId ? api(`/api/positions?account_id=${cmoAccountId}`, { key: 'cmo-pos' }).catch(() => null) : null,
+      ]);
       if (!res.ok) throw new Error();
       const q = await res.json();
       const bid = parseFloat(q.bid) || 0;
@@ -2158,6 +2163,21 @@ async function initPositions() {
       }
       cmoBuyPrice  = ask || mid;
       cmoSellPrice = bid || mid;
+
+      // Populate balances for % quick-fill
+      if (acctData) {
+        cmoUsdtAvbl = parseFloat(acctData.cash) || 0;
+        const buyAvbl = document.getElementById('cmo-buy-avbl');
+        if (buyAvbl) buyAvbl.textContent = cmoUsdtAvbl.toFixed(2) + ' USDT';
+      }
+      if (posData) {
+        const symUpper = sym.toUpperCase();
+        const pos = (posData || []).find(p => p.symbol?.toUpperCase() === symUpper);
+        cmoAssetQty = pos ? (parseFloat(pos.qty) || 0) : 0;
+        const sellAvbl = document.getElementById('cmo-sell-avbl');
+        if (sellAvbl) sellAvbl.textContent = cmoAssetQty.toFixed(6).replace(/\.?0+$/, '') + ' ' + symUpper;
+      }
+
       const isLimitOn = document.getElementById('cmo-otype-limit')?.classList.contains('cmo-otype-active');
       if (isLimitOn) {
         const bp = document.getElementById('cmo-buy-price');
@@ -2240,10 +2260,17 @@ async function initPositions() {
     updateCmoSellFee();
   });
 
+  function clearPctActive(side) {
+    document.querySelectorAll(`.cmo-pct-btn[data-side="${side}"]`).forEach(b => b.classList.remove('pct-active'));
+  }
+
   document.querySelectorAll('.cmo-pct-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       const side = btn.dataset.side;
       const pct  = parseInt(btn.dataset.pct) / 100;
+      // Mark selected, clear siblings
+      clearPctActive(side);
+      btn.classList.add('pct-active');
       if (side === 'buy') {
         const price    = parseFloat(document.getElementById('cmo-buy-price')?.value) || cmoBuyPrice;
         const total    = cmoUsdtAvbl * pct;
@@ -2264,6 +2291,14 @@ async function initPositions() {
         updateCmoSellFee();
       }
     });
+  });
+
+  // Clear pct active state when user types in amount/total fields directly
+  ['cmo-buy-amount', 'cmo-buy-total'].forEach(id => {
+    document.getElementById(id)?.addEventListener('input', () => clearPctActive('buy'));
+  });
+  ['cmo-sell-amount', 'cmo-sell-total'].forEach(id => {
+    document.getElementById(id)?.addEventListener('input', () => clearPctActive('sell'));
   });
 
   async function submitCmoOrder(side) {
@@ -3218,12 +3253,17 @@ async function initBalances() {
       const assetsSub = document.getElementById('crypto-bal-assets-sub');
       if (assetsSub) assetsSub.textContent = assetCount === 1 ? 'coin held' : 'coins held';
 
-      // 24h P&L from unrealized_pl sum (proxy — Binance demo doesn't provide daily change)
-      const totalUpnl = (positions || []).reduce((s, p) => s + (p.unrealized_pl || 0), 0);
+      // Realized P&L from closed trades (tracked in our own cost basis DB)
+      const realizedPnl = summary.realized_pnl ?? null;
       const pnl24El = document.getElementById('crypto-bal-24h');
       if (pnl24El) {
-        pnl24El.textContent = fmt.usdSigned(totalUpnl, '—');
-        pnl24El.style.color = totalUpnl >= 0 ? 'var(--green)' : 'var(--red)';
+        if (realizedPnl !== null) {
+          pnl24El.textContent = fmt.usdSigned(realizedPnl, '—');
+          pnl24El.style.color = realizedPnl >= 0 ? 'var(--green)' : 'var(--red)';
+        } else {
+          pnl24El.textContent = '—';
+          pnl24El.style.color = '';
+        }
       }
 
       // Crypto holdings table
