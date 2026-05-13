@@ -121,6 +121,16 @@ CREATE TABLE IF NOT EXISTS price_alerts (
   triggered_at TEXT,
   created_at   TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+CREATE TABLE IF NOT EXISTS audit_log (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  ts         TEXT NOT NULL DEFAULT (datetime('now')),
+  category   TEXT NOT NULL,
+  action     TEXT NOT NULL,
+  detail     TEXT NOT NULL DEFAULT ''
+);
+
+CREATE INDEX IF NOT EXISTS idx_audit_ts ON audit_log(ts DESC);
 """
 
 RISK_DEFAULTS = {
@@ -1135,3 +1145,26 @@ def set_tuning_win_rate_after(run_id: int, win_rate: float) -> None:
             "UPDATE ai_tuning_log SET win_rate_after=? WHERE id=?",
             (win_rate, run_id),
         )
+
+
+# ── Audit log ──────────────────────────────────────────────────────────────────
+
+def log_audit(category: str, action: str, detail: str = "") -> None:
+    """Append one immutable audit record. Fire-and-forget; never raises."""
+    try:
+        with get_conn() as c:
+            c.execute(
+                "INSERT INTO audit_log(category, action, detail) VALUES(?,?,?)",
+                (category, action, detail),
+            )
+    except Exception:
+        pass
+
+
+def list_audit(limit: int = 200) -> list[dict]:
+    with get_conn() as c:
+        rows = c.execute(
+            "SELECT id, ts, category, action, detail FROM audit_log ORDER BY ts DESC LIMIT ?",
+            (limit,),
+        ).fetchall()
+    return [dict(r) for r in rows]
