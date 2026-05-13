@@ -3614,6 +3614,7 @@ async function initSettings() {
     try {
       await api('/api/ai/settings', {
         method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ollama_url:           document.getElementById('ai-ollama-url')?.value?.trim(),
           ollama_model:         document.getElementById('ai-ollama-model')?.value?.trim(),
