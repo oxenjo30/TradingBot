@@ -3793,9 +3793,11 @@ async function initAiTuning() {
       const provider = cfg.tuner_provider || s.provider || 'ollama';
 
       if (provider === 'claude') {
-        if (dot)     dot.className = 'status-dot ' + (s.reachable ? 'dot-green' : 'dot-red');
+        if (dot)     dot.className = 'status-dot ' + (cfg.claude_api_key_set ? 'dot-green' : 'dot-red');
         if (modelEl) modelEl.textContent = 'Claude (Anthropic)';
-        if (subEl)   subEl.textContent   = cfg.claude_model || s.model || '—';
+        if (subEl)   subEl.textContent   = cfg.claude_api_key_set
+          ? (cfg.claude_model || s.model || '—')
+          : 'API key not set';
       } else {
         const ok = s.reachable;
         if (dot)     dot.className = 'status-dot ' + (ok ? 'dot-green' : 'dot-red');

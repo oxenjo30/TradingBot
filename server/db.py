@@ -52,6 +52,20 @@ CREATE TABLE IF NOT EXISTS strategy_perf (
 CREATE INDEX IF NOT EXISTS idx_signals_ts ON signals(ts DESC);
 CREATE INDEX IF NOT EXISTS idx_perf_strategy ON strategy_perf(strategy, date DESC);
 
+-- Tracks open buy positions so sells can be matched back for P&L recording.
+-- Rows are inserted on buy fill and deleted (FIFO) on matching sell fill.
+CREATE TABLE IF NOT EXISTS open_trades (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    opened_at  TEXT NOT NULL,
+    strategy   TEXT NOT NULL,
+    symbol     TEXT NOT NULL,
+    account_id INTEGER,
+    qty        REAL NOT NULL,
+    fill_price REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_open_trades_lookup
+    ON open_trades(strategy, symbol, account_id, opened_at ASC);
+
 CREATE TABLE IF NOT EXISTS symbol_blacklist (
   symbol     TEXT PRIMARY KEY,
   added_at   TEXT NOT NULL DEFAULT (datetime('now'))
@@ -159,7 +173,18 @@ RISK_DEFAULTS = {
     "max_symbol_exposure_pct": "0",     # 0 = disabled
     "trading_hours_start":     "",      # "" = disabled (HH:MM ET)
     "trading_hours_end":       "",      # "" = disabled (HH:MM ET)
-    "take_profit_pct":         "0",    # 0 = disabled
+    "take_profit_pct":         "0",     # 0 = disabled
+    # Crypto-specific settings (Binance / 24-7 brokers) — fully independent of stock settings
+    "max_daily_loss_pct_crypto":      "5.0",
+    "max_position_pct_crypto":        "20.0",
+    "take_profit_pct_crypto":         "0",    # 0 = disabled
+    "max_open_positions_crypto":      "10",   # 0 = disabled
+    "max_symbol_exposure_pct_crypto": "0",    # 0 = disabled
+    "consecutive_loss_limit_crypto":  "0",    # 0 = disabled
+    "weekly_loss_limit_pct_crypto":   "0",    # 0 = disabled
+    "max_orders_per_day_crypto":      "0",    # 0 = disabled
+    "position_size_mode_crypto":      "fixed",
+    "position_size_pct_crypto":       "5.0",
 }
 
 
@@ -279,6 +304,10 @@ def init_db():
         cols = [r[1] for r in c.execute("PRAGMA table_info(signals)")]
         if "ai_explanation" not in cols:
             c.execute("ALTER TABLE signals ADD COLUMN ai_explanation TEXT DEFAULT NULL")
+        if "ai_provider" not in cols:
+            c.execute("ALTER TABLE signals ADD COLUMN ai_provider TEXT DEFAULT NULL")
+        if "ai_model" not in cols:
+            c.execute("ALTER TABLE signals ADD COLUMN ai_model TEXT DEFAULT NULL")
     # Migration: create ai_tuning_log table if missing
     with get_conn() as c:
         tables = [r[0] for r in c.execute("SELECT name FROM sqlite_master WHERE type='table'")]
@@ -292,8 +321,34 @@ def init_db():
                   new_params       TEXT NOT NULL,
                   rationale        TEXT NOT NULL,
                   win_rate_before  REAL,
-                  win_rate_after   REAL DEFAULT NULL
+                  win_rate_after   REAL DEFAULT NULL,
+                  ai_provider      TEXT DEFAULT NULL,
+                  ai_model         TEXT DEFAULT NULL
                 );
+            """)
+    # Migration: add ai_provider / ai_model columns to existing ai_tuning_log
+    with get_conn() as c:
+        cols = [r[1] for r in c.execute("PRAGMA table_info(ai_tuning_log)")]
+        if "ai_provider" not in cols:
+            c.execute("ALTER TABLE ai_tuning_log ADD COLUMN ai_provider TEXT DEFAULT NULL")
+        if "ai_model" not in cols:
+            c.execute("ALTER TABLE ai_tuning_log ADD COLUMN ai_model TEXT DEFAULT NULL")
+    # Migration: create open_trades table if missing
+    with get_conn() as c:
+        tables = [r[0] for r in c.execute("SELECT name FROM sqlite_master WHERE type='table'")]
+        if "open_trades" not in tables:
+            c.executescript("""
+                CREATE TABLE IF NOT EXISTS open_trades (
+                    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                    opened_at  TEXT NOT NULL,
+                    strategy   TEXT NOT NULL,
+                    symbol     TEXT NOT NULL,
+                    account_id INTEGER,
+                    qty        REAL NOT NULL,
+                    fill_price REAL NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_open_trades_lookup
+                    ON open_trades(strategy, symbol, account_id, opened_at ASC);
             """)
 
 
@@ -318,6 +373,17 @@ def get_risk_settings() -> dict:
         "trading_hours_start":     base["trading_hours_start"],
         "trading_hours_end":       base["trading_hours_end"],
         "take_profit_pct":         float(base["take_profit_pct"]),
+        # Crypto-specific settings (fully independent of stock)
+        "max_daily_loss_pct_crypto":      float(base["max_daily_loss_pct_crypto"]),
+        "max_position_pct_crypto":        float(base["max_position_pct_crypto"]),
+        "take_profit_pct_crypto":         float(base["take_profit_pct_crypto"]),
+        "max_open_positions_crypto":      int(base["max_open_positions_crypto"]),
+        "max_symbol_exposure_pct_crypto": float(base["max_symbol_exposure_pct_crypto"]),
+        "consecutive_loss_limit_crypto":  int(base["consecutive_loss_limit_crypto"]),
+        "weekly_loss_limit_pct_crypto":   float(base["weekly_loss_limit_pct_crypto"]),
+        "max_orders_per_day_crypto":      int(base["max_orders_per_day_crypto"]),
+        "position_size_mode_crypto":      base["position_size_mode_crypto"],
+        "position_size_pct_crypto":       float(base["position_size_pct_crypto"]),
     }
 
 
@@ -916,68 +982,69 @@ def crypto_get_realized_pnl(account_id: int) -> float:
 
 def crypto_pnl_from_signals(account_id: int) -> dict:
     """
-    Compute per-symbol and total P&L purely from filled signals.
+    Compute per-symbol realized P&L for a Binance account.
 
-    Uses filled_qty * filled_price when available, falls back to the raw qty
-    field (which for notional orders stores the dollar amount spent/received).
+    Primary source: strategy_perf rows written by close_trade_and_record_perf()
+    — these use FIFO matching so the number is accurate even when buys and sells
+    are unequal in count.
+
+    Falls back to a buy/sell notional diff from the signals table only when no
+    strategy_perf rows exist yet (fresh account with no completed round-trips).
 
     Returns:
         {
-          "total_buy":      float,   # total USDT spent on buys
-          "total_sell":     float,   # total USDT received from sells
-          "realized_pnl":  float,   # sell proceeds - matched buy cost
+          "total_buy":      float,
+          "total_sell":     float,
+          "realized_pnl":  float,
           "by_symbol": {
-            "BTC": {"buy": x, "sell": y, "pnl": z, "trades": n}, ...
+            "BTC/USDT": {"buy": x, "sell": y, "pnl": z, "trades": n}, ...
           }
         }
     """
+    # ── Primary: read from FIFO-matched strategy_perf ─────────────────────────
     with get_conn() as c:
-        rows = c.execute(
-            """SELECT symbol, side,
-                      COALESCE(filled_qty, qty)   AS fqty,
-                      COALESCE(filled_price, 0)   AS fprice,
-                      qty                          AS raw_qty
-               FROM signals
-               WHERE account_id=? AND status IN ('filled','closed') AND blocked=0
-               ORDER BY id""",
+        perf_rows = c.execute(
+            """SELECT symbol, SUM(notional) AS sell_notional,
+                      SUM(pnl) AS pnl, COUNT(*) AS trades
+               FROM strategy_perf
+               WHERE account_id=? AND side='sell'
+               GROUP BY symbol""",
             (account_id,),
         ).fetchall()
 
-    by_sym: dict = {}
-    for r in rows:
-        sym   = r["symbol"].upper().replace("/USDT", "").replace("USDT", "")
-        fqty  = float(r["fqty"]  or 0)
-        fprice = float(r["fprice"] or 0)
-        raw   = float(r["raw_qty"] or 0)
+    if perf_rows:
+        by_sym: dict = {}
+        total_buy = total_sell = realized = 0.0
+        for r in perf_rows:
+            sym = r["symbol"].upper()
+            pnl = float(r["pnl"] or 0)
+            notional = float(r["sell_notional"] or 0)
+            buy_notional = notional - pnl  # entry_price * qty = notional - profit
+            by_sym[sym] = {
+                "buy":    round(buy_notional, 4),
+                "sell":   round(notional, 4),
+                "pnl":    round(pnl, 4),
+                "trades": int(r["trades"]),
+            }
+            total_buy  += buy_notional
+            total_sell += notional
+            realized   += pnl
+        return {
+            "total_buy":    total_buy,
+            "total_sell":   total_sell,
+            "realized_pnl": realized,
+            "by_symbol":    by_sym,
+        }
 
-        # Dollar value of this leg:
-        # If we have both filled_qty and filled_price → use their product.
-        # If only filled_price is 0 (pre-migration rows) → treat raw_qty as the notional.
-        if fprice > 0 and fqty > 0:
-            notional = fqty * fprice
-        else:
-            notional = raw   # raw_qty stored as notional dollars for manual orders
-
-        s = by_sym.setdefault(sym, {"buy": 0.0, "sell": 0.0, "pnl": 0.0, "trades": 0})
-        s["trades"] += 1
-        if r["side"] == "buy":
-            s["buy"] += notional
-        else:
-            s["sell"] += notional
-
-    # Realized P&L per symbol = sell proceeds - buy cost (capped at what was bought)
-    total_buy = total_sell = realized = 0.0
-    for sym, s in by_sym.items():
-        s["pnl"] = s["sell"] - s["buy"]
-        total_buy  += s["buy"]
-        total_sell += s["sell"]
-        realized   += s["pnl"]
-
+    # No completed round-trips yet — return zero rather than an unreliable estimate.
+    # Buys in the signals table don't have filled_price (Binance demo doesn't return
+    # filled_avg_price on buy orders), so any sell-minus-buy calculation produces
+    # a phantom profit. strategy_perf will accumulate accurate data as trades complete.
     return {
-        "total_buy":     total_buy,
-        "total_sell":    total_sell,
-        "realized_pnl":  realized,
-        "by_symbol":     by_sym,
+        "total_buy":    0.0,
+        "total_sell":   0.0,
+        "realized_pnl": 0.0,
+        "by_symbol":    {},
     }
 
 
@@ -1207,9 +1274,12 @@ def list_backtest_runs_with_benchmark() -> list[dict]:
 
 # ── AI helpers ─────────────────────────────────────────────────────────────────
 
-def set_signal_explanation(signal_id: int, text: str) -> None:
+def set_signal_explanation(signal_id: int, text: str, ai_provider: str | None = None, ai_model: str | None = None) -> None:
     with get_conn() as c:
-        c.execute("UPDATE signals SET ai_explanation=? WHERE id=?", (text, signal_id))
+        c.execute(
+            "UPDATE signals SET ai_explanation=?, ai_provider=?, ai_model=? WHERE id=?",
+            (text, ai_provider, ai_model, signal_id),
+        )
 
 
 def get_unexplained_signals(limit: int = 50) -> list[dict]:
@@ -1227,12 +1297,20 @@ def get_unexplained_signals(limit: int = 50) -> list[dict]:
     return [dict(r) for r in rows]
 
 
-def get_signal_explanation(signal_id: int) -> str | None:
+def get_signal_explanation(signal_id: int) -> dict | None:
     with get_conn() as c:
         row = c.execute(
-            "SELECT ai_explanation FROM signals WHERE id=?", (signal_id,)
+            "SELECT ai_explanation, ai_provider, ai_model FROM signals WHERE id=?", (signal_id,)
         ).fetchone()
-    return row["ai_explanation"] if row else None
+    if not row:
+        return None
+    return {"explanation": row["ai_explanation"], "ai_provider": row["ai_provider"], "ai_model": row["ai_model"]}
+
+
+def get_signal_by_id(signal_id: int) -> dict | None:
+    with get_conn() as c:
+        row = c.execute("SELECT * FROM signals WHERE id=?", (signal_id,)).fetchone()
+    return dict(row) if row else None
 
 
 def log_tuning_run(
@@ -1241,14 +1319,16 @@ def log_tuning_run(
     new_params: dict,
     rationale: str,
     win_rate_before: float | None,
+    ai_provider: str | None = None,
+    ai_model: str | None = None,
 ) -> int:
     with get_conn() as c:
         cur = c.execute(
             """INSERT INTO ai_tuning_log
-               (created_at, strategy, old_params, new_params, rationale, win_rate_before)
-               VALUES (?,?,?,?,?,?)""",
+               (created_at, strategy, old_params, new_params, rationale, win_rate_before, ai_provider, ai_model)
+               VALUES (?,?,?,?,?,?,?,?)""",
             (now_iso(), strategy, json.dumps(old_params), json.dumps(new_params),
-             rationale, win_rate_before),
+             rationale, win_rate_before, ai_provider, ai_model),
         )
         return cur.lastrowid
 
@@ -1311,6 +1391,117 @@ def get_strategy_perf_90d(strategy: str) -> dict:
         "win_rate":     round(wins / total * 100, 1) if total else 0.0,
         "avg_pnl":      round(row["avg_pnl"], 2),
     }
+
+
+def get_open_trade_strategy(symbol: str, account_id: int | None) -> str | None:
+    """Return the strategy that opened the oldest buy for symbol+account."""
+    with get_conn() as c:
+        row = c.execute(
+            """SELECT strategy FROM open_trades
+               WHERE symbol=? AND (account_id=? OR (account_id IS NULL AND ? IS NULL))
+               ORDER BY opened_at ASC LIMIT 1""",
+            (symbol, account_id, account_id),
+        ).fetchone()
+    return row["strategy"] if row else None
+
+
+def get_open_trade_entry_price(strategy: str, symbol: str) -> float | None:
+    """Return the avg fill price across all open buys for this strategy+symbol."""
+    with get_conn() as c:
+        row = c.execute(
+            """SELECT AVG(fill_price) as avg_price FROM open_trades
+               WHERE strategy=? AND symbol=?""",
+            (strategy, symbol),
+        ).fetchone()
+    val = row["avg_price"] if row else None
+    return float(val) if val is not None else None
+
+
+def record_open_trade(strategy: str, symbol: str, account_id: int | None,
+                      qty: float, fill_price: float) -> None:
+    """Record a filled buy so it can be matched against a future sell for P&L."""
+    with get_conn() as c:
+        c.execute(
+            """INSERT INTO open_trades(opened_at, strategy, symbol, account_id, qty, fill_price)
+               VALUES(datetime('now'), ?, ?, ?, ?, ?)""",
+            (strategy, symbol, account_id, qty, fill_price),
+        )
+
+
+def close_trade_and_record_perf(strategy: str, symbol: str, account_id: int | None,
+                                 sell_qty: float, sell_price: float) -> None:
+    """
+    FIFO-match a sell against open buy rows for symbol+account (any strategy),
+    write realized P&L rows into strategy_perf attributed to the buying strategy,
+    and delete the consumed buy rows.
+
+    Searches by symbol+account only — not strategy — because one strategy may open
+    a position that another strategy closes (e.g. volatility_breakout buys BNB,
+    rsi_bounce sells it when overbought).
+    """
+    if sell_qty <= 0 or sell_price <= 0:
+        return
+
+    with get_conn() as c:
+        # Fetch oldest open buys for this symbol+account regardless of which strategy opened them
+        buys = c.execute(
+            """SELECT id, strategy, qty, fill_price FROM open_trades
+               WHERE symbol=? AND (account_id=? OR (account_id IS NULL AND ? IS NULL))
+               ORDER BY opened_at ASC""",
+            (symbol, account_id, account_id),
+        ).fetchall()
+
+        remaining = sell_qty
+        for buy in buys:
+            if remaining <= 0:
+                break
+            buy_id       = buy["id"]
+            buy_strategy = buy["strategy"]   # attribute P&L to whoever opened the position
+            buy_qty      = buy["qty"]
+            buy_price    = buy["fill_price"]
+
+            matched = min(remaining, buy_qty)
+            pnl     = (sell_price - buy_price) * matched
+            pnl_pct = ((sell_price - buy_price) / buy_price * 100) if buy_price else 0.0
+
+            c.execute(
+                """INSERT INTO strategy_perf
+                   (date, strategy, symbol, side, qty, notional, entry_price, exit_price, pnl, pnl_pct, account_id)
+                   VALUES(DATE('now'), ?, ?, 'sell', ?, ?, ?, ?, ?, ?, ?)""",
+                (buy_strategy, symbol, matched, matched * sell_price,
+                 buy_price, sell_price, round(pnl, 6), round(pnl_pct, 4), account_id),
+            )
+
+            leftover = buy_qty - matched
+            if leftover < 0.000001:
+                c.execute("DELETE FROM open_trades WHERE id=?", (buy_id,))
+            else:
+                c.execute("UPDATE open_trades SET qty=? WHERE id=?", (leftover, buy_id))
+
+            remaining -= matched
+
+
+def count_open_trades_for_symbol(symbol: str) -> int:
+    """Return the total number of open buy rows for a symbol across all strategies/accounts."""
+    with get_conn() as c:
+        row = c.execute(
+            "SELECT COUNT(*) AS n FROM open_trades WHERE symbol=?", (symbol,)
+        ).fetchone()
+    return row["n"] if row else 0
+
+
+def get_crypto_sell_perf(account_id: int) -> list[dict]:
+    """Return strategy_perf sell rows for a Binance account, newest first."""
+    with get_conn() as c:
+        rows = c.execute(
+            """SELECT symbol, qty, entry_price, exit_price, pnl, pnl_pct, date
+               FROM strategy_perf
+               WHERE account_id=? AND side='sell'
+               ORDER BY id DESC
+               LIMIT 200""",
+            (account_id,),
+        ).fetchall()
+    return [dict(r) for r in rows]
 
 
 def set_tuning_win_rate_after(run_id: int, win_rate: float) -> None:
