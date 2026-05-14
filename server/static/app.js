@@ -5308,14 +5308,16 @@ function _updateSentimentToggleUI(enabled) {
 
 window.saveSentimentEnabled = async function(enabled) {
   _updateSentimentToggleUI(enabled);
+  const msg = document.getElementById('sentiment-settings-msg');
   try {
-    await api('/api/ai/settings', {
+    const res = await fetch('/api/ai/settings', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ sentiment_enabled: enabled }),
     });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    if (msg) { msg.style.color='var(--green)'; msg.textContent= enabled ? 'Sentiment enabled.' : 'Sentiment disabled.'; msg.style.display=''; setTimeout(()=>msg.style.display='none',3000); }
   } catch (e) {
-    const msg = document.getElementById('sentiment-settings-msg');
     if (msg) { msg.style.color = 'var(--red)'; msg.textContent = `Error: ${e.message}`; msg.style.display = ''; }
   }
 };
@@ -5338,7 +5340,7 @@ window.saveSentimentThresholds = async function() {
     return;
   }
   try {
-    await api('/api/ai/settings', {
+    const res = await fetch('/api/ai/settings', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -5347,6 +5349,7 @@ window.saveSentimentThresholds = async function() {
         sentiment_boost_multiplier: mult,
       }),
     });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
     if (msg) { msg.style.color='var(--green)'; msg.textContent='Sentiment settings saved.'; msg.style.display=''; setTimeout(()=>msg.style.display='none',3000); }
   } catch (e) {
     if (msg) { msg.style.color='var(--red)'; msg.textContent=`Error: ${e.message}`; msg.style.display=''; }
