@@ -1248,6 +1248,57 @@ async function initDashboard() {
     }
   }
 
+  async function loadSentiment() {
+    const tbody = document.getElementById('sentiment-tbody');
+    if (!tbody) return;
+    try {
+      const data = await api('/api/sentiment');
+      const upd  = document.getElementById('sentiment-updated');
+      if (upd) upd.textContent = data.length ? `Updated ${new Date().toLocaleTimeString()}` : '';
+
+      if (!data.length) {
+        tbody.innerHTML = '<tr><td colspan="4" class="state-empty">Sentiment data will appear once the engine runs.</td></tr>';
+        return;
+      }
+
+      data.sort((a, b) => Math.abs(b.score) - Math.abs(a.score));
+
+      tbody.innerHTML = data.map(row => {
+        const score    = typeof row.score === 'number' ? row.score : 0;
+        const pct      = Math.round(((score + 1) / 2) * 100);
+        const color    = score > 0.3  ? '#10B981'
+                       : score < -0.3 ? '#EF4444'
+                       : '#F59E0B';
+        const label    = score > 0.3  ? 'Positive'
+                       : score < -0.3 ? 'Negative'
+                       : 'Neutral';
+        const bgColor  = score > 0.3  ? 'rgba(16,185,129,.15)'
+                       : score < -0.3 ? 'rgba(239,68,68,.15)'
+                       : 'rgba(245,158,11,.15)';
+        const barBg    = 'rgba(100,116,139,.15)';
+        return `<tr>
+          <td style="font-weight:600;">${escHtml(row.symbol)}</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:.5rem;">
+              <div style="width:80px;height:6px;border-radius:3px;background:${barBg};flex-shrink:0;">
+                <div style="width:${pct}%;height:100%;border-radius:3px;background:${color};"></div>
+              </div>
+              <span style="font-size:11px;font-weight:700;color:${color};">${score >= 0 ? '+' : ''}${score.toFixed(2)}</span>
+            </div>
+          </td>
+          <td>
+            <span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:10px;background:${bgColor};color:${color};">
+              ${label}
+            </span>
+          </td>
+          <td style="font-size:12px;color:var(--muted);max-width:300px;">${escHtml(row.reason || '—')}</td>
+        </tr>`;
+      }).join('');
+    } catch (_) {
+      if (tbody) tbody.innerHTML = '<tr><td colspan="4" class="state-empty">Could not load sentiment data.</td></tr>';
+    }
+  }
+
   createPoller(fetchAccount,         30_000).start();
   createPoller(fetchPerformance,     30_000).start();
   createPoller(fetchSignals,         60_000).start();
@@ -1256,6 +1307,7 @@ async function initDashboard() {
   createPoller(fetchOrders,          30_000).start();
   createPoller(fetchClock,           10_000).start();
   createPoller(fetchCryptoDashboard, 30_000).start();
+  createPoller(loadSentiment,        15 * 60 * 1000).start();
 }
 
 // ─────────────────────────────────────────
