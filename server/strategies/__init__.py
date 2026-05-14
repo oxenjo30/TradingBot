@@ -11,6 +11,7 @@ from .crypto_trend import CryptoTrend
 from .crypto_rsi_bounce import CryptoRSIBounce
 from .crypto_volatility_breakout import CryptoVolatilityBreakout
 from .crypto_grid import CryptoGrid
+from .ema_confluence import EMAConfluence
 
 REGISTRY: dict[str, type[Strategy]] = {
     cls.name: cls for cls in (
@@ -26,6 +27,7 @@ REGISTRY: dict[str, type[Strategy]] = {
         CryptoRSIBounce,
         CryptoVolatilityBreakout,
         CryptoGrid,
+        EMAConfluence,
     )
 }
 
