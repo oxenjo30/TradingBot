@@ -2,10 +2,11 @@
 import logging
 import threading
 import uuid
+from dataclasses import replace as _dc_replace
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 
-from . import ai_explainer, ai_tuner, alpaca_client, crypto, db, notifications, risk, strategies
+from . import ai_explainer, ai_tuner, alpaca_client, crypto, db, notifications, risk, sentiment, strategies
 from .broker_factory import get_account_client
 
 log = logging.getLogger("engine")
@@ -51,6 +52,12 @@ def _run_take_profit_pass(acct_client, acct_id: int, take_profit_pct: float,
             notifications.notify_trade(
                 "take_profit", symbol, "sell", qty, None, reason, order["id"]
             )
+            # Record P&L against whichever strategy originally opened this position.
+            tp_price = float(order.get("filled_avg_price") or 0)
+            if tp_price > 0 and qty > 0:
+                orig_strategy = db.get_open_trade_strategy(symbol, acct_id)
+                if orig_strategy:
+                    db.close_trade_and_record_perf(orig_strategy, symbol, acct_id, qty, tp_price)
             local_positions.pop(symbol, None)
         except Exception as e:
             log.exception("take-profit order failed for %s acct %d", symbol, acct_id)
@@ -179,6 +186,7 @@ def run_tick():
                     "dtc": acct_dtc,
                     "positions": acct_positions,
                     "market_values": acct_market_values,
+                    "broker": broker,
                 }
 
             acct_data = client_cache[acct_id]
@@ -227,6 +235,19 @@ def run_tick():
                 price = None
                 if sig.notional:
                     final_qty = None
+                    # Cap notional to available buying power so we never overspend.
+                    # Reserve $10 as a floor so the order clears Binance minimum.
+                    if broker in CRYPTO_BROKERS and sig.side == "buy":
+                        available = float(account.get("buying_power") or 0)
+                        if available < 10.0:
+                            log.info("skip buy %s — insufficient balance $%.2f", sig.symbol, available)
+                            db.log_signal(s["name"], sig.symbol, sig.side, sig.notional,
+                                          f"blocked: insufficient balance ${available:.2f}", None, "blocked",
+                                          account_id=acct_id)
+                            continue
+                        if sig.notional > available:
+                            log.info("notional capped %s %.2f → %.2f (buying_power)", sig.symbol, sig.notional, available)
+                            sig = _dc_replace(sig, notional=round(available, 2))
                 else:
                     try:
                         quote = acct_client.get_latest_quote(sig.symbol)
@@ -234,7 +255,7 @@ def run_tick():
                     except Exception:
                         price = None
                     final_qty = risk.calc_qty(
-                        sig.symbol, sig.side, sig.qty, account, price
+                        sig.symbol, sig.side, sig.qty, account, price, broker=broker
                     )
 
                 # ── zero-qty guard ──────────────────────────────────────────
@@ -242,6 +263,38 @@ def run_tick():
                     db.log_signal(s["name"], sig.symbol, sig.side, final_qty,
                                   "blocked: zero or negative qty after sizing", None, "blocked")
                     continue
+
+                # ── crypto minimum notional guard ($10) ─────────────────────
+                # Binance rejects orders below ~$5-10 notional. For sells,
+                # final_qty comes from the held position — dust fractions slip
+                # through the $1 dust filter if market_value is slightly above $1.
+                if broker in CRYPTO_BROKERS and sig.side == "sell" and final_qty is not None:
+                    sym_market_val = acct_data["market_values"].get(sig.symbol, 0.0)
+                    if sym_market_val < 10.0:
+                        log.info("skip dust sell %s market_value=%.4f < $10", sig.symbol, sym_market_val)
+                        continue
+
+                # ── sentiment gate / boost ─────────────────────────────────
+                if sentiment.is_enabled() and sig.side == "buy":
+                    sent        = sentiment.get_sentiment(sig.symbol)
+                    sent_score  = sent["score"]
+                    block_thresh = float(db.get_app_config("sentiment_block_threshold", "-0.3"))
+                    boost_thresh = float(db.get_app_config("sentiment_boost_threshold", "0.3"))
+                    boost_mult   = float(db.get_app_config("sentiment_boost_multiplier", "1.25"))
+                    if sent_score < block_thresh:
+                        error_qty = final_qty if final_qty is not None else (sig.notional or 0)
+                        db.log_signal(s["name"], sig.symbol, sig.side, error_qty,
+                                      f"{sig.reason} | sentiment blocked: {sent['reason']}",
+                                      None, "blocked", blocked=True, account_id=acct_id,
+                                      sentiment_score=sent_score)
+                        log.info("sentiment blocked %s %s score=%.2f", sig.symbol, sig.side, sent_score)
+                        continue
+                    if sent_score > boost_thresh and sig.notional:
+                        sig = _dc_replace(sig, notional=round(sig.notional * boost_mult, 2))
+                        log.info("sentiment boost %s notional x%.2f score=%.2f",
+                                 sig.symbol, boost_mult, sent_score)
+                else:
+                    sent_score = None
 
                 # ── submit ──────────────────────────────────────────────────
                 client_oid = f"{s['name']}-{uuid.uuid4().hex[:12]}"
@@ -253,14 +306,37 @@ def run_tick():
                         client_order_id=client_oid,
                     )
                     display_qty = final_qty if not sig.notional else sig.notional
-                    # Capture filled qty/price from order response for crypto P&L tracking
-                    ord_filled_qty   = float(order.get("qty") or 0) or None
+                    # Capture filled qty/price from order response for crypto P&L tracking.
+                    # Binance demo doesn't return filled_avg_price on buy orders, so fall
+                    # back to: the pre-order quote price, then a fresh ticker fetch.
+                    ord_filled_qty   = float(order.get("filled_qty") or order.get("qty") or 0) or None
                     ord_filled_price = float(order.get("filled_avg_price") or price or 0) or None
+                    if not ord_filled_price:
+                        try:
+                            quote = acct_client.get_latest_quote(sig.symbol)
+                            ord_filled_price = float(quote.get("price") or quote.get("ask") or 0) or None
+                        except Exception:
+                            pass
                     sig_id = db.log_signal(s["name"], sig.symbol, sig.side, display_qty,
                                            sig.reason, order["id"], order["status"],
                                            account_id=acct_id,
                                            filled_qty=ord_filled_qty,
-                                           filled_price=ord_filled_price)
+                                           filled_price=ord_filled_price,
+                                           sentiment_score=sent_score)
+                    # ── P&L tracking ────────────────────────────────────────
+                    # Use actual filled qty/price when available; fall back to
+                    # the estimated values used for sizing.
+                    perf_qty   = ord_filled_qty   or final_qty or 0
+                    perf_price = ord_filled_price or price     or 0
+                    if perf_qty > 0 and perf_price > 0:
+                        if sig.side == "buy":
+                            db.record_open_trade(
+                                s["name"], sig.symbol, acct_id, perf_qty, perf_price
+                            )
+                        else:
+                            db.close_trade_and_record_perf(
+                                s["name"], sig.symbol, acct_id, perf_qty, perf_price
+                            )
                     try:
                         ai_explainer.enqueue({
                             "id": sig_id,
@@ -297,7 +373,10 @@ def run_tick():
                     log.exception("order submit failed for %s %s %s",
                                   sig.symbol, sig.side, final_qty)
                     db.increment_consecutive_losses()
-                    db.log_signal(s["name"], sig.symbol, sig.side, final_qty,
+                    # final_qty may be None when signal uses notional sizing; use 0 as fallback
+                    # to satisfy the signals.qty NOT NULL constraint.
+                    error_qty = final_qty if final_qty is not None else (sig.notional or 0)
+                    db.log_signal(s["name"], sig.symbol, sig.side, error_qty,
                                   f"{sig.reason} | submit error: {e}", None, "error",
                                   account_id=acct_id)
 
@@ -314,8 +393,12 @@ def run_tick():
             _last_run["ran"].append({"strategy": s["name"], "skipped": skip_reason})
 
     # ── Take-profit pass ────────────────────────────────────────────────────
-    tp_pct = db.get_risk_settings().get("take_profit_pct", 0.0)
+    _tp_settings = db.get_risk_settings()
+    _tp_pct_stock  = _tp_settings.get("take_profit_pct", 0.0)
+    _tp_pct_crypto = _tp_settings.get("take_profit_pct_crypto", 0.0)
     for acct_id, acct_data in client_cache.items():
+        is_crypto_acct = acct_data.get("broker", "alpaca") in CRYPTO_BROKERS
+        tp_pct = _tp_pct_crypto if is_crypto_acct else _tp_pct_stock
         _run_take_profit_pass(
             acct_data["client"], acct_id, tp_pct, acct_data["positions"]
         )
