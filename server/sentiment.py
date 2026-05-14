@@ -116,7 +116,7 @@ def get_sentiment(symbol: str) -> dict:
     with _lock:
         cached = _cache.get(symbol)
         if cached and (time.monotonic() - cached["cached_at"]) < _TTL:
-            return cached
+            return {k: v for k, v in cached.items() if k != "cached_at"}
 
     headlines = fetch_headlines(symbol)
     result    = score_headlines(symbol, headlines)
@@ -129,7 +129,7 @@ def get_sentiment(symbol: str) -> dict:
     }
     with _lock:
         _cache[symbol] = entry
-    return entry
+    return {k: v for k, v in entry.items() if k != "cached_at"}
 
 
 def get_all_cached() -> list[dict]:

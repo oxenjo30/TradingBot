@@ -99,10 +99,23 @@ def test_get_sentiment_caches_result(monkeypatch):
         return {"score": 0.5, "reason": "positive"}
     monkeypatch.setattr("server.sentiment.fetch_headlines", fake_fetch)
     monkeypatch.setattr("server.sentiment.score_headlines", fake_score)
-    monkeypatch.setattr("server.sentiment.db.get_app_config", lambda k, d="": "sk-ant-test")
     from server import sentiment
     sentiment._cache.clear()
     r1 = sentiment.get_sentiment("AAPL")
     r2 = sentiment.get_sentiment("AAPL")
     assert fetch_count[0] == 1
     assert r1["score"] == r2["score"]
+
+
+def test_get_all_cached_excludes_cached_at():
+    """get_all_cached never exposes the internal cached_at field."""
+    import time
+    from server import sentiment
+    sentiment._cache["TESTXYZ"] = {
+        "symbol": "TESTXYZ", "score": 0.1, "reason": "ok",
+        "fetched_at": "2026-01-01T00:00:00", "cached_at": time.monotonic(),
+    }
+    results = sentiment.get_all_cached()
+    assert any(r["symbol"] == "TESTXYZ" for r in results)
+    assert all("cached_at" not in r for r in results)
+    sentiment._cache.pop("TESTXYZ", None)
