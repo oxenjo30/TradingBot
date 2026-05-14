@@ -13,7 +13,7 @@ from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from . import ai_explainer, ai_tuner, alpaca_client, auth, backtest as bt_mod, crypto, db, engine, notifications, risk, scanner, strategies
+from . import ai_explainer, ai_tuner, alpaca_client, auth, backtest as bt_mod, crypto, db, engine, notifications, risk, scanner, sentiment, strategies
 from .config import STATIC_DIR, BASE_DIR
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
@@ -29,6 +29,7 @@ async def lifespan(app: FastAPI):
         if cls.name not in existing:
             db.upsert_strategy(cls.name, enabled=False, params=cls.default_params)
     engine.start(interval_seconds=60)
+    ai_explainer.start()
     # Pre-load asset search cache in background so first search is instant
     import threading
     threading.Thread(target=alpaca_client._load_asset_cache, daemon=True).start()
@@ -163,6 +164,10 @@ class NotificationSettings(BaseModel):
     telegram_enabled: bool = False
     telegram_token: str = ""
     telegram_chat_id: str = ""
+    slack_enabled: bool = False
+    slack_webhook_url: str = ""
+    discord_enabled: bool = False
+    discord_webhook_url: str = ""
     notify_on_trade: bool = True
     notify_on_block: bool = False
     notify_daily_summary: bool = True
@@ -201,6 +206,14 @@ class AiSettingsBody(BaseModel):
     ollama_model:         str | None = None
     explanations_enabled: bool | None = None
     tuner_enabled:        bool | None = None
+    tuner_provider:       str | None = None  # "ollama" or "claude"
+    claude_api_key:       str | None = None
+    claude_model:         str | None = None
+    target_win_rate:           float | None = None
+    sentiment_enabled:         bool | None  = None
+    sentiment_block_threshold: float | None = None
+    sentiment_boost_threshold: float | None = None
+    sentiment_boost_multiplier:float | None = None
 
 
 # ── Setup & Auth routes ────────────────────────────────────────────────────────
@@ -371,6 +384,13 @@ def submit_order(o: OrderIn, request: Request):
         import logging, traceback
         logging.error("submit_order error: %s\n%s", e, traceback.format_exc())
         raise HTTPException(400, str(e))
+
+@app.get("/api/crypto-sell-perf")
+def crypto_sell_perf(request: Request, account_id: int | None = None):
+    _require_auth(request)
+    if not account_id:
+        return []
+    return db.get_crypto_sell_perf(account_id)
 
 @app.delete("/api/orders/{order_id}")
 def cancel(order_id: str, request: Request, account_id: int | None = None):
@@ -850,9 +870,9 @@ def performance_compare(request: Request):
 # ── Signals & Engine ───────────────────────────────────────────────────────────
 
 @app.get("/api/signals")
-def signals(request: Request, limit: int = 100):
+def signals(request: Request, limit: int = 100, since: str | None = None, until: str | None = None):
     _require_auth(request)
-    return db.recent_signals(limit=limit)
+    return db.recent_signals(limit=limit, since=since, until=until)
 
 @app.get("/api/engine")
 def engine_status():
@@ -868,8 +888,18 @@ def engine_run_now(request: Request):
 @app.get("/api/signals/{signal_id}/explanation")
 def signal_explanation(signal_id: int, request: Request):
     _require_auth(request)
-    text = db.get_signal_explanation(signal_id)
-    return {"explanation": text, "ready": text is not None}
+    row = db.get_signal_explanation(signal_id)
+    if row is None or row["explanation"] is None:
+        sig = db.get_signal_by_id(signal_id)
+        if sig:
+            ai_explainer.enqueue(sig)
+        return {"explanation": None, "ready": False, "ai_provider": None, "ai_model": None}
+    return {
+        "explanation": row["explanation"],
+        "ready":       True,
+        "ai_provider": row["ai_provider"],
+        "ai_model":    row["ai_model"],
+    }
 
 
 @app.get("/api/ai/status")
@@ -881,11 +911,22 @@ def ai_status(request: Request):
 @app.get("/api/ai/settings")
 def ai_settings_get(request: Request):
     _require_auth(request)
+    raw_key = db.get_app_config("ai_claude_api_key", "")
+    masked_key = ("sk-ant-..." + raw_key[-4:]) if len(raw_key) > 4 else ("*" * len(raw_key) if raw_key else "")
     return {
         "ollama_url":           db.get_app_config("ai_ollama_url", "http://localhost:11434"),
         "ollama_model":         db.get_app_config("ai_ollama_model", "llama3"),
         "explanations_enabled": db.get_app_config("ai_explanations_enabled", "true") == "true",
         "tuner_enabled":        db.get_app_config("ai_tuner_enabled", "true") == "true",
+        "tuner_provider":       db.get_app_config("ai_tuner_provider", "ollama"),
+        "claude_api_key_set":   bool(raw_key),
+        "claude_api_key_masked": masked_key,
+        "claude_model":         db.get_app_config("ai_claude_model", "claude-haiku-4-5-20251001"),
+        "target_win_rate":           float(db.get_app_config("ai_target_win_rate", "51")),
+        "sentiment_enabled":         db.get_app_config("sentiment_enabled", "false") == "true",
+        "sentiment_block_threshold": float(db.get_app_config("sentiment_block_threshold", "-0.3")),
+        "sentiment_boost_threshold": float(db.get_app_config("sentiment_boost_threshold", "0.3")),
+        "sentiment_boost_multiplier":float(db.get_app_config("sentiment_boost_multiplier", "1.25")),
     }
 
 
@@ -900,6 +941,22 @@ def ai_settings_patch(body: AiSettingsBody, request: Request):
         db.set_app_config("ai_explanations_enabled", "true" if body.explanations_enabled else "false")
     if body.tuner_enabled is not None:
         db.set_app_config("ai_tuner_enabled", "true" if body.tuner_enabled else "false")
+    if body.tuner_provider is not None and body.tuner_provider in ("ollama", "claude"):
+        db.set_app_config("ai_tuner_provider", body.tuner_provider)
+    if body.claude_api_key is not None and body.claude_api_key.strip():
+        db.set_app_config("ai_claude_api_key", body.claude_api_key.strip())
+    if body.claude_model is not None and body.claude_model.strip():
+        db.set_app_config("ai_claude_model", body.claude_model.strip())
+    if body.target_win_rate is not None and 50 <= body.target_win_rate <= 90:
+        db.set_app_config("ai_target_win_rate", str(body.target_win_rate))
+    if body.sentiment_enabled is not None:
+        db.set_app_config("sentiment_enabled", "true" if body.sentiment_enabled else "false")
+    if body.sentiment_block_threshold is not None and -1.0 <= body.sentiment_block_threshold <= 0:
+        db.set_app_config("sentiment_block_threshold", str(body.sentiment_block_threshold))
+    if body.sentiment_boost_threshold is not None and 0 <= body.sentiment_boost_threshold <= 1.0:
+        db.set_app_config("sentiment_boost_threshold", str(body.sentiment_boost_threshold))
+    if body.sentiment_boost_multiplier is not None and 1.0 <= body.sentiment_boost_multiplier <= 2.0:
+        db.set_app_config("sentiment_boost_multiplier", str(body.sentiment_boost_multiplier))
     return {"ok": True}
 
 
@@ -907,6 +964,12 @@ def ai_settings_patch(body: AiSettingsBody, request: Request):
 def ai_tuning_log_get(request: Request):
     _require_auth(request)
     return db.list_tuning_log()
+
+
+@app.get("/api/sentiment")
+def sentiment_get(request: Request):
+    _require_auth(request)
+    return sentiment.get_all_cached()
 
 
 _tune_now_lock = threading.Lock()
@@ -1025,7 +1088,7 @@ def webhook_signal(body: WebhookSignal, request: Request):
 
     # Risk check + order submission
     try:
-        acct_client = _get_account_client(body.account_id)
+        acct_client = _get_broker_client(body.account_id)
         if acct_client:
             acct_summary = acct_client.get_account_summary()
         else:
@@ -1198,9 +1261,9 @@ def reset_losses(request: Request):
 
 
 @app.get("/api/audit")
-def get_audit_log(request: Request, limit: int = 200):
+def get_audit_log(request: Request, limit: int = 200, since: str | None = None, until: str | None = None):
     _require_auth(request)
-    return db.list_audit(limit=min(limit, 500))
+    return db.list_audit(limit=min(limit, 500), since=since, until=until)
 
 
 # ── Notifications ──────────────────────────────────────────────────────────────
