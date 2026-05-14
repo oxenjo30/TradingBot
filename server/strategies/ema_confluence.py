@@ -55,15 +55,19 @@ class EMAConfluence(Strategy):
 
     def _get_symbols(self) -> list:
         fixed = [s.upper().strip() for s in (self.params.get("symbols") or []) if s]
-        if self.params.get("use_scanner", True) and not fixed:
+        if self.params.get("use_scanner", True):
             try:
                 from .. import scanner
                 scanned = scanner.get_scanner_universe(
                     min_price=5.0, max_price=500.0, top_actives=25, top_gainers=15
                 )
-                return scanned
+                seen = set(fixed)
+                for s in scanned:
+                    if s not in seen:
+                        fixed.append(s)
+                        seen.add(s)
             except Exception:
-                return fixed
+                pass
         return fixed
 
     def _near_earnings(self, client, symbol: str) -> bool:
@@ -88,7 +92,7 @@ class EMAConfluence(Strategy):
         )
 
         open_positions = sum(1 for v in positions.values() if v > 0)
-        days = 10 if timeframe == "hour" else 300
+        days = 10 if timeframe == "hour" else 500
 
         for sym in self._get_symbols():
             try:
@@ -134,8 +138,8 @@ class EMAConfluence(Strategy):
 
                 size = notional * _SCALE.get(bull_score, 1.0) if scaled else notional
                 reason = (
-                    f"4-EMA bull score {bull_score}/4: price {price:.2f} "
-                    f"> EMA8 {e8:.2f} > EMA13 {e13:.2f} > EMA48 {e48:.2f} > EMA200 {e200:.2f} "
+                    f"4-EMA bull score {bull_score}/4: price {price:.2f} above "
+                    f"EMA8 {e8:.2f}, EMA13 {e13:.2f}, EMA48 {e48:.2f}, EMA200 {e200:.2f} "
                     f"| notional ${size:.0f}"
                 )
                 out.append(Signal(symbol=sym, side="buy", notional=size, reason=reason))
