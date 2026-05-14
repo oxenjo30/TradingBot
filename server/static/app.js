@@ -3663,63 +3663,125 @@ async function initBalances() {
 // ─────────────────────────────────────────
 async function initLogs() {
   initClockChip(document.getElementById('market-chip'));
-  let currentFilter = 'all';
+
+  const sigStatusEl    = document.getElementById('sig-status');
+  const sigStrategyEl  = document.getElementById('sig-strategy');
+  const sigSideEl      = document.getElementById('sig-side');
+  const sigLimitEl     = document.getElementById('sig-limit');
+  const sigDateFromEl  = document.getElementById('sig-date-from');
+  const sigDateToEl    = document.getElementById('sig-date-to');
+  const sigClearDates  = document.getElementById('sig-clear-dates');
+  const sigCountEl     = document.getElementById('sig-count');
+  const auditCatEl     = document.getElementById('audit-category');
+  const auditLimitEl   = document.getElementById('audit-limit');
+  const auditDateFromEl= document.getElementById('audit-date-from');
+  const auditDateToEl  = document.getElementById('audit-date-to');
+  const auditClearDates= document.getElementById('audit-clear-dates');
+  const auditCountEl   = document.getElementById('audit-count');
+
+  const statusCls = { filled: 'b-enabled', blocked: 'b-notrun', error: 'b-error',
+                      accepted: 'b-buy', pending_new: 'b-disabled', closed: 'b-disabled' };
+  const catCls    = { risk: 'b-notrun', kill_switch: 'b-error',
+                      strategy: 'b-buy', account: 'b-sell', position: 'b-disabled' };
+
+  // ── Signal Feed ──────────────────────────────────────────────────────
+  let allSignals = [];
 
   async function fetchSignals() {
     const tbody = document.getElementById('logs-body');
+    const limit = sigLimitEl?.value || 200;
+    const from  = sigDateFromEl?.value || '';
+    const to    = sigDateToEl?.value   || '';
+    const hasDate = from || to;
+    if (sigClearDates) sigClearDates.style.display = hasDate ? '' : 'none';
+    let url = `/api/signals?limit=${limit}`;
+    if (from) url += `&since=${from}`;
+    if (to)   url += `&until=${to}`;
     try {
-      const sigs = await api('/api/signals?limit=200', { key: 'logs-signals' });
-      const filtered = currentFilter === 'all' ? sigs : sigs.filter(s => s.status === currentFilter);
-      tbody.innerHTML = '';
-      if (!filtered.length) {
-        tbody.innerHTML = '<tr><td colspan="8" class="state-empty">No signals.</td></tr>';
-        return;
-      }
-      const statusCls = { filled: 'b-enabled', blocked: 'b-notrun', error: 'b-error', pending: 'b-disabled' };
-      filtered.slice(0, 100).forEach(s => {
-        const tr = document.createElement('tr');
-        const fields = [fmt.time(s.ts), s.strategy, s.symbol, '', (s.qty||0).toFixed(2), s.reason, '', ''];
-        fields.forEach((v, i) => {
-          const td = document.createElement('td');
-          if (i === 3) {
-            const tag = document.createElement('span');
-            tag.className = 'badge ' + (s.side === 'buy' ? 'b-buy' : 'b-sell');
-            tag.textContent = s.side === 'buy' ? 'Buy' : 'Sell';
-            td.appendChild(tag);
-          } else if (i === 5) {
-            td.className = 'col-reason';
-            td.title = v;
-            td.textContent = v;
-          } else if (i === 6) {
-            const badge = document.createElement('span');
-            badge.className = 'badge ' + (statusCls[s.status] || 'b-disabled');
-            badge.textContent = s.status;
-            td.appendChild(badge);
-          } else if (i === 7) {
-            const btn = document.createElement('button');
-            btn.className = 'btn-explain';
-            btn.textContent = 'Explain';
-            btn.onclick = function() { toggleExplanation(s.id, this); };
-            td.appendChild(btn);
-          } else { td.textContent = v; }
-          tr.appendChild(td);
+      allSignals = await api(url);
+
+      // Populate strategy dropdown from actual data (once)
+      if (sigStrategyEl && sigStrategyEl.options.length <= 1) {
+        const strats = [...new Set(allSignals.map(s => s.strategy))].sort();
+        strats.forEach(st => {
+          const opt = document.createElement('option');
+          opt.value = st;
+          opt.textContent = st.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+          sigStrategyEl.appendChild(opt);
         });
-        tbody.appendChild(tr);
-      });
+      }
+
+      renderSignals();
     } catch (e) {
       if (e.name === 'AbortError') return;
       tbody.innerHTML = '<tr><td colspan="8" class="state-error">Failed to load — retrying in 30s</td></tr>';
-      throw e;
     }
   }
 
-  document.querySelectorAll('[data-filter]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('[data-filter]').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      currentFilter = btn.dataset.filter;
-      fetchSignals();
+  function renderSignals() {
+    const tbody = document.getElementById('logs-body');
+    const status   = sigStatusEl?.value   || 'all';
+    const strategy = sigStrategyEl?.value || 'all';
+    const side     = sigSideEl?.value     || 'all';
+
+    let rows = allSignals;
+    if (status   !== 'all') rows = rows.filter(s => s.status   === status);
+    if (strategy !== 'all') rows = rows.filter(s => s.strategy === strategy);
+    if (side     !== 'all') rows = rows.filter(s => s.side     === side);
+
+    if (sigCountEl) sigCountEl.textContent = `${rows.length} row${rows.length !== 1 ? 's' : ''}`;
+
+    tbody.innerHTML = '';
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="8" class="state-empty">No signals match the selected filters.</td></tr>';
+      return;
+    }
+    rows.forEach(s => {
+      const tr = document.createElement('tr');
+      const fields = [fmt.time(s.ts), s.strategy, s.symbol, '', (s.qty||0).toFixed(2), s.reason, '', ''];
+      fields.forEach((v, i) => {
+        const td = document.createElement('td');
+        if (i === 3) {
+          const tag = document.createElement('span');
+          tag.className = 'badge ' + (s.side === 'buy' ? 'b-buy' : 'b-sell');
+          tag.textContent = s.side === 'buy' ? 'Buy' : 'Sell';
+          td.appendChild(tag);
+        } else if (i === 5) {
+          td.className = 'col-reason';
+          td.title = v;
+          td.textContent = v;
+        } else if (i === 6) {
+          const badge = document.createElement('span');
+          badge.className = 'badge ' + (statusCls[s.status] || 'b-disabled');
+          badge.textContent = s.status;
+          td.appendChild(badge);
+        } else if (i === 7) {
+          const btn = document.createElement('button');
+          btn.className = 'btn-explain';
+          btn.textContent = 'Explain';
+          btn.onclick = function() { toggleExplanation(s.id, this); };
+          td.appendChild(btn);
+        } else {
+          td.textContent = v;
+        }
+        tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
     });
+  }
+
+  // Dropdowns re-render from cache; date/limit changes refetch from server
+  [sigStatusEl, sigStrategyEl, sigSideEl].forEach(el =>
+    el?.addEventListener('change', renderSignals)
+  );
+  sigLimitEl?.addEventListener('change', fetchSignals);
+  [sigDateFromEl, sigDateToEl].forEach(el =>
+    el?.addEventListener('input', fetchSignals)
+  );
+  sigClearDates?.addEventListener('click', () => {
+    if (sigDateFromEl) sigDateFromEl.value = '';
+    if (sigDateToEl)   sigDateToEl.value   = '';
+    fetchSignals();
   });
 
   document.getElementById('export-trades-btn')?.addEventListener('click', () => {
@@ -3729,48 +3791,74 @@ async function initLogs() {
     a.click();
   });
 
+  // ── Audit Log ────────────────────────────────────────────────────────
+  let allAudit = [];
+
   async function fetchAudit() {
     const tbody = document.getElementById('audit-body');
     if (!tbody) return;
+    const limit = auditLimitEl?.value || 100;
+    const from  = auditDateFromEl?.value || '';
+    const to    = auditDateToEl?.value   || '';
+    const hasDate = from || to;
+    if (auditClearDates) auditClearDates.style.display = hasDate ? '' : 'none';
+    let url = `/api/audit?limit=${limit}`;
+    if (from) url += `&since=${from}`;
+    if (to)   url += `&until=${to}`;
     try {
-      const rows = await api('/api/audit?limit=200', { key: 'logs-audit' });
-      tbody.innerHTML = '';
-      if (!rows.length) {
-        tbody.innerHTML = '<tr><td colspan="4" class="state-empty">No audit entries yet.</td></tr>';
-        return;
-      }
-      const catCls = {
-        risk:       'b-notrun',
-        kill_switch:'b-error',
-        strategy:   'b-buy',
-        account:    'b-sell',
-        position:   'b-disabled',
-      };
-      rows.forEach(r => {
-        const tr = document.createElement('tr');
-        [fmt.time(r.ts), '', r.action, r.detail].forEach((v, i) => {
-          const td = document.createElement('td');
-          if (i === 1) {
-            const badge = document.createElement('span');
-            badge.className = 'badge ' + (catCls[r.category] || 'b-disabled');
-            badge.textContent = r.category;
-            td.appendChild(badge);
-          } else if (i === 3) {
-            td.className = 'col-detail';
-            td.title = v;
-            td.textContent = v;
-          } else {
-            td.textContent = v;
-          }
-          tr.appendChild(td);
-        });
-        tbody.appendChild(tr);
-      });
+      allAudit = await api(url);
+      renderAudit();
     } catch (e) {
       if (e.name === 'AbortError') return;
       tbody.innerHTML = '<tr><td colspan="4" class="state-error">Failed to load — retrying</td></tr>';
     }
   }
+
+  function renderAudit() {
+    const tbody = document.getElementById('audit-body');
+    const cat = auditCatEl?.value || 'all';
+
+    let rows = cat === 'all' ? allAudit : allAudit.filter(r => r.category === cat);
+
+    if (auditCountEl) auditCountEl.textContent = `${rows.length} row${rows.length !== 1 ? 's' : ''}`;
+
+    tbody.innerHTML = '';
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="4" class="state-empty">No audit entries match the selected filter.</td></tr>';
+      return;
+    }
+    rows.forEach(r => {
+      const tr = document.createElement('tr');
+      [fmt.time(r.ts), '', r.action, r.detail].forEach((v, i) => {
+        const td = document.createElement('td');
+        if (i === 1) {
+          const badge = document.createElement('span');
+          badge.className = 'badge ' + (catCls[r.category] || 'b-disabled');
+          badge.textContent = r.category;
+          td.appendChild(badge);
+        } else if (i === 3) {
+          td.className = 'col-detail';
+          td.title = v;
+          td.textContent = v;
+        } else {
+          td.textContent = v;
+        }
+        tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    });
+  }
+
+  auditCatEl?.addEventListener('change', renderAudit);
+  auditLimitEl?.addEventListener('change', fetchAudit);
+  [auditDateFromEl, auditDateToEl].forEach(el =>
+    el?.addEventListener('input', fetchAudit)
+  );
+  auditClearDates?.addEventListener('click', () => {
+    if (auditDateFromEl) auditDateFromEl.value = '';
+    if (auditDateToEl)   auditDateToEl.value   = '';
+    fetchAudit();
+  });
 
   createPoller(fetchSignals, 30_000).start();
   createPoller(fetchAudit,   60_000).start();
@@ -3966,11 +4054,18 @@ async function initAiTuning() {
     const key   = document.getElementById('inp-claude-key')?.value.trim();
     const model = document.getElementById('inp-claude-model')?.value;
     const msg   = document.getElementById('ai-settings-msg');
-    if (!key) { if (msg) { msg.style.color='var(--red)'; msg.textContent='Enter an API key.'; msg.style.display=''; } return; }
+    const keyStatus = document.getElementById('claude-key-status');
+    const alreadySet = keyStatus?.textContent?.startsWith('Key saved:');
+    if (!key && !alreadySet) {
+      if (msg) { msg.style.color='var(--red)'; msg.textContent='Enter an API key.'; msg.style.display=''; }
+      return;
+    }
     try {
-      await jsonPatch('/api/ai/settings', { claude_api_key: key, claude_model: model });
+      const payload = { claude_model: model };
+      if (key) payload.claude_api_key = key;
+      await jsonPatch('/api/ai/settings', payload);
       if (msg) { msg.style.color = 'var(--green)'; msg.textContent = 'Claude settings saved.'; msg.style.display = ''; setTimeout(() => msg.style.display = 'none', 3000); }
-      document.getElementById('inp-claude-key').value = '';
+      if (key) document.getElementById('inp-claude-key').value = '';
       await loadSettings();
     } catch (e) {
       if (msg) { msg.style.color = 'var(--red)'; msg.textContent = `Error: ${e.message}`; msg.style.display = ''; }
