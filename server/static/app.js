@@ -592,9 +592,136 @@ document.addEventListener('DOMContentLoaded', () => {
   initGlobalSearch();
   initBellIndicator();
   initMobileSidebar();
+  initPanicButton();
   const page = document.body.dataset.page;
   if (PAGE_INIT[page]) PAGE_INIT[page]();
 });
+
+// ── Floating panic kill-switch button (all pages) ─────────────────────────────
+function initPanicButton() {
+  const powerSvg  = `<svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>`;
+  const closeSvg  = `<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`;
+  const resumeSvg = `<svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-.47-5.43"/></svg>`;
+  const stopSvg   = `<svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>`;
+
+  // Build DOM
+  const wrap = document.createElement('div');
+  wrap.id = 'panic-wrap';
+  wrap.innerHTML = `
+    <div id="panic-panel" class="panic-panel hidden">
+      <div class="panic-panel-hd">
+        <span class="panic-panel-title">Emergency Stop</span>
+        <button id="panic-close" class="panic-close" title="Close">${closeSvg}</button>
+      </div>
+      <div class="panic-panel-desc">Tap once to arm &mdash; tap again to confirm.</div>
+      <div id="panic-acct-list" class="panic-acct-list">
+        <div style="font-size:12px;color:var(--muted);padding:.5rem 0;">Loading&hellip;</div>
+      </div>
+    </div>
+    <button id="panic-fab" class="panic-fab" title="Emergency Stop">
+      ${powerSvg}
+      <span class="panic-fab-label">Stop</span>
+    </button>`;
+  document.body.appendChild(wrap);
+
+  const fab   = document.getElementById('panic-fab');
+  const panel = document.getElementById('panic-panel');
+  const list  = document.getElementById('panic-acct-list');
+  let loaded  = false;
+
+  // Toggle panel
+  fab.addEventListener('click', () => {
+    const open = !panel.classList.contains('hidden');
+    panel.classList.toggle('hidden', open);
+    if (!open && !loaded) { loaded = true; loadPanicAccounts(); }
+  });
+  document.getElementById('panic-close').addEventListener('click', () => {
+    panel.classList.add('hidden');
+  });
+  // Close on outside click
+  document.addEventListener('click', e => {
+    if (!wrap.contains(e.target)) panel.classList.add('hidden');
+  });
+
+  async function loadPanicAccounts() {
+    try {
+      const accounts = await api('/api/broker-accounts', { key: 'panic-accts' });
+      if (!accounts.length) { list.innerHTML = '<div style="font-size:12px;color:var(--muted);">No accounts.</div>'; return; }
+      const statuses = await Promise.all(accounts.map(async a => {
+        try { const r = await api(`/api/broker-accounts/${a.id}/kill-switch`, { key: `panic-ks-${a.id}` }); return !!r.kill_switch; }
+        catch { return false; }
+      }));
+
+      list.innerHTML = '';
+      accounts.forEach((acct, i) => {
+        const meta  = getBrokerMeta(acct.broker);
+        const ksOn  = statuses[i];
+        const row   = document.createElement('div');
+        row.className = 'panic-row';
+        row.innerHTML = `
+          <div class="panic-row-meta">
+            <span class="panic-initials" style="background:${meta.bg};color:${meta.color};">${meta.initials}</span>
+            <span class="panic-acct-name">${escHtml(acct.label || acct.broker)}</span>
+            <span class="panic-badge ${ksOn ? 'panic-badge-halt' : 'panic-badge-run'}" id="pb-badge-${acct.id}">${ksOn ? 'Halted' : 'On'}</span>
+          </div>
+          <button class="panic-row-btn ${ksOn ? 'panic-row-resume' : 'panic-row-stop'}"
+            id="pb-btn-${acct.id}" data-acct="${acct.id}" data-on="${ksOn?'1':'0'}" data-armed="0">
+            ${ksOn ? resumeSvg+'Resume' : stopSvg+'Stop'}
+          </button>`;
+        list.appendChild(row);
+
+        let armTimer = null;
+        row.querySelector('button').addEventListener('click', async ev => {
+          const btn   = ev.currentTarget;
+          const id    = btn.dataset.acct;
+          const isOn  = btn.dataset.on === '1';
+          const armed = btn.dataset.armed === '1';
+
+          if (isOn) {
+            btn.disabled = true;
+            try {
+              await api(`/api/broker-accounts/${id}/kill-switch?on=false`, { method: 'POST', key: `panic-resume-${id}` });
+              btn.dataset.on = '0'; btn.dataset.armed = '0';
+              btn.className = 'panic-row-btn panic-row-stop';
+              btn.innerHTML = stopSvg + 'Stop';
+              const badge = document.getElementById(`pb-badge-${id}`);
+              if (badge) { badge.className = 'panic-badge panic-badge-run'; badge.textContent = 'On'; }
+            } catch {}
+            finally { btn.disabled = false; }
+            return;
+          }
+          if (!armed) {
+            btn.dataset.armed = '1';
+            btn.className = 'panic-row-btn panic-row-arm';
+            btn.innerHTML = stopSvg + 'Confirm?';
+            clearTimeout(armTimer);
+            armTimer = setTimeout(() => {
+              if (btn.dataset.armed === '1') {
+                btn.dataset.armed = '0';
+                btn.className = 'panic-row-btn panic-row-stop';
+                btn.innerHTML = stopSvg + 'Stop';
+              }
+            }, 3000);
+            return;
+          }
+          clearTimeout(armTimer);
+          btn.disabled = true; btn.dataset.armed = '0';
+          try {
+            await api(`/api/broker-accounts/${id}/kill-switch?on=true`, { method: 'POST', key: `panic-stop-${id}` });
+            btn.dataset.on = '1';
+            btn.className = 'panic-row-btn panic-row-resume';
+            btn.innerHTML = resumeSvg + 'Resume';
+            const badge = document.getElementById(`pb-badge-${id}`);
+            if (badge) { badge.className = 'panic-badge panic-badge-halt'; badge.textContent = 'Halted'; }
+            // Pulse the FAB red to confirm
+            fab.classList.add('panic-fab-active');
+          } catch {}
+          finally { btn.disabled = false; }
+        });
+      });
+    } catch {}
+  }
+}
 
 // ─────────────────────────────────────────
 // Page init functions are appended in Tasks 4–10
@@ -1204,21 +1331,48 @@ async function toggleExplanation(signalId, btnEl) {
     return;
   }
   btnEl.disabled = true;
-  btnEl.textContent = 'Loading…';
-  let text;
-  try {
-    const data = await api(`/api/signals/${signalId}/explanation`);
-    text = (data.explanation) ? escHtml(data.explanation) : 'No AI explanation available for this trade.';
-  } catch (e) {
-    text = 'Failed to load explanation.';
-  }
-  btnEl.disabled = false;
-  btnEl.textContent = 'Explain';
+  btnEl.textContent = 'Generating…';
+
+  // Insert a placeholder row immediately
   const expTr = document.createElement('tr');
   expTr.className = 'explanation-row';
   expTr.dataset.signalId = String(signalId);
-  expTr.innerHTML = `<td colspan="8"><div class="explanation-text">${text}</div></td>`;
+  expTr.innerHTML = `<td colspan="8"><div class="explanation-text" style="color:var(--muted);">Asking AI — this may take 10–30 seconds…</div></td>`;
   parentTr.insertAdjacentElement('afterend', expTr);
+
+  // Poll until the explanation is ready (max ~60s)
+  let text = null;
+  let aiProvider = null;
+  let aiModel = null;
+  const maxAttempts = 20;
+  for (let i = 0; i < maxAttempts; i++) {
+    try {
+      const data = await api(`/api/signals/${signalId}/explanation`);
+      if (data.ready && data.explanation) {
+        text = escHtml(data.explanation);
+        aiProvider = data.ai_provider;
+        aiModel = data.ai_model;
+        break;
+      }
+    } catch (_) { break; }
+    await new Promise(r => setTimeout(r, 3000));
+  }
+
+  btnEl.disabled = false;
+  btnEl.textContent = 'Explain';
+
+  let badgeHtml = '';
+  if (text && aiProvider) {
+    const isClaude = aiProvider === 'claude';
+    const label = isClaude ? 'Claude' : 'Ollama';
+    const modelStr = aiModel ? escHtml(aiModel) : '';
+    const badgeStyle = isClaude
+      ? 'background:rgba(139,92,246,0.18);color:#a78bfa;border:1px solid rgba(139,92,246,0.35);'
+      : 'background:rgba(6,182,212,0.15);color:#22d3ee;border:1px solid rgba(6,182,212,0.3);';
+    badgeHtml = `<span style="display:inline-block;font-size:10px;font-weight:600;padding:2px 7px;border-radius:10px;margin-right:8px;vertical-align:middle;${badgeStyle}">${label}${modelStr ? ' · ' + modelStr : ''}</span>`;
+  }
+
+  expTr.innerHTML = `<td colspan="8"><div class="explanation-text">${text ? badgeHtml + text : 'No explanation available — AI may still be processing. Try again in a moment.'}</div></td>`;
 }
 
 // initBots — bots.html
@@ -1852,6 +2006,72 @@ async function initPositions() {
     }
   }
 
+  function renderCryptoOrderRows(orders, perf, tbody) {
+    tbody.innerHTML = '';
+    if (!orders.length) {
+      tbody.innerHTML = '<tr><td colspan="7" class="state-empty">No orders.</td></tr>';
+      return;
+    }
+    // Normalize symbol to base asset: "ETH/USDT" → "ETH", "BNBUSDT" → "BNB"
+    function baseSym(s) {
+      return (s || '').replace('/USDT','').replace('/USD','').replace('USDT','').replace('USD','').toUpperCase();
+    }
+    // Build FIFO queue of sell perf rows per base symbol
+    const perfQueues = {};
+    perf.forEach(p => {
+      const key = baseSym(p.symbol);
+      if (!perfQueues[key]) perfQueues[key] = [];
+      perfQueues[key].push(p);
+    });
+    // Consume pointers (index into each queue)
+    const perfIdx = {};
+
+    orders.forEach(o => {
+      const tr = document.createElement('tr');
+      const side = o.side === 'buy' ? 'buy' : 'sell';
+      const fields = [fmt.time(o.submitted_at), o.symbol, side, (o.qty || o.filled_qty || 0), o.status, fmt.time(o.filled_at)];
+      fields.forEach((v, i) => {
+        const td = document.createElement('td');
+        if (i === 2) {
+          const tag = document.createElement('span');
+          tag.className = 'badge ' + (side === 'buy' ? 'b-buy' : 'b-sell');
+          tag.textContent = side === 'buy' ? 'Buy' : 'Sell';
+          td.appendChild(tag);
+        } else {
+          td.textContent = v;
+        }
+        tr.appendChild(td);
+      });
+
+      // P&L column — only filled sells get a value
+      const pnlTd = document.createElement('td');
+      const isSell = side === 'sell' && ['filled','closed','partially_filled'].includes(o.status);
+      if (isSell) {
+        const sym = baseSym(o.symbol);
+        const idx = perfIdx[sym] || 0;
+        const queue = perfQueues[sym] || [];
+        const match = queue[idx];
+        if (match) {
+          perfIdx[sym] = idx + 1;
+          const pnl    = parseFloat(match.pnl)     || 0;
+          const pnlPct = parseFloat(match.pnl_pct) || 0;
+          const pos = pnl >= 0;
+          pnlTd.style.color = pos ? 'var(--green)' : 'var(--red)';
+          pnlTd.style.fontWeight = '600';
+          pnlTd.textContent = `${pos ? '+' : ''}$${Math.abs(pnl).toFixed(2)} (${pos ? '+' : ''}${pnlPct.toFixed(2)}%)`;
+        } else {
+          pnlTd.textContent = '—';
+          pnlTd.style.color = 'var(--muted)';
+        }
+      } else {
+        pnlTd.textContent = '—';
+        pnlTd.style.color = 'var(--muted)';
+      }
+      tr.appendChild(pnlTd);
+      tbody.appendChild(tr);
+    });
+  }
+
   async function fetchCryptoOrders() {
     const tbody = document.getElementById('crypto-orders-body');
     if (!tbody) return;
@@ -1864,15 +2084,18 @@ async function initPositions() {
       } catch {}
     }
     if (!cmoAccountId) {
-      tbody.innerHTML = '<tr><td colspan="6" class="state-empty">No Binance account connected.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="7" class="state-empty">No Binance account connected.</td></tr>';
       return;
     }
     try {
-      const orders = await api(`/api/orders?status=${currentStatus}&limit=50&account_id=${cmoAccountId}`, { key: 'pos-crypto-orders' });
-      renderOrderRows(orders, tbody, 6);
+      const [orders, perf] = await Promise.all([
+        api(`/api/orders?status=${currentStatus}&limit=50&account_id=${cmoAccountId}`, { key: 'pos-crypto-orders' }),
+        api(`/api/crypto-sell-perf?account_id=${cmoAccountId}`, { key: 'pos-crypto-sell-perf' }),
+      ]);
+      renderCryptoOrderRows(orders, perf || [], tbody);
     } catch (e) {
       if (e.name === 'AbortError') return;
-      tbody.innerHTML = '<tr><td colspan="6" class="state-error">Failed to load &mdash; retrying in 30s</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="7" class="state-error">Failed to load &mdash; retrying in 30s</td></tr>';
     }
   }
 
@@ -2439,6 +2662,10 @@ async function initPerformance() {
             tag.className = 'badge ' + (s.side === 'buy' ? 'b-buy' : 'b-sell');
             tag.textContent = s.side === 'buy' ? 'Buy' : 'Sell';
             td.appendChild(tag);
+          } else if (i === 4) {
+            td.className = 'col-reason';
+            td.title = v;
+            td.textContent = v;
           } else if (i === 5) {
             const badge = document.createElement('span');
             badge.className = 'badge ' + statusCls;
@@ -2790,6 +3017,19 @@ async function initRisk() {
       document.getElementById('inp-max-open').value    = s.max_open_positions      ?? 10;
       document.getElementById('inp-sym-exp').value     = s.max_symbol_exposure_pct ?? 0;
       document.getElementById('inp-take-profit').value = s.take_profit_pct         ?? 0;
+
+      // Crypto-specific inputs
+      const el = id => document.getElementById(id);
+      if (el('inp-max-loss-crypto'))    el('inp-max-loss-crypto').value    = s.max_daily_loss_pct_crypto      ?? 5;
+      if (el('inp-max-pos-crypto'))     el('inp-max-pos-crypto').value     = s.max_position_pct_crypto        ?? 20;
+      if (el('inp-take-profit-crypto')) el('inp-take-profit-crypto').value = s.take_profit_pct_crypto         ?? 0;
+      if (el('inp-max-open-crypto'))    el('inp-max-open-crypto').value    = s.max_open_positions_crypto      ?? 10;
+      if (el('inp-sym-exp-crypto'))     el('inp-sym-exp-crypto').value     = s.max_symbol_exposure_pct_crypto ?? 0;
+      if (el('inp-consec-crypto'))      el('inp-consec-crypto').value      = s.consecutive_loss_limit_crypto  ?? 0;
+      if (el('inp-weekly-loss-crypto')) el('inp-weekly-loss-crypto').value = s.weekly_loss_limit_pct_crypto   ?? 0;
+      if (el('inp-max-orders-crypto'))  el('inp-max-orders-crypto').value  = s.max_orders_per_day_crypto      ?? 0;
+      if (el('inp-size-pct-crypto'))    el('inp-size-pct-crypto').value    = s.position_size_pct_crypto       ?? 5;
+      setSizingModeCrypto(s.position_size_mode_crypto || 'fixed');
       if (s.trading_hours_start) document.getElementById('inp-hours-start').value = s.trading_hours_start;
       if (s.trading_hours_end)   document.getElementById('inp-hours-end').value   = s.trading_hours_end;
 
@@ -2947,12 +3187,50 @@ async function initRisk() {
     });
   });
 
-  // Position sizing mode toggle
+  // Page-level broker tab switcher (Stock / Crypto)
+  const brokerTabs = document.querySelectorAll('.broker-tab');
+  if (brokerTabs.length) {
+    brokerTabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        const active = tab.dataset.broker;
+        brokerTabs.forEach(t => t.classList.toggle('broker-tab-active', t.dataset.broker === active));
+        document.getElementById('panel-stock').style.display  = active === 'stock'  ? '' : 'none';
+        document.getElementById('panel-crypto').style.display = active === 'crypto' ? '' : 'none';
+      });
+    });
+  }
+
+  // Position sizing mode toggle (Stock)
   function setSizingMode(mode) {
     document.getElementById('sizing-fixed').classList.toggle('active', mode === 'fixed');
     document.getElementById('sizing-pct').classList.toggle('active',  mode === 'pct');
     document.getElementById('pct-sizing-row').classList.toggle('hidden', mode !== 'pct');
   }
+
+  // Position sizing mode toggle (Crypto)
+  function setSizingModeCrypto(mode) {
+    const fx = document.getElementById('sizing-fixed-crypto');
+    const pc = document.getElementById('sizing-pct-crypto');
+    const row = document.getElementById('pct-sizing-row-crypto');
+    if (fx)  fx.classList.toggle('active', mode === 'fixed');
+    if (pc)  pc.classList.toggle('active', mode === 'pct_portfolio');
+    if (row) row.classList.toggle('hidden', mode !== 'pct_portfolio');
+  }
+
+  ['sizing-fixed-crypto', 'sizing-pct-crypto'].forEach(id => {
+    const btn = document.getElementById(id);
+    if (!btn) return;
+    btn.addEventListener('click', async () => {
+      const mode = btn.dataset.mode;
+      setSizingModeCrypto(mode);
+      try {
+        await api('/api/risk/position_size_mode_crypto', {
+          method: 'PATCH',
+          body: JSON.stringify({ value: mode }),
+        });
+      } catch { /* silent */ }
+    });
+  });
 
   ['sizing-fixed', 'sizing-pct'].forEach(id => {
     document.getElementById(id).addEventListener('click', async () => {
@@ -3068,44 +3346,89 @@ async function initRisk() {
         container.innerHTML = '<div class="state-empty">No broker accounts configured.</div>'; return;
       }
       container.innerHTML = '';
+
       await Promise.all(accounts.map(async acct => {
         let ksOn = false;
         try {
           const ks = await api(`/api/broker-accounts/${acct.id}/kill-switch`, { key: `ks-${acct.id}` });
           ksOn = !!ks.kill_switch;
         } catch {}
-        const row = document.createElement('div');
-        row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:.5rem 0;border-bottom:1px solid var(--border);';
-        row.dataset.acctId = acct.id;
-        const meta = getBrokerMeta(acct.broker);
-        row.innerHTML = `
-          <div style="display:flex;align-items:center;gap:.5rem;">
-            <span class="acct-initials" style="background:${meta.bg};color:${meta.color};border-radius:6px;padding:2px 6px;font-size:11px;font-weight:700;">${meta.initials}</span>
-            <span style="font-size:13px;">${acct.label || acct.broker}</span>
-            <span class="badge ${ksOn ? 'b-error' : 'b-enabled'}" id="acct-ks-badge-${acct.id}">${ksOn ? 'HALTED' : 'Running'}</span>
-          </div>
-          <button class="btn ${ksOn ? 'btn-ghost' : 'btn-danger'}" style="font-size:11px;padding:.25rem .6rem;" id="acct-ks-btn-${acct.id}"
-            data-acct="${acct.id}" data-on="${ksOn ? '1' : '0'}">
-            ${ksOn ? 'Resume' : 'Stop'}
-          </button>`;
-        container.appendChild(row);
 
-        row.querySelector('button').addEventListener('click', async (ev) => {
+        const meta = getBrokerMeta(acct.broker);
+        const card = document.createElement('div');
+        card.className = 'aks-card' + (ksOn ? ' aks-halted' : '');
+        card.dataset.acctId = acct.id;
+
+        // Power icon SVG
+        const powerSvg = `<svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>`;
+        const resumeSvg = `<svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-.47-5.43"/></svg>`;
+
+        card.innerHTML = `
+          <div class="aks-initials" style="background:${meta.bg};color:${meta.color};">${meta.initials}</div>
+          <div class="aks-label">${escHtml(acct.label || acct.broker)}</div>
+          <span class="aks-status ${ksOn ? 'halted' : 'running'}" id="aks-status-${acct.id}">${ksOn ? 'Halted' : 'Running'}</span>
+          <button class="aks-btn ${ksOn ? 'aks-resume' : 'aks-idle'}" id="aks-btn-${acct.id}" data-acct="${acct.id}" data-on="${ksOn ? '1' : '0'}" data-armed="0">
+            ${ksOn ? resumeSvg + 'Resume' : powerSvg + 'Stop'}
+          </button>`;
+        container.appendChild(card);
+
+        let armTimer = null;
+
+        card.querySelector('button').addEventListener('click', async (ev) => {
           const btn = ev.currentTarget;
           const id  = btn.dataset.acct;
-          const cur = btn.dataset.on === '1';
-          const next = !cur;
+          const isOn = btn.dataset.on === '1';    // currently halted?
+          const armed = btn.dataset.armed === '1';
+
+          // If halted → always go straight to Resume (no arm step needed)
+          if (isOn) {
+            btn.disabled = true;
+            try {
+              await api(`/api/broker-accounts/${id}/kill-switch?on=false`, { method: 'POST', key: `ks-toggle-${id}` });
+              btn.dataset.on = '0';
+              btn.dataset.armed = '0';
+              btn.className = 'aks-btn aks-idle';
+              btn.innerHTML = powerSvg + 'Stop';
+              card.classList.remove('aks-halted');
+              const st = document.getElementById(`aks-status-${id}`);
+              if (st) { st.className = 'aks-status running'; st.textContent = 'Running'; }
+              showToast(`${acct.label} resumed`);
+            } catch { showToast('Failed to resume', true); }
+            finally { btn.disabled = false; }
+            return;
+          }
+
+          // Step 1: arm
+          if (!armed) {
+            btn.dataset.armed = '1';
+            btn.className = 'aks-btn aks-armed';
+            btn.innerHTML = powerSvg + 'Confirm?';
+            // Auto-disarm after 3 s
+            clearTimeout(armTimer);
+            armTimer = setTimeout(() => {
+              if (btn.dataset.armed === '1') {
+                btn.dataset.armed = '0';
+                btn.className = 'aks-btn aks-idle';
+                btn.innerHTML = powerSvg + 'Stop';
+              }
+            }, 3000);
+            return;
+          }
+
+          // Step 2: confirmed — fire
+          clearTimeout(armTimer);
           btn.disabled = true;
+          btn.dataset.armed = '0';
           try {
-            await api(`/api/broker-accounts/${id}/kill-switch?on=${next}`, { method: 'POST', key: `ks-toggle-${id}` });
-            btn.dataset.on = next ? '1' : '0';
-            btn.textContent = next ? 'Resume' : 'Stop';
-            btn.className = `btn ${next ? 'btn-ghost' : 'btn-danger'}`;
-            btn.style.cssText = 'font-size:11px;padding:.25rem .6rem;';
-            const badge = document.getElementById(`acct-ks-badge-${id}`);
-            if (badge) { badge.className = `badge ${next ? 'b-error' : 'b-enabled'}`; badge.textContent = next ? 'HALTED' : 'Running'; }
-            showToast(next ? `Account ${id} halted` : `Account ${id} resumed`);
-          } catch { showToast('Failed to update', true); }
+            await api(`/api/broker-accounts/${id}/kill-switch?on=true`, { method: 'POST', key: `ks-toggle-${id}` });
+            btn.dataset.on = '1';
+            btn.className = 'aks-btn aks-resume';
+            btn.innerHTML = resumeSvg + 'Resume';
+            card.classList.add('aks-halted');
+            const st = document.getElementById(`aks-status-${id}`);
+            if (st) { st.className = 'aks-status halted'; st.textContent = 'Halted'; }
+            showToast(`${acct.label} halted`, true);
+          } catch { showToast('Failed to halt', true); }
           finally { btn.disabled = false; }
         });
       }));
@@ -3363,6 +3686,10 @@ async function initLogs() {
             tag.className = 'badge ' + (s.side === 'buy' ? 'b-buy' : 'b-sell');
             tag.textContent = s.side === 'buy' ? 'Buy' : 'Sell';
             td.appendChild(tag);
+          } else if (i === 5) {
+            td.className = 'col-reason';
+            td.title = v;
+            td.textContent = v;
           } else if (i === 6) {
             const badge = document.createElement('span');
             badge.className = 'badge ' + (statusCls[s.status] || 'b-disabled');
@@ -3428,6 +3755,10 @@ async function initLogs() {
             badge.className = 'badge ' + (catCls[r.category] || 'b-disabled');
             badge.textContent = r.category;
             td.appendChild(badge);
+          } else if (i === 3) {
+            td.className = 'col-detail';
+            td.title = v;
+            td.textContent = v;
           } else {
             td.textContent = v;
           }
@@ -3452,14 +3783,33 @@ async function initAiTuning() {
 
   async function loadStatus() {
     try {
-      const s = await api('/api/ai/status');
-      const dot   = document.getElementById('ai-status-dot');
-      const label = document.getElementById('ai-status-label');
-      if (dot)   dot.style.background   = s.reachable ? '#10B981' : '#EF4444';
-      if (label) label.textContent = s.reachable
-        ? `Connected — model: ${s.model}`
-        : `Offline (${s.url})`;
-    } catch (_) {}
+      const [s, cfg] = await Promise.all([
+        api('/api/ai/status',   { key: 'ai-status' }),
+        api('/api/ai/settings', { key: 'ai-settings' }),
+      ]);
+      const dot     = document.getElementById('ai-status-dot');
+      const modelEl = document.getElementById('stat-model');
+      const subEl   = document.getElementById('stat-model-sub');
+      const provider = cfg.tuner_provider || s.provider || 'ollama';
+
+      if (provider === 'claude') {
+        if (dot)     dot.className = 'status-dot ' + (s.reachable ? 'dot-green' : 'dot-red');
+        if (modelEl) modelEl.textContent = 'Claude (Anthropic)';
+        if (subEl)   subEl.textContent   = cfg.claude_model || s.model || '—';
+      } else {
+        const ok = s.reachable;
+        if (dot)     dot.className = 'status-dot ' + (ok ? 'dot-green' : 'dot-red');
+        if (modelEl) modelEl.textContent = 'Ollama (Local)';
+        if (subEl)   subEl.textContent   = ok
+          ? `${cfg.ollama_model || s.model || '—'} — connected`
+          : `${cfg.ollama_model || s.model || '—'} — offline`;
+      }
+    } catch (e) {
+      const modelEl = document.getElementById('stat-model');
+      const subEl   = document.getElementById('stat-model-sub');
+      if (modelEl) modelEl.textContent = 'Unavailable';
+      if (subEl)   subEl.textContent   = e.message;
+    }
   }
 
   async function loadLog() {
@@ -3467,28 +3817,72 @@ async function initAiTuning() {
     if (!tbody) return;
     try {
       const rows = await api('/api/ai/tuning-log');
+
+      // Update stat cards
+      const totalEl   = document.getElementById('stat-total-runs');
+      const lastRunEl = document.getElementById('stat-last-run');
+      if (totalEl)   totalEl.textContent = rows.length;
+      if (lastRunEl) lastRunEl.textContent = rows.length ? fmt.time(rows[0].created_at) : 'Never';
+
       if (!rows.length) {
         tbody.innerHTML = '<tr><td colspan="6" class="state-empty">No tuning runs yet. The AI will analyze your strategies every Sunday at 11 PM.</td></tr>';
         return;
       }
-      tbody.innerHTML = rows.map(r => {
-        const newP = r.new_params || {};
-        const oldP = r.old_params || {};
-        const changes = Object.entries(newP)
-          .filter(([k, v]) => oldP[k] !== v)
-          .map(([k, v]) => `${k}: ${oldP[k]} → ${v}`)
-          .join(', ') || 'No changes';
-        return `<tr>
-          <td style="white-space:nowrap;">${fmt.time(r.created_at)}</td>
-          <td>${escHtml(r.strategy.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase()))}</td>
-          <td>${r.win_rate_before != null ? escHtml(String(r.win_rate_before)) + '%' : '—'}</td>
-          <td style="font-size:11px;font-family:monospace;">${escHtml(changes)}</td>
-          <td style="font-size:11px;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escHtml(r.rationale)}">${escHtml(r.rationale)}</td>
-          <td><button class="btn btn-sm" style="font-size:11px;background:rgba(239,68,68,.1);color:#EF4444;border-color:rgba(239,68,68,.3);" onclick="revertTuning(${parseInt(r.id, 10)})">Revert</button></td>
+
+      // Group rows by run (same minute bucket = same run)
+      const runBuckets = [];
+      let lastBucket = null;
+      rows.forEach(r => {
+        const minute = r.created_at ? r.created_at.slice(0, 16) : '';
+        if (!lastBucket || lastBucket.minute !== minute) {
+          lastBucket = { minute, time: r.created_at, rows: [] };
+          runBuckets.push(lastBucket);
+        }
+        lastBucket.rows.push(r);
+      });
+
+      tbody.innerHTML = runBuckets.map((bucket, bi) => {
+        const firstRow   = bucket.rows[0];
+        const providerRaw = firstRow.ai_provider || 'ollama';
+        const modelRaw    = firstRow.ai_model    || '—';
+        const providerLabel = providerRaw === 'claude'
+          ? `<span style="color:#8B5CF6;">Claude</span> <span style="color:var(--muted);font-weight:400;">(${escHtml(modelRaw)})</span>`
+          : `<span style="color:#06B6D4;">Ollama</span> <span style="color:var(--muted);font-weight:400;">(${escHtml(modelRaw)})</span>`;
+
+        const runHeader = `<tr style="background:rgba(59,130,246,.04);">
+          <td colspan="6" style="padding:.55rem .65rem;font-size:12px;font-weight:700;color:var(--muted);border-bottom:1px solid var(--border);">
+            <span style="color:var(--text);">Run ${runBuckets.length - bi}</span>
+            &nbsp;&middot;&nbsp;${fmt.time(bucket.time)}
+            &nbsp;&middot;&nbsp;<span style="color:#60A5FA;">${bucket.rows.length} ${bucket.rows.length !== 1 ? 'strategies' : 'strategy'} tuned</span>
+            &nbsp;&middot;&nbsp;${providerLabel}
+          </td>
         </tr>`;
+
+        const dataRows = bucket.rows.map(r => {
+          const newP = r.new_params || {};
+          const oldP = r.old_params || {};
+          const changePills = Object.entries(newP)
+            .filter(([k, v]) => !Array.isArray(v) && !Array.isArray(oldP[k]) && String(oldP[k]) !== String(v))
+            .map(([k, v]) =>
+              `<span class="param-change"><span class="param-old">${escHtml(String(oldP[k]))}</span> &rarr; <span class="param-new">${escHtml(String(v))}</span> <span style="color:var(--muted);font-size:10px;">${escHtml(k)}</span></span>`
+            ).join(' ') || '<span style="color:var(--muted);font-size:11px;">No numeric changes</span>';
+
+          const stratLabel = escHtml(r.strategy.replace(/_/g,' ').replace(/\b\w/g, c => c.toUpperCase()));
+          return `<tr class="tune-history-row">
+            <td style="white-space:nowrap;font-size:12px;color:var(--muted);">${stratLabel}</td>
+            <td style="font-size:13px;font-weight:600;">${r.win_rate_before != null ? r.win_rate_before + '%' : '—'}</td>
+            <td colspan="2">${changePills}</td>
+            <td><div class="rationale-text">${escHtml(r.rationale || '—')}</div></td>
+            <td style="white-space:nowrap;">
+              <button class="btn btn-sm" style="font-size:11px;background:rgba(239,68,68,.1);color:#EF4444;border-color:rgba(239,68,68,.3);" onclick="revertTuning(${parseInt(r.id, 10)})">Revert</button>
+            </td>
+          </tr>`;
+        }).join('');
+
+        return runHeader + dataRows;
       }).join('');
-    } catch (_) {
-      tbody.innerHTML = '<tr><td colspan="6" class="state-error">Failed to load tuning log.</td></tr>';
+    } catch (e) {
+      tbody.innerHTML = '<tr><td colspan="6" class="state-error">Failed to load tuning history.</td></tr>';
     }
   }
 
@@ -3496,23 +3890,107 @@ async function initAiTuning() {
     const btn = document.getElementById('tune-now-btn');
     const msg = document.getElementById('tune-msg');
     btn.disabled = true;
-    btn.textContent = 'Running…';
+    btn.innerHTML = '<svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg> Running&hellip;';
     if (msg) msg.textContent = '';
     try {
       const result = await api('/api/ai/tune-now', { method: 'POST' });
       if (msg) msg.textContent = result.error
         ? `Error: ${result.error}`
-        : `Done — ${result.tuned} updated, ${result.skipped} skipped`;
+        : result.tuned > 0
+          ? `Done — ${result.tuned} strategy updated. See history below.`
+          : `Done — no changes made (${result.skipped} strategies checked).`;
       await loadLog();
     } catch (e) {
       if (msg) msg.textContent = `Error: ${e.message}`;
     } finally {
       btn.disabled = false;
-      btn.textContent = 'Run Tuning Now';
+      btn.innerHTML = '<svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg> Run Tuning Now';
     }
   });
 
-  await Promise.all([loadStatus(), loadLog()]);
+  async function loadSettings() {
+    try {
+      const s = await api('/api/ai/settings', { key: 'ai-settings-form' });
+      const el = id => document.getElementById(id);
+      if (el('inp-ollama-url'))   el('inp-ollama-url').value   = s.ollama_url   || '';
+      if (el('inp-ollama-model')) el('inp-ollama-model').value = s.ollama_model || '';
+      if (el('inp-claude-model') && s.claude_model) el('inp-claude-model').value = s.claude_model;
+      if (el('inp-target-wr') && s.target_win_rate != null) el('inp-target-wr').value = s.target_win_rate;
+      if (el('claude-key-status')) {
+        el('claude-key-status').textContent = s.claude_api_key_set
+          ? `Key saved: ${s.claude_api_key_masked}`
+          : 'No API key saved yet.';
+      }
+      selectProvider(s.tuner_provider || 'ollama', false);
+    } catch (_) {}
+  }
+
+  window.selectProvider = function(provider, save = true) {
+    ['ollama', 'claude'].forEach(t => {
+      const tab   = document.getElementById(`tab-${t}`);
+      const panel = document.getElementById(`settings-${t}`);
+      if (tab)   tab.classList.toggle('ai-tab-active', t === provider);
+      if (panel) panel.style.display = t === provider ? '' : 'none';
+    });
+    const sub = document.querySelector('.page-sub');
+    if (sub) sub.textContent = provider === 'claude'
+      ? 'Automated strategy optimization powered by Claude (Anthropic)'
+      : 'Automated strategy optimization powered by local AI (Ollama)';
+    if (save) {
+      jsonPatch('/api/ai/settings', { tuner_provider: provider }).catch(() => {});
+    }
+  };
+
+  const jsonPatch = (path, data) => api(path, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+
+  window.saveOllamaSettings = async function() {
+    const url   = document.getElementById('inp-ollama-url')?.value.trim();
+    const model = document.getElementById('inp-ollama-model')?.value.trim();
+    const msg   = document.getElementById('ai-settings-msg');
+    try {
+      await jsonPatch('/api/ai/settings', { ollama_url: url, ollama_model: model });
+      if (msg) { msg.style.color = 'var(--green)'; msg.textContent = 'Ollama settings saved.'; msg.style.display = ''; setTimeout(() => msg.style.display = 'none', 3000); }
+      await loadStatus();
+    } catch (e) {
+      if (msg) { msg.style.color = 'var(--red)'; msg.textContent = `Error: ${e.message}`; msg.style.display = ''; }
+    }
+  };
+
+  window.saveClaudeSettings = async function() {
+    const key   = document.getElementById('inp-claude-key')?.value.trim();
+    const model = document.getElementById('inp-claude-model')?.value;
+    const msg   = document.getElementById('ai-settings-msg');
+    if (!key) { if (msg) { msg.style.color='var(--red)'; msg.textContent='Enter an API key.'; msg.style.display=''; } return; }
+    try {
+      await jsonPatch('/api/ai/settings', { claude_api_key: key, claude_model: model });
+      if (msg) { msg.style.color = 'var(--green)'; msg.textContent = 'Claude settings saved.'; msg.style.display = ''; setTimeout(() => msg.style.display = 'none', 3000); }
+      document.getElementById('inp-claude-key').value = '';
+      await loadSettings();
+    } catch (e) {
+      if (msg) { msg.style.color = 'var(--red)'; msg.textContent = `Error: ${e.message}`; msg.style.display = ''; }
+    }
+  };
+
+  window.saveTargetWinRate = async function() {
+    const val = parseFloat(document.getElementById('inp-target-wr')?.value);
+    const msg = document.getElementById('ai-settings-msg');
+    if (isNaN(val) || val < 50 || val > 90) {
+      if (msg) { msg.style.color = 'var(--red)'; msg.textContent = 'Target must be between 50 and 90%.'; msg.style.display = ''; }
+      return;
+    }
+    try {
+      await jsonPatch('/api/ai/settings', { target_win_rate: val });
+      if (msg) { msg.style.color = 'var(--green)'; msg.textContent = `Target win rate set to ${val}%.`; msg.style.display = ''; setTimeout(() => msg.style.display = 'none', 3000); }
+    } catch (e) {
+      if (msg) { msg.style.color = 'var(--red)'; msg.textContent = `Error: ${e.message}`; msg.style.display = ''; }
+    }
+  };
+
+  await Promise.all([loadStatus(), loadLog(), loadSettings()]);
 }
 
 window.revertTuning = async function(runId) {
@@ -3947,6 +4425,8 @@ async function initSettings() {
   const tgToken        = document.getElementById('telegram-token');
   const tgChatId       = document.getElementById('telegram-chat-id');
   const tgTestMsg      = document.getElementById('telegram-test-msg');
+  const tgSaveBtn      = document.getElementById('btn-save-telegram');
+  const tgSaveMsg      = document.getElementById('telegram-save-msg');
 
   const notifyTrade    = document.getElementById('notify-on-trade');
   const notifyBlock    = document.getElementById('notify-on-block');
@@ -3972,12 +4452,49 @@ async function initSettings() {
     tgFields.classList.toggle('hidden', !tgEnabled.checked);
   }
 
-  emailEnabled.addEventListener('change', syncEmailFields);
-  tgEnabled.addEventListener('change', syncTgFields);
+  async function saveNotifications() {
+    try {
+      await api('/api/notifications', {
+        key: 'save-notifications',
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email_enabled:       emailEnabled.checked,
+          email_to:            emailTo.value.trim(),
+          email_smtp:          emailSmtp.value.trim(),
+          email_port:          parseInt(emailPort.value) || 587,
+          email_user:          emailUser.value.trim(),
+          email_pass:          emailPass.value,
+          telegram_enabled:    tgEnabled.checked,
+          telegram_token:      tgToken.value.trim(),
+          telegram_chat_id:    tgChatId.value.trim(),
+          slack_enabled:       document.getElementById('slack-enabled')?.checked         || false,
+          slack_webhook_url:   document.getElementById('slack-webhook-url')?.value.trim() || '',
+          discord_enabled:     document.getElementById('discord-enabled')?.checked        || false,
+          discord_webhook_url: document.getElementById('discord-webhook-url')?.value.trim() || '',
+          notify_on_trade:     notifyTrade.checked,
+          notify_on_block:     notifyBlock.checked,
+          notify_daily_summary: notifyDaily.checked,
+        }),
+      });
+      return true;
+    } catch (e) {
+      showMsg(saveMsg, 'Failed to save: ' + e.message, 'err');
+      return false;
+    }
+  }
+
+  emailEnabled.addEventListener('change', () => { syncEmailFields(); saveNotifications(); });
+  tgEnabled.addEventListener('change',    () => { syncTgFields();    saveNotifications(); });
+  document.getElementById('slack-enabled')?.addEventListener('change',   saveNotifications);
+  document.getElementById('discord-enabled')?.addEventListener('change', saveNotifications);
+  notifyTrade.addEventListener('change', saveNotifications);
+  notifyBlock.addEventListener('change', saveNotifications);
+  notifyDaily.addEventListener('change', saveNotifications);
 
   // ── load current settings ──
   try {
-    const data = await fetch('/api/notifications').then(r => r.json());
+    const data = await api('/api/notifications');
     emailEnabled.checked  = !!data.email_enabled;
     emailTo.value         = data.email_to        || '';
     emailSmtp.value       = data.email_smtp       || 'smtp.gmail.com';
@@ -4015,36 +4532,10 @@ async function initSettings() {
   saveBtn.addEventListener('click', async () => {
     saveBtn.disabled = true;
     saveBtn.textContent = 'Saving...';
-    try {
-      await fetch('/api/notifications', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email_enabled:      emailEnabled.checked,
-          email_to:           emailTo.value.trim(),
-          email_smtp:         emailSmtp.value.trim(),
-          email_port:         parseInt(emailPort.value) || 587,
-          email_user:         emailUser.value.trim(),
-          email_pass:         emailPass.value,
-          telegram_enabled:   tgEnabled.checked,
-          telegram_token:     tgToken.value.trim(),
-          telegram_chat_id:   tgChatId.value.trim(),
-          notify_on_trade:    notifyTrade.checked,
-          notify_on_block:    notifyBlock.checked,
-          notify_daily_summary: notifyDaily.checked,
-          slack_enabled:      document.getElementById('slack-enabled')?.checked   || false,
-          slack_webhook_url:  document.getElementById('slack-webhook-url')?.value.trim() || '',
-          discord_enabled:    document.getElementById('discord-enabled')?.checked  || false,
-          discord_webhook_url: document.getElementById('discord-webhook-url')?.value.trim() || '',
-        }),
-      });
-      showMsg(saveMsg, 'Settings saved.', 'ok');
-    } catch (e) {
-      showMsg(saveMsg, 'Failed to save: ' + e.message, 'err');
-    } finally {
-      saveBtn.disabled = false;
-      saveBtn.innerHTML = '<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Save Settings';
-    }
+    const ok = await saveNotifications();
+    if (ok) showMsg(saveMsg, 'Settings saved.', 'ok');
+    saveBtn.disabled = false;
+    saveBtn.innerHTML = '<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Save Settings';
   });
 
   // ── test email ──
@@ -4098,6 +4589,14 @@ async function initSettings() {
       testTgBtn.disabled = false;
       testTgBtn.innerHTML = '<svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="22 2 11 13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg> Send Test';
     }
+  });
+
+  // ── save telegram ──
+  tgSaveBtn.addEventListener('click', async () => {
+    tgSaveBtn.disabled = true;
+    const ok = await saveNotifications();
+    if (ok) showMsg(tgSaveMsg, 'Saved!', 'ok');
+    tgSaveBtn.disabled = false;
   });
 
   // ── TradingView Webhook ──────────────────────────────────────────────────
