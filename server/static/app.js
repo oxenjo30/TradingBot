@@ -3491,6 +3491,24 @@ async function initRisk() {
     }
   }
 
+  async function loadSentimentSettings() {
+    try {
+      const s = await api('/api/ai/settings');
+      const enabled = s.sentiment_enabled || false;
+      const cb = document.getElementById('inp-sentiment-enabled');
+      if (cb) cb.checked = enabled;
+      _updateSentimentToggleUI(enabled);
+      const block = document.getElementById('inp-sentiment-block');
+      const boost = document.getElementById('inp-sentiment-boost');
+      const mult  = document.getElementById('inp-sentiment-mult');
+      if (block && s.sentiment_block_threshold != null) block.value = s.sentiment_block_threshold;
+      if (boost && s.sentiment_boost_threshold != null) boost.value = s.sentiment_boost_threshold;
+      if (mult  && s.sentiment_boost_multiplier != null) mult.value = s.sentiment_boost_multiplier;
+    } catch (_) {}
+  }
+
+  loadSentimentSettings();
+
   await loadRisk();
   loadAccountKillSwitches();
 }
@@ -5275,3 +5293,62 @@ function exportBtCsv() {
   a.click();
   URL.revokeObjectURL(a.href);
 }
+
+// ─────────────────────────────────────────
+// News Sentiment Settings — global helpers (called from risk.html onclick attrs)
+// ─────────────────────────────────────────
+function _updateSentimentToggleUI(enabled) {
+  const track = document.getElementById('sentiment-toggle-track');
+  const thumb = document.getElementById('sentiment-toggle-thumb');
+  const label = document.getElementById('sentiment-toggle-label');
+  if (track) track.style.background = enabled ? 'var(--blue, #3B82F6)' : 'var(--border)';
+  if (thumb) thumb.style.left = enabled ? '20px' : '2px';
+  if (label) { label.textContent = enabled ? 'ON' : 'OFF'; label.style.color = enabled ? 'var(--blue, #3B82F6)' : 'var(--muted)'; }
+}
+
+window.saveSentimentEnabled = async function(enabled) {
+  _updateSentimentToggleUI(enabled);
+  try {
+    await api('/api/ai/settings', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sentiment_enabled: enabled }),
+    });
+  } catch (e) {
+    const msg = document.getElementById('sentiment-settings-msg');
+    if (msg) { msg.style.color = 'var(--red)'; msg.textContent = `Error: ${e.message}`; msg.style.display = ''; }
+  }
+};
+
+window.saveSentimentThresholds = async function() {
+  const block = parseFloat(document.getElementById('inp-sentiment-block')?.value);
+  const boost = parseFloat(document.getElementById('inp-sentiment-boost')?.value);
+  const mult  = parseFloat(document.getElementById('inp-sentiment-mult')?.value);
+  const msg   = document.getElementById('sentiment-settings-msg');
+  if (isNaN(block) || block < -1 || block > 0) {
+    if (msg) { msg.style.color='var(--red)'; msg.textContent='Block threshold must be between -1 and 0.'; msg.style.display=''; }
+    return;
+  }
+  if (isNaN(boost) || boost < 0 || boost > 1) {
+    if (msg) { msg.style.color='var(--red)'; msg.textContent='Boost threshold must be between 0 and 1.'; msg.style.display=''; }
+    return;
+  }
+  if (isNaN(mult) || mult < 1 || mult > 2) {
+    if (msg) { msg.style.color='var(--red)'; msg.textContent='Boost multiplier must be between 1 and 2.'; msg.style.display=''; }
+    return;
+  }
+  try {
+    await api('/api/ai/settings', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sentiment_block_threshold:  block,
+        sentiment_boost_threshold:  boost,
+        sentiment_boost_multiplier: mult,
+      }),
+    });
+    if (msg) { msg.style.color='var(--green)'; msg.textContent='Sentiment settings saved.'; msg.style.display=''; setTimeout(()=>msg.style.display='none',3000); }
+  } catch (e) {
+    if (msg) { msg.style.color='var(--red)'; msg.textContent=`Error: ${e.message}`; msg.style.display=''; }
+  }
+};

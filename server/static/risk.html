@@ -110,6 +110,21 @@
     }
     .btn-risksave:hover { background: rgba(59,130,246,.18); }
 
+    /* Page-level broker tab switcher */
+    .broker-tab {
+      display: inline-flex; align-items: center; gap: .35rem;
+      padding: .38rem .9rem; border-radius: 8px; font-family: inherit;
+      font-size: 12px; font-weight: 700; letter-spacing: .04em; cursor: pointer;
+      border: 1px solid var(--border); background: transparent; color: var(--muted);
+      transition: background .15s, color .15s, border-color .15s;
+    }
+    .broker-tab.broker-tab-active {
+      background: rgba(59,130,246,.12); color: #60A5FA;
+      border-color: rgba(59,130,246,.35);
+    }
+    .broker-tab:hover:not(.broker-tab-active) { background: rgba(255,255,255,.05); color: var(--text); }
+    [data-theme="light"] .broker-tab.broker-tab-active { background: rgba(59,130,246,.08); color: #2563EB; border-color: rgba(59,130,246,.3); }
+
     /* Reset link-button */
     .btn-reset-link {
       background: none; border: none; font-family: inherit;
@@ -211,6 +226,75 @@
       padding: .5rem .8rem; border-radius: 8px; font-size: 12px; font-weight: 500;
       background: rgba(245,158,11,.07); border: 1px solid rgba(245,158,11,.2); color: #FCD34D;
     }
+
+    /* ── Per-account emergency kill button card ── */
+    .aks-card {
+      display: flex; flex-direction: column; align-items: center; gap: .6rem;
+      padding: 1.1rem .9rem 1rem;
+      border-radius: 14px;
+      border: 1.5px solid var(--border);
+      background: var(--card2);
+      min-width: 148px; flex: 1; max-width: 220px;
+      transition: border-color .2s, background .2s;
+    }
+    .aks-card.aks-halted {
+      border-color: rgba(239,68,68,.45);
+      background: rgba(239,68,68,.06);
+    }
+    .aks-initials {
+      width: 38px; height: 38px; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; font-weight: 800; letter-spacing: .03em;
+      flex-shrink: 0;
+    }
+    .aks-label { font-size: 12px; font-weight: 600; text-align: center; line-height: 1.3; }
+    .aks-status {
+      font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+      padding: 2px 8px; border-radius: 5px;
+    }
+    .aks-status.running { background: rgba(16,185,129,.12); color: #10B981; }
+    .aks-status.halted  { background: rgba(239,68,68,.14); color: #EF4444; }
+    .aks-btn {
+      width: 100%; padding: .55rem .4rem;
+      border-radius: 10px; border: none; cursor: pointer;
+      font-family: inherit; font-size: 12px; font-weight: 700; letter-spacing: .03em;
+      display: flex; align-items: center; justify-content: center; gap: .35rem;
+      transition: background .15s, transform .1s, box-shadow .15s;
+    }
+    .aks-btn.aks-idle {
+      background: rgba(239,68,68,.13); color: #EF4444;
+      border: 1.5px solid rgba(239,68,68,.3);
+    }
+    .aks-btn.aks-idle:hover {
+      background: rgba(239,68,68,.22); border-color: rgba(239,68,68,.55);
+      box-shadow: 0 0 0 3px rgba(239,68,68,.12);
+    }
+    .aks-btn.aks-armed {
+      background: #EF4444; color: #fff; border: 1.5px solid #DC2626;
+      box-shadow: 0 0 0 3px rgba(239,68,68,.3);
+      animation: aks-pulse 1s ease-in-out infinite;
+    }
+    @keyframes aks-pulse {
+      0%,100% { box-shadow: 0 0 0 3px rgba(239,68,68,.3); }
+      50%      { box-shadow: 0 0 0 7px rgba(239,68,68,.1); }
+    }
+    .aks-btn.aks-resume {
+      background: rgba(16,185,129,.12); color: #10B981;
+      border: 1.5px solid rgba(16,185,129,.3);
+    }
+    .aks-btn.aks-resume:hover {
+      background: rgba(16,185,129,.22); border-color: rgba(16,185,129,.55);
+      box-shadow: 0 0 0 3px rgba(16,185,129,.12);
+    }
+    .aks-btn:active { transform: scale(.97); }
+    .aks-btn:disabled { opacity: .5; cursor: not-allowed; transform: none; animation: none; }
+    [data-theme="light"] .aks-card { background: #F8FAFC; border-color: #E2E8F0; }
+    [data-theme="light"] .aks-card.aks-halted { background: rgba(239,68,68,.04); border-color: rgba(239,68,68,.35); }
+    [data-theme="light"] .aks-btn.aks-idle { background: rgba(239,68,68,.07); border-color: rgba(239,68,68,.25); color: #DC2626; }
+    [data-theme="light"] .aks-btn.aks-idle:hover { background: rgba(239,68,68,.14); border-color: rgba(239,68,68,.45); }
+    [data-theme="light"] .aks-btn.aks-resume { background: rgba(16,185,129,.08); border-color: rgba(16,185,129,.25); color: #059669; }
+    [data-theme="light"] .aks-btn.aks-resume:hover { background: rgba(16,185,129,.16); border-color: rgba(16,185,129,.45); }
+    [data-theme="light"] .aks-status.running { background: rgba(16,185,129,.1); color: #059669; }
   </style>
 </head>
 <body data-page="risk">
@@ -330,6 +414,21 @@
   <!-- Main -->
   <main class="content flex flex-col gap-4">
 
+    <!-- ── Page-level broker tabs ── -->
+    <div style="display:flex;gap:.5rem;align-items:center;">
+      <button class="broker-tab broker-tab-active" data-broker="stock">
+        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        Stock
+      </button>
+      <button class="broker-tab" data-broker="crypto">
+        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.5 9h3.5a2 2 0 0 1 0 4H9.5V9z"/><path d="M9.5 13h4a2 2 0 0 1 0 4H9.5v-4z"/><line x1="12" y1="6" x2="12" y2="9"/><line x1="12" y1="17" x2="12" y2="20"/></svg>
+        Crypto
+      </button>
+    </div>
+
+    <!-- ══════════ STOCK PANEL ══════════ -->
+    <div id="panel-stock" class="flex flex-col gap-4">
+
     <!-- ── Today's Status ── -->
     <div class="card" id="risk-status-card">
       <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:.85rem;">Today&rsquo;s Status</div>
@@ -386,7 +485,7 @@
       </div>
     </div>
 
-    <!-- ── Risk Limits ── -->
+    <!-- ── Risk Limits (Stock) ── -->
     <div class="card">
       <div class="risk-section-hd">
         <div class="risk-section-title">Risk Limits</div>
@@ -402,10 +501,7 @@
             <div><div class="ri-label">Max Daily Loss</div><div class="ri-desc">Halt engine when day P&amp;L drops below this %</div></div>
           </div>
           <div class="ri-input-row">
-            <div class="ri-field">
-              <input id="inp-max-loss" type="number" step="0.1" min="0.1" max="100">
-              <span class="ri-suffix">%</span>
-            </div>
+            <div class="ri-field"><input id="inp-max-loss" type="number" step="0.1" min="0.1" max="100"><span class="ri-suffix">%</span></div>
             <button class="btn-risksave risk-save-btn" data-key="max_daily_loss_pct" data-source="inp-max-loss">Save</button>
           </div>
         </div>
@@ -418,10 +514,7 @@
             <div><div class="ri-label">Max Day Trades</div><div class="ri-desc">Max same-day round-trip trades (PDT protection)</div></div>
           </div>
           <div class="ri-input-row">
-            <div class="ri-field">
-              <input id="inp-max-dt" type="number" step="1" min="0" max="100">
-              <span class="ri-suffix">trades</span>
-            </div>
+            <div class="ri-field"><input id="inp-max-dt" type="number" step="1" min="0" max="100"><span class="ri-suffix">trades</span></div>
             <button class="btn-risksave risk-save-btn" data-key="max_day_trades" data-source="inp-max-dt">Save</button>
           </div>
         </div>
@@ -434,10 +527,7 @@
             <div><div class="ri-label">Max Position Size</div><div class="ri-desc">Max % of portfolio any single position can hold</div></div>
           </div>
           <div class="ri-input-row">
-            <div class="ri-field">
-              <input id="inp-max-pos" type="number" step="0.5" min="1" max="100">
-              <span class="ri-suffix">%</span>
-            </div>
+            <div class="ri-field"><input id="inp-max-pos" type="number" step="0.5" min="1" max="100"><span class="ri-suffix">%</span></div>
             <button class="btn-risksave risk-save-btn" data-key="max_position_pct" data-source="inp-max-pos">Save</button>
           </div>
         </div>
@@ -447,13 +537,10 @@
             <div class="ri-icon ri-icon-green">
               <svg width="14" height="14" fill="none" stroke="#10B981" stroke-width="2" viewBox="0 0 24 24"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></svg>
             </div>
-            <div><div class="ri-label">Take-Profit Target</div><div class="ri-desc">Auto-sell a position when unrealized gain reaches this %. 0 = disabled.</div></div>
+            <div><div class="ri-label">Take-Profit Target</div><div class="ri-desc">Auto-sell when unrealized gain reaches this %. 0 = disabled.</div></div>
           </div>
           <div class="ri-input-row">
-            <div class="ri-field">
-              <input id="inp-take-profit" type="number" step="0.5" min="0" max="1000" placeholder="0" data-key="take_profit_pct">
-              <span class="ri-suffix">%</span>
-            </div>
+            <div class="ri-field"><input id="inp-take-profit" type="number" step="0.5" min="0" max="1000" placeholder="0"><span class="ri-suffix">%</span></div>
             <button class="btn-risksave risk-save-btn" data-key="take_profit_pct" data-source="inp-take-profit">Save</button>
           </div>
         </div>
@@ -461,7 +548,7 @@
       </div>
     </div>
 
-    <!-- ── Position Sizing ── -->
+    <!-- ── Position Sizing (Stock) ── -->
     <div class="card">
       <div class="risk-section-hd">
         <div class="risk-section-title">Position Sizing</div>
@@ -470,30 +557,21 @@
       <div class="sizing-opts2">
         <div class="sizing-opt2" id="sizing-fixed" data-mode="fixed">
           <div class="sizing-opt2-dot" style="background:#3B82F6;box-shadow:0 0 6px rgba(59,130,246,.5);"></div>
-          <div>
-            <div class="sizing-opt2-name">Fixed Notional</div>
-            <div class="sizing-opt2-desc">Use strategy&rsquo;s configured dollar amount</div>
-          </div>
+          <div><div class="sizing-opt2-name">Fixed Notional</div><div class="sizing-opt2-desc">Use strategy&rsquo;s configured dollar amount</div></div>
         </div>
         <div class="sizing-opt2" id="sizing-pct" data-mode="pct">
           <div class="sizing-opt2-dot" style="background:#475569;"></div>
-          <div>
-            <div class="sizing-opt2-name">Portfolio %</div>
-            <div class="sizing-opt2-desc">Size each order as a % of account equity</div>
-          </div>
+          <div><div class="sizing-opt2-name">Portfolio %</div><div class="sizing-opt2-desc">Size each order as a % of account equity</div></div>
         </div>
       </div>
       <div id="pct-sizing-row" class="ri-input-row hidden">
         <span style="font-size:12px;color:var(--muted);white-space:nowrap;">Order size:</span>
-        <div class="ri-field" style="max-width:200px;">
-          <input id="inp-size-pct" type="number" step="0.1" min="0.1" max="100">
-          <span class="ri-suffix">% of equity</span>
-        </div>
+        <div class="ri-field" style="max-width:200px;"><input id="inp-size-pct" type="number" step="0.1" min="0.1" max="100"><span class="ri-suffix">% of equity</span></div>
         <button class="btn-risksave risk-save-btn" data-key="position_size_pct" data-source="inp-size-pct">Save</button>
       </div>
     </div>
 
-    <!-- ── Circuit Breakers ── -->
+    <!-- ── Circuit Breakers (Stock) ── -->
     <div class="card">
       <div class="risk-section-hd">
         <div class="risk-section-title">Circuit Breakers</div>
@@ -509,10 +587,7 @@
             <div><div class="ri-label">Consecutive Failures</div><div class="ri-desc">Block after N order errors. Resets on success.</div></div>
           </div>
           <div class="ri-input-row">
-            <div class="ri-field">
-              <input id="inp-consec" type="number" step="1" min="0" max="50" placeholder="0">
-              <span class="ri-suffix">errors</span>
-            </div>
+            <div class="ri-field"><input id="inp-consec" type="number" step="1" min="0" max="50" placeholder="0"><span class="ri-suffix">errors</span></div>
             <button class="btn-risksave risk-save-btn" data-key="consecutive_loss_limit" data-source="inp-consec">Save</button>
           </div>
           <div style="display:flex;align-items:center;justify-content:space-between;">
@@ -529,10 +604,7 @@
             <div><div class="ri-label">Weekly Loss Limit</div><div class="ri-desc">Kill switch if week P&amp;L drops below %. Resets Mondays.</div></div>
           </div>
           <div class="ri-input-row">
-            <div class="ri-field">
-              <input id="inp-weekly-loss" type="number" step="0.1" min="0" max="100" placeholder="0">
-              <span class="ri-suffix">%</span>
-            </div>
+            <div class="ri-field"><input id="inp-weekly-loss" type="number" step="0.1" min="0" max="100" placeholder="0"><span class="ri-suffix">%</span></div>
             <button class="btn-risksave risk-save-btn" data-key="weekly_loss_limit_pct" data-source="inp-weekly-loss">Save</button>
           </div>
           <div id="weekly-current" class="ri-sub"></div>
@@ -546,10 +618,7 @@
             <div><div class="ri-label">Max Orders / Day</div><div class="ri-desc">Total filled orders cap across strategies. 0 = unlimited.</div></div>
           </div>
           <div class="ri-input-row">
-            <div class="ri-field">
-              <input id="inp-max-orders" type="number" step="1" min="0" max="500" placeholder="0">
-              <span class="ri-suffix">orders</span>
-            </div>
+            <div class="ri-field"><input id="inp-max-orders" type="number" step="1" min="0" max="500" placeholder="0"><span class="ri-suffix">orders</span></div>
             <button class="btn-risksave risk-save-btn" data-key="max_orders_per_day" data-source="inp-max-orders">Save</button>
           </div>
           <div id="orders-current" class="ri-sub"></div>
@@ -558,7 +627,7 @@
       </div>
     </div>
 
-    <!-- ── Exposure Controls ── -->
+    <!-- ── Exposure Controls (Stock) ── -->
     <div class="card">
       <div class="risk-section-hd">
         <div class="risk-section-title">Exposure Controls</div>
@@ -574,10 +643,7 @@
             <div><div class="ri-label">Max Open Positions</div><div class="ri-desc">Block new buys when this many positions are open. 0 = unlimited.</div></div>
           </div>
           <div class="ri-input-row">
-            <div class="ri-field">
-              <input id="inp-max-open" type="number" step="1" min="0" max="200">
-              <span class="ri-suffix">positions</span>
-            </div>
+            <div class="ri-field"><input id="inp-max-open" type="number" step="1" min="0" max="200"><span class="ri-suffix">positions</span></div>
             <button class="btn-risksave risk-save-btn" data-key="max_open_positions" data-source="inp-max-open">Save</button>
           </div>
         </div>
@@ -590,10 +656,7 @@
             <div><div class="ri-label">Max Symbol Exposure</div><div class="ri-desc">Block buys if position already represents this % of portfolio. 0 = unlimited.</div></div>
           </div>
           <div class="ri-input-row">
-            <div class="ri-field">
-              <input id="inp-sym-exp" type="number" step="0.5" min="0" max="100" placeholder="0">
-              <span class="ri-suffix">%</span>
-            </div>
+            <div class="ri-field"><input id="inp-sym-exp" type="number" step="0.5" min="0" max="100" placeholder="0"><span class="ri-suffix">%</span></div>
             <button class="btn-risksave risk-save-btn" data-key="max_symbol_exposure_pct" data-source="inp-sym-exp">Save</button>
           </div>
         </div>
@@ -605,18 +668,12 @@
     <div class="card">
       <div class="risk-section-hd">
         <div class="risk-section-title">Bot Trading Hours</div>
-        <div class="risk-section-desc">Automated strategies only fire within this window (Eastern Time). Manual orders are never restricted. Leave blank to allow all market hours. <b style="color:#F59E0B;">Binance (crypto) accounts are exempt — they trade 24/7 regardless of this setting.</b></div>
+        <div class="risk-section-desc">Automated strategies only fire within this window (Eastern Time). Manual orders are never restricted. Leave blank to allow all market hours.</div>
       </div>
       <div class="hours-row2">
-        <div class="hours-field2">
-          <span class="hours-lbl2">From</span>
-          <input id="inp-hours-start" type="time" class="time-input2" value="09:35">
-        </div>
+        <div class="hours-field2"><span class="hours-lbl2">From</span><input id="inp-hours-start" type="time" class="time-input2" value="09:35"></div>
         <span style="color:var(--muted);font-size:13px;font-weight:600;">&ndash;</span>
-        <div class="hours-field2">
-          <span class="hours-lbl2">To</span>
-          <input id="inp-hours-end" type="time" class="time-input2" value="15:45">
-        </div>
+        <div class="hours-field2"><span class="hours-lbl2">To</span><input id="inp-hours-end" type="time" class="time-input2" value="15:45"></div>
         <div class="hours-actions2">
           <button id="btn-save-hours" class="btn-risksave">Save</button>
           <button id="btn-clear-hours" class="btn btn-ghost" style="font-size:11px;padding:.35rem .75rem;">Clear</button>
@@ -634,8 +691,7 @@
       <div class="ntl-add-row2">
         <input id="inp-blacklist-add" type="text" class="ntl-input2" placeholder="AAPL" maxlength="10">
         <button id="btn-blacklist-add" class="btn-risksave" style="display:flex;align-items:center;gap:.35rem;">
-          <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          Add
+          <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Add
         </button>
       </div>
       <div id="blacklist-chips" class="ntl-chips2">
@@ -643,15 +699,249 @@
       </div>
     </div>
 
-    <!-- ── Per-Account Kill Switches ── -->
+    </div><!-- end #panel-stock -->
+
+    <!-- ══════════ CRYPTO PANEL ══════════ -->
+    <div id="panel-crypto" style="display:none;" class="flex flex-col gap-4">
+
+    <!-- ── Risk Limits (Crypto) ── -->
+    <div class="card">
+      <div class="risk-section-hd">
+        <div class="risk-section-title">Risk Limits</div>
+        <div class="risk-section-desc">Hard caps for crypto (Binance) accounts &mdash; completely independent from stock settings.</div>
+      </div>
+      <div class="rg3">
+
+        <div class="ri">
+          <div class="ri-top">
+            <div class="ri-icon ri-icon-orange">
+              <svg width="14" height="14" fill="none" stroke="#F59E0B" stroke-width="2" viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+            </div>
+            <div><div class="ri-label">Max Daily Loss</div><div class="ri-desc">Halt engine when crypto day P&amp;L drops below this %</div></div>
+          </div>
+          <div class="ri-input-row">
+            <div class="ri-field"><input id="inp-max-loss-crypto" type="number" step="0.1" min="0.1" max="100"><span class="ri-suffix">%</span></div>
+            <button class="btn-risksave risk-save-btn" data-key="max_daily_loss_pct_crypto" data-source="inp-max-loss-crypto">Save</button>
+          </div>
+        </div>
+
+        <div class="ri">
+          <div class="ri-top">
+            <div class="ri-icon ri-icon-cyan">
+              <svg width="14" height="14" fill="none" stroke="#06B6D4" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+            </div>
+            <div><div class="ri-label">Max Position Size</div><div class="ri-desc">Max % of portfolio any single crypto position can hold</div></div>
+          </div>
+          <div class="ri-input-row">
+            <div class="ri-field"><input id="inp-max-pos-crypto" type="number" step="0.5" min="1" max="100"><span class="ri-suffix">%</span></div>
+            <button class="btn-risksave risk-save-btn" data-key="max_position_pct_crypto" data-source="inp-max-pos-crypto">Save</button>
+          </div>
+        </div>
+
+        <div class="ri">
+          <div class="ri-top">
+            <div class="ri-icon ri-icon-green">
+              <svg width="14" height="14" fill="none" stroke="#10B981" stroke-width="2" viewBox="0 0 24 24"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></svg>
+            </div>
+            <div><div class="ri-label">Take-Profit Target</div><div class="ri-desc">Auto-sell a crypto position when unrealized gain reaches this %. 0 = disabled.</div></div>
+          </div>
+          <div class="ri-input-row">
+            <div class="ri-field"><input id="inp-take-profit-crypto" type="number" step="0.5" min="0" max="1000" placeholder="0"><span class="ri-suffix">%</span></div>
+            <button class="btn-risksave risk-save-btn" data-key="take_profit_pct_crypto" data-source="inp-take-profit-crypto">Save</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ── Position Sizing (Crypto) ── -->
+    <div class="card">
+      <div class="risk-section-hd">
+        <div class="risk-section-title">Position Sizing</div>
+        <div class="risk-section-desc">How the engine calculates crypto order size when a strategy signals without an explicit notional.</div>
+      </div>
+      <div class="sizing-opts2">
+        <div class="sizing-opt2" id="sizing-fixed-crypto" data-mode="fixed">
+          <div class="sizing-opt2-dot" style="background:#3B82F6;box-shadow:0 0 6px rgba(59,130,246,.5);"></div>
+          <div><div class="sizing-opt2-name">Fixed Notional</div><div class="sizing-opt2-desc">Use strategy&rsquo;s configured dollar amount</div></div>
+        </div>
+        <div class="sizing-opt2" id="sizing-pct-crypto" data-mode="pct_portfolio">
+          <div class="sizing-opt2-dot" style="background:#475569;"></div>
+          <div><div class="sizing-opt2-name">Portfolio %</div><div class="sizing-opt2-desc">Size each crypto order as a % of account equity</div></div>
+        </div>
+      </div>
+      <div id="pct-sizing-row-crypto" class="ri-input-row hidden">
+        <span style="font-size:12px;color:var(--muted);white-space:nowrap;">Order size:</span>
+        <div class="ri-field" style="max-width:200px;"><input id="inp-size-pct-crypto" type="number" step="0.1" min="0.1" max="100"><span class="ri-suffix">% of equity</span></div>
+        <button class="btn-risksave risk-save-btn" data-key="position_size_pct_crypto" data-source="inp-size-pct-crypto">Save</button>
+      </div>
+    </div>
+
+    <!-- ── Circuit Breakers (Crypto) ── -->
+    <div class="card">
+      <div class="risk-section-hd">
+        <div class="risk-section-title">Circuit Breakers</div>
+        <div class="risk-section-desc">Auto-pause crypto trading on repetitive losses or excessive order volume.</div>
+      </div>
+      <div class="rg3">
+
+        <div class="ri">
+          <div class="ri-top">
+            <div class="ri-icon ri-icon-red">
+              <svg width="14" height="14" fill="none" stroke="#EF4444" stroke-width="2" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            </div>
+            <div><div class="ri-label">Consecutive Failures</div><div class="ri-desc">Block crypto after N order errors. Resets on success.</div></div>
+          </div>
+          <div class="ri-input-row">
+            <div class="ri-field"><input id="inp-consec-crypto" type="number" step="1" min="0" max="50" placeholder="0"><span class="ri-suffix">errors</span></div>
+            <button class="btn-risksave risk-save-btn" data-key="consecutive_loss_limit_crypto" data-source="inp-consec-crypto">Save</button>
+          </div>
+        </div>
+
+        <div class="ri">
+          <div class="ri-top">
+            <div class="ri-icon ri-icon-orange">
+              <svg width="14" height="14" fill="none" stroke="#F59E0B" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            </div>
+            <div><div class="ri-label">Weekly Loss Limit</div><div class="ri-desc">Kill switch if 7-day crypto P&amp;L drops below %. 0 = disabled.</div></div>
+          </div>
+          <div class="ri-input-row">
+            <div class="ri-field"><input id="inp-weekly-loss-crypto" type="number" step="0.1" min="0" max="100" placeholder="0"><span class="ri-suffix">%</span></div>
+            <button class="btn-risksave risk-save-btn" data-key="weekly_loss_limit_pct_crypto" data-source="inp-weekly-loss-crypto">Save</button>
+          </div>
+        </div>
+
+        <div class="ri">
+          <div class="ri-top">
+            <div class="ri-icon ri-icon-indigo">
+              <svg width="14" height="14" fill="none" stroke="#6366F1" stroke-width="2" viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+            </div>
+            <div><div class="ri-label">Max Orders / Day</div><div class="ri-desc">Total filled crypto orders cap per day. 0 = unlimited.</div></div>
+          </div>
+          <div class="ri-input-row">
+            <div class="ri-field"><input id="inp-max-orders-crypto" type="number" step="1" min="0" max="500" placeholder="0"><span class="ri-suffix">orders</span></div>
+            <button class="btn-risksave risk-save-btn" data-key="max_orders_per_day_crypto" data-source="inp-max-orders-crypto">Save</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ── Exposure Controls (Crypto) ── -->
+    <div class="card">
+      <div class="risk-section-hd">
+        <div class="risk-section-title">Exposure Controls</div>
+        <div class="risk-section-desc">Prevent over-concentration across crypto positions.</div>
+      </div>
+      <div class="rg2">
+
+        <div class="ri">
+          <div class="ri-top">
+            <div class="ri-icon ri-icon-cyan">
+              <svg width="14" height="14" fill="none" stroke="#06B6D4" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>
+            </div>
+            <div><div class="ri-label">Max Open Positions</div><div class="ri-desc">Block new crypto buys when this many are open. 0 = unlimited.</div></div>
+          </div>
+          <div class="ri-input-row">
+            <div class="ri-field"><input id="inp-max-open-crypto" type="number" step="1" min="0" max="200" placeholder="0"><span class="ri-suffix">positions</span></div>
+            <button class="btn-risksave risk-save-btn" data-key="max_open_positions_crypto" data-source="inp-max-open-crypto">Save</button>
+          </div>
+        </div>
+
+        <div class="ri">
+          <div class="ri-top">
+            <div class="ri-icon ri-icon-purple">
+              <svg width="14" height="14" fill="none" stroke="#8B5CF6" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            </div>
+            <div><div class="ri-label">Max Symbol Exposure</div><div class="ri-desc">Block crypto buys if position already represents this % of portfolio. 0 = unlimited.</div></div>
+          </div>
+          <div class="ri-input-row">
+            <div class="ri-field"><input id="inp-sym-exp-crypto" type="number" step="0.5" min="0" max="100" placeholder="0"><span class="ri-suffix">%</span></div>
+            <button class="btn-risksave risk-save-btn" data-key="max_symbol_exposure_pct_crypto" data-source="inp-sym-exp-crypto">Save</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    </div><!-- end #panel-crypto -->
+
+    <!-- ── Per-Account Kill Switches (always visible) ── -->
     <div class="card">
       <div class="risk-section-hd">
         <div class="risk-section-title">Per-Account Kill Switches</div>
-        <div class="risk-section-desc">Stop automated trading for a specific broker account without affecting others.</div>
+        <div class="risk-section-desc">Emergency stop for a specific broker account. Tap once to arm, tap again to confirm.</div>
       </div>
-      <div id="acct-ks-list">
+      <div id="acct-ks-list" style="display:flex;flex-wrap:wrap;gap:1rem;padding-top:.25rem;">
         <div class="state-empty">Loading accounts&hellip;</div>
       </div>
+    </div>
+
+    <!-- ── News Sentiment Settings ── -->
+    <div class="card">
+      <div class="risk-section-hd">
+        <div class="risk-section-title">News Sentiment</div>
+        <div class="risk-section-desc">
+          Claude scores recent headlines per ticker. Negative sentiment blocks buys; positive sentiment boosts position size.
+          Requires a Claude API key configured in <a href="/static/ai-tuning.html" style="color:var(--blue);">AI Tuning</a>.
+        </div>
+      </div>
+
+      <!-- Enable toggle -->
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:.75rem 0;border-bottom:1px solid var(--border);margin-bottom:1rem;">
+        <div>
+          <div style="font-size:13px;font-weight:600;">Enable Sentiment Filtering</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px;">Off by default &mdash; enable once Claude API key is set.</div>
+        </div>
+        <label style="cursor:pointer;display:flex;align-items:center;gap:.5rem;">
+          <input type="checkbox" id="inp-sentiment-enabled" onchange="saveSentimentEnabled(this.checked)" style="display:none;">
+          <div id="sentiment-toggle-track" style="width:40px;height:22px;border-radius:11px;background:var(--border);position:relative;transition:background .2s;cursor:pointer;" onclick="document.getElementById('inp-sentiment-enabled').click()">
+            <div id="sentiment-toggle-thumb" style="width:18px;height:18px;border-radius:50%;background:#fff;position:absolute;top:2px;left:2px;transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.3);"></div>
+          </div>
+          <span id="sentiment-toggle-label" style="font-size:12px;font-weight:600;color:var(--muted);">OFF</span>
+        </label>
+      </div>
+
+      <!-- Threshold inputs -->
+      <div class="rg3" style="grid-template-columns:repeat(3,1fr);">
+        <div class="ri">
+          <div class="ri-top">
+            <div class="ri-icon" style="background:rgba(239,68,68,.1);">
+              <svg width="14" height="14" fill="none" stroke="#EF4444" stroke-width="2" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>
+            </div>
+            <div><div class="ri-label">Block Threshold</div><div class="ri-desc">Block buy when score is below this (range &minus;1 to 0)</div></div>
+          </div>
+          <div class="ri-input-row">
+            <div class="ri-field"><input id="inp-sentiment-block" type="number" step="0.05" min="-1" max="0" value="-0.3"></div>
+            <button class="btn-risksave risk-save-btn" onclick="saveSentimentThresholds()">Save</button>
+          </div>
+        </div>
+
+        <div class="ri">
+          <div class="ri-top">
+            <div class="ri-icon" style="background:rgba(16,185,129,.1);">
+              <svg width="14" height="14" fill="none" stroke="#10B981" stroke-width="2" viewBox="0 0 24 24"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
+            </div>
+            <div><div class="ri-label">Boost Threshold</div><div class="ri-desc">Boost size when score is above this (range 0 to 1)</div></div>
+          </div>
+          <div class="ri-input-row">
+            <div class="ri-field"><input id="inp-sentiment-boost" type="number" step="0.05" min="0" max="1" value="0.3"></div>
+          </div>
+        </div>
+
+        <div class="ri">
+          <div class="ri-top">
+            <div class="ri-icon" style="background:rgba(59,130,246,.1);">
+              <svg width="14" height="14" fill="none" stroke="#3B82F6" stroke-width="2" viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/></svg>
+            </div>
+            <div><div class="ri-label">Boost Multiplier</div><div class="ri-desc">Multiply notional by this on positive sentiment</div></div>
+          </div>
+          <div class="ri-input-row">
+            <div class="ri-field"><input id="inp-sentiment-mult" type="number" step="0.05" min="1" max="2" value="1.25"><span class="ri-suffix">&times;</span></div>
+          </div>
+        </div>
+      </div>
+      <div id="sentiment-settings-msg" style="font-size:12px;margin-top:.6rem;display:none;"></div>
     </div>
 
     <!-- Toast -->
