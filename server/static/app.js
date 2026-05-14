@@ -1265,7 +1265,7 @@ async function initDashboard() {
 
       tbody.innerHTML = data.map(row => {
         const score    = typeof row.score === 'number' ? row.score : 0;
-        const pct      = Math.round(((score + 1) / 2) * 100);
+        const pct      = Math.min(100, Math.max(0, Math.round(((score + 1) / 2) * 100)));
         const color    = score > 0.3  ? '#10B981'
                        : score < -0.3 ? '#EF4444'
                        : '#F59E0B';
@@ -1294,7 +1294,8 @@ async function initDashboard() {
           <td style="font-size:12px;color:var(--muted);max-width:300px;">${escHtml(row.reason || '—')}</td>
         </tr>`;
       }).join('');
-    } catch (_) {
+    } catch (e) {
+      if (e.name === 'AbortError') return;
       if (tbody) tbody.innerHTML = '<tr><td colspan="4" class="state-empty">Could not load sentiment data.</td></tr>';
     }
   }
