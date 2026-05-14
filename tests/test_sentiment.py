@@ -119,3 +119,24 @@ def test_get_all_cached_excludes_cached_at():
     assert any(r["symbol"] == "TESTXYZ" for r in results)
     assert all("cached_at" not in r for r in results)
     sentiment._cache.pop("TESTXYZ", None)
+
+
+def test_log_signal_accepts_sentiment_score():
+    """log_signal stores sentiment_score without error."""
+    import tempfile, os
+    from unittest.mock import patch
+    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
+        tmp = f.name
+    try:
+        with patch("server.db.DB_PATH", tmp):
+            from server import db as _db
+            _db.init_db()
+            sig_id = _db.log_signal(
+                "test_strat", "AAPL", "buy", 10.0, "test reason",
+                sentiment_score=0.72
+            )
+            with _db.get_conn() as conn:
+                row = conn.execute("SELECT sentiment_score FROM signals WHERE id=?", (sig_id,)).fetchone()
+            assert row[0] == pytest.approx(0.72)
+    finally:
+        os.unlink(tmp)

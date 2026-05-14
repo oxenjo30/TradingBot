@@ -299,7 +299,7 @@ def init_db():
                 "ALTER TABLE backtest_runs ADD COLUMN is_benchmark INTEGER NOT NULL DEFAULT 0"
             )
 
-    # Migration: add ai_explanation to signals if missing
+    # Migration: add ai_explanation / filled_qty / sentiment_score to signals if missing
     with get_conn() as c:
         cols = [r[1] for r in c.execute("PRAGMA table_info(signals)")]
         if "ai_explanation" not in cols:
@@ -308,6 +308,12 @@ def init_db():
             c.execute("ALTER TABLE signals ADD COLUMN ai_provider TEXT DEFAULT NULL")
         if "ai_model" not in cols:
             c.execute("ALTER TABLE signals ADD COLUMN ai_model TEXT DEFAULT NULL")
+        if "filled_qty" not in cols:
+            c.execute("ALTER TABLE signals ADD COLUMN filled_qty REAL DEFAULT NULL")
+        if "filled_price" not in cols:
+            c.execute("ALTER TABLE signals ADD COLUMN filled_price REAL DEFAULT NULL")
+        if "sentiment_score" not in cols:
+            c.execute("ALTER TABLE signals ADD COLUMN sentiment_score REAL DEFAULT NULL")
     # Migration: create ai_tuning_log table if missing
     with get_conn() as c:
         tables = [r[0] for r in c.execute("SELECT name FROM sqlite_master WHERE type='table'")]
@@ -541,14 +547,15 @@ def get_strategy(name: str) -> dict | None:
 def log_signal(strategy: str, symbol: str, side: str, qty: float, reason: str,
                order_id: str | None = None, status: str = "ok",
                blocked: bool = False, account_id: int | None = None,
-               filled_qty: float | None = None, filled_price: float | None = None) -> int:
+               filled_qty: float | None = None, filled_price: float | None = None,
+               sentiment_score: float | None = None) -> int:
     with get_conn() as c:
         cur = c.execute(
             """INSERT INTO signals(ts, strategy, symbol, side, qty, reason, order_id, status,
-                                   blocked, account_id, filled_qty, filled_price)
-               VALUES(?,?,?,?,?,?,?,?,?,?,?,?)""",
+                                   blocked, account_id, filled_qty, filled_price, sentiment_score)
+               VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (now_iso(), strategy, symbol, side, qty, reason, order_id, status,
-             int(blocked), account_id, filled_qty, filled_price),
+             int(blocked), account_id, filled_qty, filled_price, sentiment_score),
         )
         return cur.lastrowid
 
