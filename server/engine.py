@@ -378,7 +378,7 @@ def run_tick():
                     error_qty = final_qty if final_qty is not None else (sig.notional or 0)
                     db.log_signal(s["name"], sig.symbol, sig.side, error_qty,
                                   f"{sig.reason} | submit error: {e}", None, "error",
-                                  account_id=acct_id)
+                                  account_id=acct_id, sentiment_score=sent_score)
 
         # If no account ran, record why so the UI shows the right badge.
         if not _strategy_ran:
