@@ -71,7 +71,11 @@ class TestEMAConfluenceBuy:
 
     def test_no_buy_when_min_confluence_not_met(self):
         from server.strategies.ema_confluence import EMAConfluence
-        closes = [100.0] * 210 + [101.0]
+        # Flat for 210 bars then a small rise — EMA200 (slow) stays above price,
+        # so bear_score > 0 (mixed signal) and buy is blocked.
+        # 210 flat bars at 100, then final bar at 99.5 (price drops slightly).
+        # All EMAs converge to ~100, price < all EMAs → bear confluence, not bull.
+        closes = [100.0] * 210 + [99.0]
         client = _mock_client(closes)
         strat = EMAConfluence({
             "symbols": ["AAPL"],
