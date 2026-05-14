@@ -39,50 +39,59 @@ class PatternHit:
 
 `detect_all(bars, enabled_categories)` calls all enabled detectors and returns `list[PatternHit]`. Each detector is a standalone function that takes `bars: list[dict]` and returns `PatternHit | None`.
 
+`enabled_categories` is `list[str]` — e.g. `["candlestick", "reversal"]`. The strategy builds it from the three bool params:
+```python
+enabled_categories = [c for c, on in [
+    ("candlestick", self.params.get("enable_candlestick", True)),
+    ("reversal",    self.params.get("enable_reversal", True)),
+    ("continuation",self.params.get("enable_continuation", True)),
+] if on]
+```
+
 ---
 
 ## Pattern Catalogue (21 patterns)
 
-### Candlestick (confidence 0.7, last 1–3 bars)
+### Candlestick (last 1–3 bars)
 
-| Pattern | Direction | Detection Rule |
-|---------|-----------|----------------|
-| Bullish Engulfing | bull | bar[-1] bullish body fully wraps bar[-2] bearish body |
-| Bearish Engulfing | bear | bar[-1] bearish body fully wraps bar[-2] bullish body |
-| Hammer | bull | lower wick >= 2x body, upper wick <= 0.3x body, in downtrend (price < 10-bar SMA) |
-| Shooting Star | bear | upper wick >= 2x body, lower wick <= 0.3x body, in uptrend (price > 10-bar SMA) |
-| Morning Star | bull | 3-bar: large bearish -> small body (gap or inside) -> large bullish closing above bar[-3] midpoint |
-| Evening Star | bear | 3-bar: large bullish -> small body -> large bearish closing below bar[-3] midpoint |
-| Doji | bull/bear | abs(close - open) <= 0.05 * (high - low); direction from trend (bull if price < 10-bar SMA, bear if above) |
+| Pattern | Direction | Confidence | Detection Rule |
+|---------|-----------|------------|----------------|
+| Bullish Engulfing | bull | 0.7 | bar[-1] bullish body fully wraps bar[-2] bearish body |
+| Bearish Engulfing | bear | 0.7 | bar[-1] bearish body fully wraps bar[-2] bullish body |
+| Hammer | bull | 0.7 | lower wick >= 2x body, upper wick <= 0.3x body, in downtrend (price < 10-bar SMA) |
+| Shooting Star | bear | 0.7 | upper wick >= 2x body, lower wick <= 0.3x body, in uptrend (price > 10-bar SMA) |
+| Morning Star | bull | 0.7 | 3-bar: large bearish -> small body (gap or inside) -> large bullish closing above bar[-3] midpoint |
+| Evening Star | bear | 0.7 | 3-bar: large bullish -> small body -> large bearish closing below bar[-3] midpoint |
+| Doji | bull/bear | 0.4 | abs(close - open) <= 0.05 * (high - low); direction from trend (bull if price < 10-bar SMA, bear if above) |
 
-### Reversal (confidence 1.0, last 20–60 bars)
+### Reversal (last 20–60 bars)
 
-| Pattern | Direction | Detection Rule |
-|---------|-----------|----------------|
-| Double Bottom | bull | two troughs within 2% of each other, 5+ bars apart, price breaks above neckline (peak between troughs) |
-| Double Top | bear | two peaks within 2% of each other, 5+ bars apart, price breaks below neckline |
-| Triple Bottom | bull | three troughs within 2% of each other, each 5+ bars apart |
-| Triple Top | bear | three peaks within 2% of each other, each 5+ bars apart |
-| Head & Shoulders | bear | left shoulder < head > right shoulder (shoulders within 3% of each other), neckline break below |
-| Inverse Head & Shoulders | bull | left shoulder > head < right shoulder (shoulders within 3%), neckline break above |
-| V-Bottom | bull | decline >= 8% over 5 bars followed by recovery >= 8% over next 5 bars |
+| Pattern | Direction | Confidence | Detection Rule |
+|---------|-----------|------------|----------------|
+| Double Bottom | bull | 1.0 | two troughs within 2% of each other, 5+ bars apart, price breaks above neckline (peak between troughs) |
+| Double Top | bear | 1.0 | two peaks within 2% of each other, 5+ bars apart, price breaks below neckline |
+| Triple Bottom | bull | 1.0 | three troughs within 2% of each other, each 5+ bars apart; confirmed by price breaking above the highest peak between the troughs (neckline) |
+| Triple Top | bear | 1.0 | three peaks within 2% of each other, each 5+ bars apart; confirmed by price breaking below the lowest trough between the peaks (neckline) |
+| Head & Shoulders | bear | 1.0 | left shoulder < head > right shoulder (shoulders within 3% of each other), neckline break below |
+| Inverse Head & Shoulders | bull | 1.0 | left shoulder > head < right shoulder (shoulders within 3%), neckline break above |
+| V-Bottom | bull | 0.4 | decline >= 8% over 5 bars followed by recovery >= 8% over next 5 bars |
 
-### Continuation (confidence 0.7, last 15–40 bars)
+### Continuation (last 15–40 bars)
 
-| Pattern | Direction | Detection Rule |
-|---------|-----------|----------------|
-| Bull Flag | bull | upleg >= 5% in <= 10 bars, then shallow downward channel <= 40% retracement over 5–15 bars |
-| Bear Flag | bear | downleg >= 5% in <= 10 bars, then shallow upward channel <= 40% retracement over 5–15 bars |
-| Ascending Triangle | bull | flat resistance (highs within 1.5%) + rising lows, at least 2 touches each side |
-| Descending Triangle | bear | flat support (lows within 1.5%) + falling highs, at least 2 touches each side |
-| Symmetrical Triangle | bull/bear | converging highs and lows, at least 2 touches each side; direction from trend |
-| Pennant | bull/bear | strong move >= 5% then tight symmetrical triangle within 5 bars; direction from preceding move |
-| Rising Wedge | bear | rising highs + rising lows, highs rising faster (slope of highs > slope of lows) |
-| Falling Wedge | bull | falling highs + falling lows, lows falling faster (slope of lows < slope of highs) |
+| Pattern | Direction | Confidence | Detection Rule |
+|---------|-----------|------------|----------------|
+| Bull Flag | bull | 0.7 | upleg >= 5% in <= 10 bars, then shallow downward channel <= 40% retracement over 5–15 bars |
+| Bear Flag | bear | 0.7 | downleg >= 5% in <= 10 bars, then shallow upward channel <= 40% retracement over 5–15 bars |
+| Ascending Triangle | bull | 0.7 | flat resistance (highs within 1.5%) + rising lows, at least 2 touches each side |
+| Descending Triangle | bear | 0.7 | flat support (lows within 1.5%) + falling highs, at least 2 touches each side |
+| Symmetrical Triangle | bull/bear | 0.7 | converging highs and lows, at least 2 touches each side; direction from trend |
+| Pennant | bull/bear | 0.4 | strong move >= 5% then tight symmetrical triangle within 5 bars; direction from preceding move |
+| Rising Wedge | bear | 0.7 | last 10–20 bars: rising highs + rising lows (at least 3 touches each), slope of highs > slope of lows; both trendlines rising |
+| Falling Wedge | bull | 0.7 | last 10–20 bars: falling highs + falling lows (at least 3 touches each), slope of lows < slope of highs (lows falling faster); both trendlines falling |
 
 **Confidence levels:**
 - `1.0` — high-reliability patterns (H&S, double/triple tops/bottoms) — full notional
-- `0.7` — moderate patterns (flags, triangles, most candlesticks) — 70% notional
+- `0.7` — moderate patterns (flags, triangles, most candlesticks except doji) — 70% notional
 - `0.4` — lower-confidence patterns (doji, pennant, V-bottom) — 40% notional
 
 ---
@@ -107,8 +116,10 @@ Compute EMA200 from available bars (same `_ema()` formula as EMAConfluence):
 
 ### Sell/Exit Signal (when holding)
 
+The trend filter (`price > EMA200`) guards **new entries only**. Exits apply regardless of EMA200.
+
 Fire when any of:
-- Any bear-direction hit passes trend filter (`price < EMA200`)
+- Any bear-direction hit detected (no EMA200 check — if holding a long, a bear pattern is always a valid exit signal)
 - `price < ema_exit_value` (EMA48 or EMA200 depending on `ema_exit` param)
 
 Reason (pattern): `"Chart exit: {name} -- {direction} pattern detected"`
@@ -131,6 +142,8 @@ Reason (EMA): `"Chart exit: price {price:.2f} < EMA{ema_exit} {val:.2f} -- trend
 | `notional` | number | `500` | `10` | `100000` | Max USD per trade at confidence 1.0. |
 | `ema_exit` | select | `"48"` | — | — | EMA period for exit fallback. Options: 48, 200. |
 | `max_positions` | number | `5` | `1` | `50` | Max simultaneous open positions. |
+
+**Parameter casts:** `min_confidence` is stored as a string by the param editor (`"0.7"`) — cast with `float(self.params.get("min_confidence", 0.7))`. `ema_exit` is stored as `"48"` or `"200"` — cast with `int(self.params.get("ema_exit", "48"))`. `_ema()` should be defined locally in `chart_patterns.py` (copy from `ema_confluence.py`) — do not import it cross-module.
 
 ---
 
