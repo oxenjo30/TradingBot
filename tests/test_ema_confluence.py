@@ -116,8 +116,8 @@ class TestEMAConfluenceBuy:
         })
         signals = strat.evaluate({}, client=client)
         buys = [s for s in signals if s.side == "buy"]
-        if buys:
-            assert buys[0].notional == 750.0
+        assert buys, "expected a buy signal but got none"
+        assert buys[0].notional == 750.0
 
     def test_scaled_sizing_score4_uses_full_notional(self):
         from server.strategies.ema_confluence import EMAConfluence
@@ -134,8 +134,8 @@ class TestEMAConfluenceBuy:
         })
         signals = strat.evaluate({}, client=client)
         buys = [s for s in signals if s.side == "buy"]
-        if buys:
-            assert buys[0].notional == pytest.approx(1000.0)
+        assert buys, "expected a buy signal but got none"
+        assert buys[0].notional == pytest.approx(1000.0)
 
     def test_no_buy_when_mixed_signals(self):
         from server.strategies.ema_confluence import EMAConfluence
@@ -206,8 +206,8 @@ class TestEMAConfluenceSell:
         })
         signals = strat.evaluate({"AAPL": 7.5}, client=client)
         sells = [s for s in signals if s.side == "sell"]
-        if sells:
-            assert sells[0].qty == pytest.approx(7.5)
+        assert sells, "expected a sell signal but got none"
+        assert sells[0].qty == pytest.approx(7.5)
 
     def test_no_sell_when_not_holding(self):
         from server.strategies.ema_confluence import EMAConfluence
