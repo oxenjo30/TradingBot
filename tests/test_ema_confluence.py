@@ -157,6 +157,31 @@ class TestEMAConfluenceBuy:
         signals = strat.evaluate({}, client=client)
         assert not any(s.side == "buy" for s in signals)
 
+    def test_no_buy_when_bear_score_nonzero_despite_meeting_bull_count(self):
+        """bear_score == 0 guard: price above 2 EMAs but below the other 2 must not buy."""
+        import server.strategies.ema_confluence as mod
+        from unittest.mock import patch
+        from server.strategies.ema_confluence import EMAConfluence
+        # Patch _ema to return controlled values: price=120 > EMA8=115 > EMA13=110 (bull 2)
+        # but price=120 < EMA48=130 < EMA200=150 (bear 2). bull_score=2, bear_score=2 -> blocked.
+        ema_values = {8: 115.0, 13: 110.0, 48: 130.0, 200: 150.0}
+        def fake_ema(closes, period):
+            return ema_values.get(period, 100.0)
+        closes = [120.0] * 210
+        client = _mock_client(closes)
+        strat = EMAConfluence({
+            "symbols": ["AAPL"],
+            "use_scanner": False,
+            "min_confluence": 2,
+            "scaled_sizing": False,
+            "notional": 500,
+            "max_positions": 5,
+            "avoid_earnings": False,
+        })
+        with patch.object(mod, "_ema", side_effect=fake_ema):
+            signals = strat.evaluate({}, client=client)
+        assert not any(s.side == "buy" for s in signals)
+
     def test_no_buy_when_already_holding(self):
         from server.strategies.ema_confluence import EMAConfluence
         closes = self._bull_closes(220)
