@@ -397,6 +397,32 @@
       <div class="sys-item"><svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/></svg><span>API Response: <span id="sys-latency">&mdash;</span></span></div>
     </div>
 
+  <!-- ── Market Sentiment ── -->
+  <div class="card">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.85rem;flex-wrap:wrap;gap:.5rem;">
+      <div>
+        <div style="font-size:14px;font-weight:700;">Market Sentiment</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:2px;">Claude-scored news headlines per ticker &mdash; refreshes every 15 min.</div>
+      </div>
+      <span id="sentiment-updated" style="font-size:11px;color:var(--muted);"></span>
+    </div>
+    <div class="dtable-wrap">
+      <table class="dtable">
+        <thead>
+          <tr>
+            <th>Symbol</th>
+            <th>Score</th>
+            <th>Sentiment</th>
+            <th>Reasoning</th>
+          </tr>
+        </thead>
+        <tbody id="sentiment-tbody">
+          <tr><td colspan="4" class="state-empty">Sentiment data will appear once the engine runs.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
   </main>
 </div>
 
