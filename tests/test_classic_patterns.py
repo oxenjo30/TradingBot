@@ -201,3 +201,126 @@ class TestCandlestickDetectors:
         with patch.object(det_mod, "detect_bullish_engulfing", side_effect=Exception("boom")):
             result = detect_all(bars, ["candlestick"])
         assert isinstance(result, list)
+
+
+# ---------------------------------------------------------------------------
+# Reversal detectors
+# ---------------------------------------------------------------------------
+
+class TestReversalDetectors:
+    def test_double_bottom_detected(self):
+        from server.strategies.patterns.detectors import detect_double_bottom
+        # Two troughs at ~90, neckline ~100, current price 101 (above neckline)
+        closes = [100.0] * 10 + [95.0, 92.0, 90.0, 92.0, 95.0] + \
+                 [100.0] * 10 + [95.0, 92.0, 90.5, 92.0, 95.0] + \
+                 [100.0] * 10 + [101.0]
+        bars = _make_bars(closes)
+        result = detect_double_bottom(bars)
+        assert result is not None
+        assert result.direction == "bull"
+        assert result.confidence == 1.0
+
+    def test_double_top_detected(self):
+        from server.strategies.patterns.detectors import detect_double_top
+        # Two peaks at ~110, neckline ~100, current price 99 (below neckline)
+        closes = [100.0] * 10 + [105.0, 108.0, 110.0, 108.0, 105.0] + \
+                 [100.0] * 10 + [105.0, 108.0, 110.5, 108.0, 105.0] + \
+                 [100.0] * 10 + [99.0]
+        bars = _make_bars(closes)
+        result = detect_double_top(bars)
+        assert result is not None
+        assert result.direction == "bear"
+        assert result.confidence == 1.0
+
+    def test_triple_bottom_detected(self):
+        from server.strategies.patterns.detectors import detect_triple_bottom
+        # Three troughs near 90, neckline ~100, price breaks above
+        closes = ([100.0] * 5 + [95.0, 90.0, 95.0] +
+                  [100.0] * 5 + [95.0, 90.5, 95.0] +
+                  [100.0] * 5 + [95.0, 90.2, 95.0] +
+                  [100.0] * 5 + [101.0])
+        bars = _make_bars(closes)
+        result = detect_triple_bottom(bars)
+        assert result is not None
+        assert result.direction == "bull"
+        assert result.confidence == 1.0
+
+    def test_triple_top_detected(self):
+        from server.strategies.patterns.detectors import detect_triple_top
+        # Three peaks near 110, neckline ~100, price breaks below
+        closes = ([100.0] * 5 + [105.0, 110.0, 105.0] +
+                  [100.0] * 5 + [105.0, 110.5, 105.0] +
+                  [100.0] * 5 + [105.0, 110.2, 105.0] +
+                  [100.0] * 5 + [99.0])
+        bars = _make_bars(closes)
+        result = detect_triple_top(bars)
+        assert result is not None
+        assert result.direction == "bear"
+        assert result.confidence == 1.0
+
+    def test_head_and_shoulders_detected(self):
+        from server.strategies.patterns.detectors import detect_head_and_shoulders
+        # LS=108, trough1=100, Head=115, trough2=100, RS=108.5, neckline~100, current=99
+        closes = ([100.0] * 3 +
+                  [104.0, 108.0, 104.0] +   # left shoulder
+                  [100.0] * 3 +              # trough 1
+                  [108.0, 112.0, 115.0, 112.0, 108.0] +  # head
+                  [100.0] * 3 +              # trough 2
+                  [104.0, 108.5, 104.0] +    # right shoulder
+                  [100.0] * 3 + [99.0])
+        bars = _make_bars(closes)
+        result = detect_head_and_shoulders(bars)
+        assert result is not None
+        assert result.direction == "bear"
+        assert result.confidence == 1.0
+
+    def test_inverse_head_and_shoulders_detected(self):
+        from server.strategies.patterns.detectors import detect_inverse_head_and_shoulders
+        # LS=92, peak1=100, Head=85, peak2=100, RS=91.5, neckline~100, current=101
+        closes = ([100.0] * 3 +
+                  [96.0, 92.0, 96.0] +       # left shoulder
+                  [100.0] * 3 +              # peak 1
+                  [92.0, 88.0, 85.0, 88.0, 92.0] +  # head
+                  [100.0] * 3 +              # peak 2
+                  [96.0, 91.5, 96.0] +       # right shoulder
+                  [100.0] * 3 + [101.0])
+        bars = _make_bars(closes)
+        result = detect_inverse_head_and_shoulders(bars)
+        assert result is not None
+        assert result.direction == "bull"
+        assert result.confidence == 1.0
+
+    def test_v_bottom_detected(self):
+        from server.strategies.patterns.detectors import detect_v_bottom
+        # 15 bars: bars[-15] close=100, bars[-10:-5] min around 90 (decline>=8%),
+        # bars[-1] close=99 (recovery>=8% from 90)
+        closes = ([100.0] +          # bars[-15]
+                  [97.0, 94.0, 92.0, 91.0] +  # bars[-14:-10]
+                  [90.0, 90.5, 91.0, 92.0, 93.0] +  # bars[-10:-5] min=90
+                  [94.0, 95.0, 96.0, 97.5, 99.0])    # bars[-5:] recovery
+        bars = _make_bars(closes)
+        result = detect_v_bottom(bars)
+        assert result is not None
+        assert result.direction == "bull"
+        assert result.confidence == 0.4
+
+    def test_v_bottom_not_detected_when_decline_too_small(self):
+        from server.strategies.patterns.detectors import detect_v_bottom
+        # Only 3% decline - below 8% threshold
+        closes = ([100.0] +
+                  [99.0, 98.5, 98.0, 97.5] +
+                  [97.0, 97.5, 98.0, 98.5, 99.0] +
+                  [99.5, 100.0, 100.5, 101.0, 102.0])
+        bars = _make_bars(closes)
+        result = detect_v_bottom(bars)
+        assert result is None
+
+    def test_double_bottom_requires_neckline_break(self):
+        from server.strategies.patterns.detectors import detect_double_bottom
+        # Two troughs at ~90, neckline ~100, but current price is only 98 (below neckline)
+        closes = ([100.0] * 10 + [95.0, 92.0, 90.0, 92.0, 95.0] +
+                  [100.0] * 10 + [95.0, 92.0, 90.5, 92.0, 95.0] +
+                  [100.0] * 5 + [98.0])
+        bars = _make_bars(closes)
+        result = detect_double_bottom(bars)
+        assert result is None
