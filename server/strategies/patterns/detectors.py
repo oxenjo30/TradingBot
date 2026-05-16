@@ -270,12 +270,12 @@ def detect_triple_bottom(bars: list[dict]) -> PatternHit | None:
     troughs = _local_minima(closes, window=3)
     if len(troughs) < 3:
         return None
-    base = min(closes[t] for t in troughs)
     for i in range(len(troughs) - 2):
         t1, t2, t3 = troughs[i], troughs[i + 1], troughs[i + 2]
         if t2 - t1 < 5 or t3 - t2 < 5:
             continue
         v1, v2, v3 = closes[t1], closes[t2], closes[t3]
+        base = min(v1, v2, v3)
         if any(abs(v - base) / base > 0.02 for v in (v1, v2, v3)):
             continue
         neckline = max(closes[t1:t3 + 1])
@@ -292,12 +292,12 @@ def detect_triple_top(bars: list[dict]) -> PatternHit | None:
     peaks = _local_maxima(closes, window=3)
     if len(peaks) < 3:
         return None
-    apex = max(closes[p] for p in peaks)
     for i in range(len(peaks) - 2):
         p1, p2, p3 = peaks[i], peaks[i + 1], peaks[i + 2]
         if p2 - p1 < 5 or p3 - p2 < 5:
             continue
         v1, v2, v3 = closes[p1], closes[p2], closes[p3]
+        apex = max(v1, v2, v3)
         if any(abs(v - apex) / apex > 0.02 for v in (v1, v2, v3)):
             continue
         neckline = min(closes[p1:p3 + 1])
