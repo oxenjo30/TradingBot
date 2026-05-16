@@ -68,7 +68,7 @@ def detect_all(bars: list[dict], enabled_categories: list[str]) -> list[PatternH
 # ---------------------------------------------------------------------------
 
 def _sma(values: list[float]) -> float:
-    return sum(values) / len(values)
+    return sum(values) / len(values) if values else 0.0
 
 
 def detect_bullish_engulfing(bars: list[dict]) -> PatternHit | None:
@@ -140,11 +140,12 @@ def detect_morning_star(bars: list[dict]) -> PatternHit | None:
         return None
     body3 = abs(b3["c"] - b3["o"])
     body2 = abs(b2["c"] - b2["o"])
+    range2 = b2["h"] - b2["l"]
     if body3 < 0.6 * range3:
         return None
     if b3["o"] <= b3["c"]:  # bar[-3] must be bearish
         return None
-    if body2 > 0.5 * range3:
+    if range2 > 0 and body2 > 0.3 * range2:
         return None
     midpoint3 = (b3["o"] + b3["c"]) / 2
     if b1["c"] > b1["o"] and b1["c"] > midpoint3:
@@ -161,11 +162,12 @@ def detect_evening_star(bars: list[dict]) -> PatternHit | None:
         return None
     body3 = abs(b3["c"] - b3["o"])
     body2 = abs(b2["c"] - b2["o"])
+    range2 = b2["h"] - b2["l"]
     if body3 < 0.6 * range3:
         return None
     if b3["c"] <= b3["o"]:  # bar[-3] must be bullish
         return None
-    if body2 > 0.5 * range3:
+    if range2 > 0 and body2 > 0.3 * range2:
         return None
     midpoint3 = (b3["o"] + b3["c"]) / 2
     if b1["o"] > b1["c"] and b1["c"] < midpoint3:
