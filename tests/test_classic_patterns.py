@@ -155,8 +155,8 @@ class TestCandlestickDetectors:
         # bar[-1]: bearish, close=103 < midpoint of bar[-3] = (100+110)/2=105
         closes = [100.0] * 7 + [110.0, 112.0, 103.0]
         opens  = [100.0] * 7 + [100.0, 111.0, 112.0]
-        highs  = [100.0] * 7 + [110.0, 113.0, 112.5]
-        lows   = [100.0] * 7 + [100.0, 110.0, 102.5]
+        highs  = [100.0] * 7 + [110.0, 114.0, 112.5]  # bar[-2] range=5 (114-109), body=1
+        lows   = [100.0] * 7 + [100.0, 109.0, 102.5]
         bars = _make_bars(closes, highs=highs, lows=lows, opens=opens)
         result = detect_evening_star(bars)
         assert result is not None
