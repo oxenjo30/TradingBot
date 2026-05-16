@@ -213,6 +213,13 @@
             <div id="telegram-test-msg" class="field-msg hidden"></div>
           </div>
         </div>
+        <div style="display:flex;align-items:center;justify-content:flex-end;gap:.75rem;margin-top:.75rem;">
+          <span id="telegram-save-msg" class="field-msg hidden"></span>
+          <button id="btn-save-telegram" class="btn btn-primary btn-sm">
+            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+            Save
+          </button>
+        </div>
       </div>
     </div>
 
@@ -339,24 +346,6 @@
         <button id="ai-save-btn" class="btn btn-sm btn-primary">Save AI Settings</button>
         <button id="ai-tune-now-btn" class="btn btn-sm">Run Tuning Now</button>
         <span id="ai-save-msg" class="field-msg hidden"></span>
-      </div>
-    </div>
-
-    <!-- License card -->
-    <div class="card" id="lic-card" style="margin-top:1rem;">
-      <div style="font-size:14px;font-weight:600;margin-bottom:.75rem;">License</div>
-      <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
-        <div>
-          <div class="text-muted" style="font-size:11px;margin-bottom:2px;">Status</div>
-          <div id="lic-status" style="font-size:13px;font-weight:600;">&#8212;</div>
-        </div>
-        <div>
-          <div class="text-muted" style="font-size:11px;margin-bottom:2px;">Days Remaining</div>
-          <div id="lic-days" style="font-size:13px;font-weight:600;">&#8212;</div>
-        </div>
-        <div style="margin-left:auto;">
-          <button class="btn btn-sm" id="lic-deactivate-btn" style="display:none;background:rgba(239,68,68,.12);color:#EF4444;border-color:rgba(239,68,68,.3);">Deactivate</button>
-        </div>
       </div>
     </div>
 
