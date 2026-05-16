@@ -71,6 +71,34 @@ def _sma(values: list[float]) -> float:
     return sum(values) / len(values) if values else 0.0
 
 
+def _local_minima(values: list[float], window: int = 3) -> list[int]:
+    result = []
+    for i in range(window, len(values) - window):
+        if all(values[i] <= values[i + j] for j in range(-window, window + 1) if j != 0):
+            result.append(i)
+    return result
+
+
+def _local_maxima(values: list[float], window: int = 3) -> list[int]:
+    result = []
+    for i in range(window, len(values) - window):
+        if all(values[i] >= values[i + j] for j in range(-window, window + 1) if j != 0):
+            result.append(i)
+    return result
+
+
+def _linreg_slope(values: list[float]) -> float:
+    n = len(values)
+    if n < 2:
+        return 0.0
+    xs = list(range(n))
+    x_mean = sum(xs) / n
+    y_mean = sum(values) / n
+    num = sum((xs[i] - x_mean) * (values[i] - y_mean) for i in range(n))
+    den = sum((xs[i] - x_mean) ** 2 for i in range(n))
+    return num / den if den != 0 else 0.0
+
+
 def detect_bullish_engulfing(bars: list[dict]) -> PatternHit | None:
     if len(bars) < 2:
         return None
@@ -191,28 +219,159 @@ def detect_doji(bars: list[dict]) -> PatternHit | None:
 
 
 # ---------------------------------------------------------------------------
-# Reversal detectors — stubs
+# Reversal detectors
 # ---------------------------------------------------------------------------
 
 def detect_double_bottom(bars: list[dict]) -> PatternHit | None:
+    if len(bars) < 20:
+        return None
+    window = bars[-60:] if len(bars) >= 60 else bars
+    closes = [b["c"] for b in window]
+    troughs = _local_minima(closes, window=3)
+    for i in range(len(troughs)):
+        for j in range(i + 1, len(troughs)):
+            t1, t2 = troughs[i], troughs[j]
+            if t2 - t1 < 5:
+                continue
+            v1, v2 = closes[t1], closes[t2]
+            if abs(v1 - v2) / max(v1, v2) > 0.02:
+                continue
+            neckline = max(closes[t1:t2 + 1])
+            if closes[-1] > neckline:
+                return PatternHit("double_bottom", "bull", 1.0, "reversal")
     return None
+
 
 def detect_double_top(bars: list[dict]) -> PatternHit | None:
+    if len(bars) < 20:
+        return None
+    window = bars[-60:] if len(bars) >= 60 else bars
+    closes = [b["c"] for b in window]
+    peaks = _local_maxima(closes, window=3)
+    for i in range(len(peaks)):
+        for j in range(i + 1, len(peaks)):
+            p1, p2 = peaks[i], peaks[j]
+            if p2 - p1 < 5:
+                continue
+            v1, v2 = closes[p1], closes[p2]
+            if abs(v1 - v2) / max(v1, v2) > 0.02:
+                continue
+            neckline = min(closes[p1:p2 + 1])
+            if closes[-1] < neckline:
+                return PatternHit("double_top", "bear", 1.0, "reversal")
     return None
+
 
 def detect_triple_bottom(bars: list[dict]) -> PatternHit | None:
+    if len(bars) < 25:
+        return None
+    window = bars[-60:] if len(bars) >= 60 else bars
+    closes = [b["c"] for b in window]
+    troughs = _local_minima(closes, window=3)
+    if len(troughs) < 3:
+        return None
+    base = min(closes[t] for t in troughs)
+    for i in range(len(troughs) - 2):
+        t1, t2, t3 = troughs[i], troughs[i + 1], troughs[i + 2]
+        if t2 - t1 < 5 or t3 - t2 < 5:
+            continue
+        v1, v2, v3 = closes[t1], closes[t2], closes[t3]
+        if any(abs(v - base) / base > 0.02 for v in (v1, v2, v3)):
+            continue
+        neckline = max(closes[t1:t3 + 1])
+        if closes[-1] > neckline:
+            return PatternHit("triple_bottom", "bull", 1.0, "reversal")
     return None
+
 
 def detect_triple_top(bars: list[dict]) -> PatternHit | None:
+    if len(bars) < 25:
+        return None
+    window = bars[-60:] if len(bars) >= 60 else bars
+    closes = [b["c"] for b in window]
+    peaks = _local_maxima(closes, window=3)
+    if len(peaks) < 3:
+        return None
+    apex = max(closes[p] for p in peaks)
+    for i in range(len(peaks) - 2):
+        p1, p2, p3 = peaks[i], peaks[i + 1], peaks[i + 2]
+        if p2 - p1 < 5 or p3 - p2 < 5:
+            continue
+        v1, v2, v3 = closes[p1], closes[p2], closes[p3]
+        if any(abs(v - apex) / apex > 0.02 for v in (v1, v2, v3)):
+            continue
+        neckline = min(closes[p1:p3 + 1])
+        if closes[-1] < neckline:
+            return PatternHit("triple_top", "bear", 1.0, "reversal")
     return None
+
 
 def detect_head_and_shoulders(bars: list[dict]) -> PatternHit | None:
+    if len(bars) < 20:
+        return None
+    window = bars[-60:] if len(bars) >= 60 else bars
+    closes = [b["c"] for b in window]
+    peaks = _local_maxima(closes, window=3)
+    if len(peaks) < 3:
+        return None
+    for i in range(len(peaks) - 2):
+        ls_i, head_i, rs_i = peaks[i], peaks[i + 1], peaks[i + 2]
+        ls, head, rs = closes[ls_i], closes[head_i], closes[rs_i]
+        if head <= ls or head <= rs:
+            continue
+        if abs(ls - rs) / max(ls, rs) > 0.03:
+            continue
+        troughs_between = _local_minima(closes[ls_i:rs_i + 1], window=2)
+        if len(troughs_between) < 2:
+            continue
+        t1 = closes[ls_i + troughs_between[0]]
+        t2 = closes[ls_i + troughs_between[-1]]
+        neckline = (t1 + t2) / 2
+        if closes[-1] < neckline:
+            return PatternHit("head_and_shoulders", "bear", 1.0, "reversal")
     return None
+
 
 def detect_inverse_head_and_shoulders(bars: list[dict]) -> PatternHit | None:
+    if len(bars) < 20:
+        return None
+    window = bars[-60:] if len(bars) >= 60 else bars
+    closes = [b["c"] for b in window]
+    troughs = _local_minima(closes, window=3)
+    if len(troughs) < 3:
+        return None
+    for i in range(len(troughs) - 2):
+        ls_i, head_i, rs_i = troughs[i], troughs[i + 1], troughs[i + 2]
+        ls, head, rs = closes[ls_i], closes[head_i], closes[rs_i]
+        if head >= ls or head >= rs:
+            continue
+        if abs(ls - rs) / max(ls, rs) > 0.03:
+            continue
+        peaks_between = _local_maxima(closes[ls_i:rs_i + 1], window=2)
+        if len(peaks_between) < 2:
+            continue
+        p1 = closes[ls_i + peaks_between[0]]
+        p2 = closes[ls_i + peaks_between[-1]]
+        neckline = (p1 + p2) / 2
+        if closes[-1] > neckline:
+            return PatternHit("inverse_head_and_shoulders", "bull", 1.0, "reversal")
     return None
 
+
 def detect_v_bottom(bars: list[dict]) -> PatternHit | None:
+    if len(bars) < 15:
+        return None
+    segment = bars[-15:]
+    start_close = segment[0]["c"]
+    mid_closes = [b["c"] for b in segment[5:10]]
+    end_close = segment[-1]["c"]
+    trough = min(mid_closes)
+    if trough == 0:
+        return None
+    decline = (start_close - trough) / start_close
+    recovery = (end_close - trough) / trough
+    if decline >= 0.08 and recovery >= 0.08:
+        return PatternHit("v_bottom", "bull", 0.4, "reversal")
     return None
 
 
