@@ -45,8 +45,13 @@ class TestPatternHit:
         assert result == []
 
     def test_detect_all_each_item_is_pattern_hit(self):
+        from server.strategies.patterns import detectors as det_mod
         from server.strategies.patterns.detectors import detect_all, PatternHit
+        from unittest.mock import patch
+        fake_hit = PatternHit(name="test", direction="bull", confidence=0.7, category="candlestick")
         bars = _make_bars([100.0] * 30)
-        results = detect_all(bars, ["candlestick", "reversal", "continuation"])
+        with patch.object(det_mod, "detect_bullish_engulfing", return_value=fake_hit):
+            results = detect_all(bars, ["candlestick"])
+        assert len(results) >= 1
         for item in results:
             assert isinstance(item, PatternHit)
