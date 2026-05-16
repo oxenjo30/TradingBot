@@ -376,29 +376,146 @@ def detect_v_bottom(bars: list[dict]) -> PatternHit | None:
 
 
 # ---------------------------------------------------------------------------
-# Continuation detectors — stubs
+# Continuation detectors
 # ---------------------------------------------------------------------------
 
 def detect_bull_flag(bars: list[dict]) -> PatternHit | None:
-    return None
+    if len(bars) < 25:
+        return None
+    upleg_start = bars[-25]["c"]
+    upleg_end   = bars[-15]["c"]
+    if upleg_end < upleg_start * 1.05:
+        return None
+    upleg_size = upleg_end - upleg_start
+    channel = [b["c"] for b in bars[-14:]]
+    slope = _linreg_slope(channel)
+    if slope >= 0:
+        return None
+    retracement = upleg_end - min(channel)
+    if retracement > 0.4 * upleg_size:
+        return None
+    return PatternHit("bull_flag", "bull", 0.7, "continuation")
+
 
 def detect_bear_flag(bars: list[dict]) -> PatternHit | None:
-    return None
+    if len(bars) < 25:
+        return None
+    downleg_start = bars[-25]["c"]
+    downleg_end   = bars[-15]["c"]
+    if downleg_end > downleg_start * 0.95:
+        return None
+    downleg_size = downleg_start - downleg_end
+    channel = [b["c"] for b in bars[-14:]]
+    slope = _linreg_slope(channel)
+    if slope <= 0:
+        return None
+    retracement = max(channel) - downleg_end
+    if retracement > 0.4 * downleg_size:
+        return None
+    return PatternHit("bear_flag", "bear", 0.7, "continuation")
+
 
 def detect_ascending_triangle(bars: list[dict]) -> PatternHit | None:
-    return None
+    if len(bars) < 20:
+        return None
+    window = bars[-40:] if len(bars) >= 40 else bars
+    highs = [b["h"] for b in window]
+    lows  = [b["l"] for b in window]
+    slope_h = _linreg_slope(highs)
+    slope_l = _linreg_slope(lows)
+    # Rising lows (slope_l > 0) and flat/converging highs (|slope_h| < slope_l)
+    if slope_l <= 0:
+        return None
+    if abs(slope_h) >= slope_l:
+        return None
+    return PatternHit("ascending_triangle", "bull", 0.7, "continuation")
+
 
 def detect_descending_triangle(bars: list[dict]) -> PatternHit | None:
-    return None
+    if len(bars) < 20:
+        return None
+    window = bars[-40:] if len(bars) >= 40 else bars
+    highs = [b["h"] for b in window]
+    lows  = [b["l"] for b in window]
+    slope_h = _linreg_slope(highs)
+    slope_l = _linreg_slope(lows)
+    # Falling highs (slope_h < 0) and flat/converging lows (|slope_l| < |slope_h|)
+    if slope_h >= 0:
+        return None
+    if abs(slope_l) >= abs(slope_h):
+        return None
+    return PatternHit("descending_triangle", "bear", 0.7, "continuation")
+
 
 def detect_symmetrical_triangle(bars: list[dict]) -> PatternHit | None:
-    return None
+    if len(bars) < 20:
+        return None
+    window = bars[-40:] if len(bars) >= 40 else bars
+    highs = [b["h"] for b in window]
+    lows  = [b["l"] for b in window]
+    slope_h = _linreg_slope(highs)
+    slope_l = _linreg_slope(lows)
+    # Converging: highs falling (slope_h < 0) and lows rising (slope_l > 0)
+    if slope_h >= 0 or slope_l <= 0:
+        return None
+    closes = [b["c"] for b in window]
+    # inline EMA200 for trend direction; default bull when insufficient history
+    if len(closes) >= 200:
+        k = 2 / 201
+        ema = sum(closes[:200]) / 200
+        for c in closes[200:]:
+            ema = c * k + ema * (1 - k)
+        direction: Literal["bull", "bear"] = "bull" if closes[-1] > ema else "bear"
+    else:
+        direction = "bull"
+    return PatternHit("symmetrical_triangle", direction, 0.7, "continuation")
+
 
 def detect_pennant(bars: list[dict]) -> PatternHit | None:
-    return None
+    if len(bars) < 10:
+        return None
+    pre_close  = bars[-11]["c"] if len(bars) > 10 else bars[-10]["c"]
+    move_close = bars[-6]["c"]
+    move_pct = (move_close - pre_close) / pre_close if pre_close != 0 else 0
+    if abs(move_pct) < 0.05:
+        return None
+    tight_highs = [b["h"] for b in bars[-5:]]
+    tight_lows  = [b["l"] for b in bars[-5:]]
+    range_size = max(tight_highs) - min(tight_lows)
+    base = bars[-6]["c"]
+    if base == 0 or range_size > 0.05 * base:
+        return None
+    direction: Literal["bull", "bear"] = "bull" if move_pct > 0 else "bear"
+    return PatternHit("pennant", direction, 0.4, "continuation")
+
 
 def detect_rising_wedge(bars: list[dict]) -> PatternHit | None:
-    return None
+    if len(bars) < 10:
+        return None
+    window = bars[-20:] if len(bars) >= 20 else bars
+    highs = [b["h"] for b in window]
+    lows  = [b["l"] for b in window]
+    slope_h = _linreg_slope(highs)
+    slope_l = _linreg_slope(lows)
+    # Both rising, highs rising faster (converging upward)
+    if slope_h <= 0 or slope_l <= 0:
+        return None
+    if slope_h <= slope_l:
+        return None
+    return PatternHit("rising_wedge", "bear", 0.7, "continuation")
+
 
 def detect_falling_wedge(bars: list[dict]) -> PatternHit | None:
-    return None
+    if len(bars) < 10:
+        return None
+    window = bars[-20:] if len(bars) >= 20 else bars
+    highs = [b["h"] for b in window]
+    lows  = [b["l"] for b in window]
+    slope_h = _linreg_slope(highs)
+    slope_l = _linreg_slope(lows)
+    # Both falling, lows falling faster (converging downward)
+    if slope_h >= 0 or slope_l >= 0:
+        return None
+    if slope_l >= slope_h:
+        return None
+    return PatternHit("falling_wedge", "bull", 0.7, "continuation")
