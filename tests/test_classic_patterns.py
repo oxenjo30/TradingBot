@@ -324,3 +324,119 @@ class TestReversalDetectors:
         bars = _make_bars(closes)
         result = detect_double_bottom(bars)
         assert result is None
+
+
+# ---------------------------------------------------------------------------
+# Continuation detectors
+# ---------------------------------------------------------------------------
+
+class TestContinuationDetectors:
+    def test_bull_flag_detected(self):
+        from server.strategies.patterns.detectors import detect_bull_flag
+        # Upleg bars[-25:-15]: from 100 to 108 (>=5% gain)
+        # Channel bars[-14:]: slight pullback from 108 to 105 (retracement < 40% of 8-pt move)
+        upleg   = [100.0 + i * 0.8 for i in range(11)]   # 100 -> 108
+        channel = [108.0 - i * 0.21 for i in range(14)]  # 108 -> 105.1 (retracement ~2.9/8=36%)
+        closes = upleg + channel
+        bars = _make_bars(closes)
+        result = detect_bull_flag(bars)
+        assert result is not None
+        assert result.direction == "bull"
+        assert result.confidence == 0.7
+
+    def test_bear_flag_detected(self):
+        from server.strategies.patterns.detectors import detect_bear_flag
+        # Downleg bars[-25:-15]: from 100 to 92 (>=5% drop)
+        # Channel bars[-14:]: slight bounce from 92 to 95 (retracement ~3/8=37.5% < 40%)
+        downleg = [100.0 - i * 0.8 for i in range(11)]   # 100 -> 92
+        channel = [92.0 + i * 0.21 for i in range(14)]   # 92 -> 94.9
+        closes = downleg + channel
+        bars = _make_bars(closes)
+        result = detect_bear_flag(bars)
+        assert result is not None
+        assert result.direction == "bear"
+        assert result.confidence == 0.7
+
+    def test_ascending_triangle_detected(self):
+        from server.strategies.patterns.detectors import detect_ascending_triangle
+        # Flat resistance near 110, rising lows
+        highs  = [110.0, 108.0, 110.2, 107.0, 110.1, 106.0, 110.3, 105.0, 110.0, 104.0] * 4
+        lows   = [95.0,  96.0,  97.0,  98.0,  99.0,  100.0, 101.0, 102.0, 103.0, 104.0] * 4
+        closes = [(h + l) / 2 for h, l in zip(highs, lows)]
+        bars = _make_bars(closes, highs=highs, lows=lows)
+        result = detect_ascending_triangle(bars)
+        assert result is not None
+        assert result.direction == "bull"
+        assert result.confidence == 0.7
+
+    def test_descending_triangle_detected(self):
+        from server.strategies.patterns.detectors import detect_descending_triangle
+        # Flat support near 90, falling highs
+        lows   = [90.0, 91.0, 90.2, 91.5, 90.1, 91.0, 90.3, 91.2, 90.0, 90.5] * 4
+        highs  = [115.0, 114.0, 113.0, 112.0, 111.0, 110.0, 109.0, 108.0, 107.0, 106.0] * 4
+        closes = [(h + l) / 2 for h, l in zip(highs, lows)]
+        bars = _make_bars(closes, highs=highs, lows=lows)
+        result = detect_descending_triangle(bars)
+        assert result is not None
+        assert result.direction == "bear"
+        assert result.confidence == 0.7
+
+    def test_symmetrical_triangle_detected(self):
+        from server.strategies.patterns.detectors import detect_symmetrical_triangle
+        # Converging: highs falling from 115->105, lows rising from 85->95
+        highs  = [115.0 - i * 0.25 for i in range(40)]
+        lows   = [85.0  + i * 0.25 for i in range(40)]
+        closes = [(h + l) / 2 for h, l in zip(highs, lows)]
+        bars = _make_bars(closes, highs=highs, lows=lows)
+        result = detect_symmetrical_triangle(bars)
+        assert result is not None
+        assert result.confidence == 0.7
+
+    def test_pennant_detected(self):
+        from server.strategies.patterns.detectors import detect_pennant
+        # bars[-10:-5]: strong move up >=5%; bars[-5:]: tight consolidation
+        pre = [100.0] * 25
+        move = [100.0 + i * 1.1 for i in range(6)]  # 100 -> 105.5 (5.5%)
+        tight = [105.5, 105.6, 105.4, 105.5, 105.3]  # tight range
+        closes = pre + move + tight
+        highs = [c * 1.01 for c in closes[:-5]] + [105.7, 105.8, 105.6, 105.7, 105.5]
+        lows  = [c * 0.99 for c in closes[:-5]] + [105.3, 105.4, 105.2, 105.3, 105.1]
+        bars = _make_bars(closes, highs=highs, lows=lows)
+        result = detect_pennant(bars)
+        assert result is not None
+        assert result.direction == "bull"
+        assert result.confidence == 0.4
+
+    def test_rising_wedge_detected(self):
+        from server.strategies.patterns.detectors import detect_rising_wedge
+        # Both highs and lows rise, but highs rise faster
+        highs = [100.0 + i * 1.2 for i in range(20)]   # slope 1.2
+        lows  = [95.0  + i * 0.6 for i in range(20)]   # slope 0.6 (lows rise slower)
+        closes = [(h + l) / 2 for h, l in zip(highs, lows)]
+        bars = _make_bars(closes, highs=highs, lows=lows)
+        result = detect_rising_wedge(bars)
+        assert result is not None
+        assert result.direction == "bear"
+        assert result.confidence == 0.7
+
+    def test_falling_wedge_detected(self):
+        from server.strategies.patterns.detectors import detect_falling_wedge
+        # Both highs and lows fall, but lows fall faster
+        highs = [120.0 - i * 0.6 for i in range(20)]   # slope -0.6
+        lows  = [115.0 - i * 1.2 for i in range(20)]   # slope -1.2 (lows fall faster)
+        closes = [(h + l) / 2 for h, l in zip(highs, lows)]
+        bars = _make_bars(closes, highs=highs, lows=lows)
+        result = detect_falling_wedge(bars)
+        assert result is not None
+        assert result.direction == "bull"
+        assert result.confidence == 0.7
+
+    def test_bull_flag_not_detected_when_retracement_too_deep(self):
+        from server.strategies.patterns.detectors import detect_bull_flag
+        # Upleg 100->108 (+8), then channel retraces more than 40% (>3.2 pts)
+        upleg   = [100.0 + i * 0.8 for i in range(11)]   # 100 -> 108
+        channel = [108.0 - i * 0.35 for i in range(14)]  # 108 -> 103.1 (retracement ~4.9/8=61%)
+        closes = upleg + channel
+        bars = _make_bars(closes)
+        result = detect_bull_flag(bars)
+        assert result is None
