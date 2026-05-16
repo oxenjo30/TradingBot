@@ -64,29 +64,128 @@ def detect_all(bars: list[dict], enabled_categories: list[str]) -> list[PatternH
 
 
 # ---------------------------------------------------------------------------
-# Candlestick detectors — stubs
+# Candlestick detectors
 # ---------------------------------------------------------------------------
 
+def _sma(values: list[float]) -> float:
+    return sum(values) / len(values)
+
+
 def detect_bullish_engulfing(bars: list[dict]) -> PatternHit | None:
+    if len(bars) < 2:
+        return None
+    prev, curr = bars[-2], bars[-1]
+    prev_bear = prev["o"] > prev["c"]
+    curr_bull = curr["c"] > curr["o"]
+    if not prev_bear or not curr_bull:
+        return None
+    if curr["o"] < prev["c"] and curr["c"] > prev["o"]:
+        return PatternHit("bullish_engulfing", "bull", 0.7, "candlestick")
     return None
+
 
 def detect_bearish_engulfing(bars: list[dict]) -> PatternHit | None:
+    if len(bars) < 2:
+        return None
+    prev, curr = bars[-2], bars[-1]
+    prev_bull = prev["c"] > prev["o"]
+    curr_bear = curr["o"] > curr["c"]
+    if not prev_bull or not curr_bear:
+        return None
+    if curr["o"] > prev["c"] and curr["c"] < prev["o"]:
+        return PatternHit("bearish_engulfing", "bear", 0.7, "candlestick")
     return None
+
 
 def detect_hammer(bars: list[dict]) -> PatternHit | None:
-    return None
+    if len(bars) < 10:
+        return None
+    b = bars[-1]
+    body = abs(b["c"] - b["o"])
+    if body == 0:
+        return None
+    lower_wick = min(b["o"], b["c"]) - b["l"]
+    upper_wick = b["h"] - max(b["o"], b["c"])
+    if lower_wick < 2 * body or upper_wick > 0.3 * body:
+        return None
+    sma10 = _sma([x["c"] for x in bars[-10:]])
+    if b["c"] >= sma10:
+        return None
+    return PatternHit("hammer", "bull", 0.7, "candlestick")
+
 
 def detect_shooting_star(bars: list[dict]) -> PatternHit | None:
-    return None
+    if len(bars) < 10:
+        return None
+    b = bars[-1]
+    body = abs(b["c"] - b["o"])
+    if body == 0:
+        return None
+    upper_wick = b["h"] - max(b["o"], b["c"])
+    lower_wick = min(b["o"], b["c"]) - b["l"]
+    if upper_wick < 2 * body or lower_wick > 0.3 * body:
+        return None
+    sma10 = _sma([x["c"] for x in bars[-10:]])
+    if b["c"] <= sma10:
+        return None
+    return PatternHit("shooting_star", "bear", 0.7, "candlestick")
+
 
 def detect_morning_star(bars: list[dict]) -> PatternHit | None:
+    if len(bars) < 3:
+        return None
+    b3, b2, b1 = bars[-3], bars[-2], bars[-1]
+    range3 = b3["h"] - b3["l"]
+    if range3 == 0:
+        return None
+    body3 = abs(b3["c"] - b3["o"])
+    body2 = abs(b2["c"] - b2["o"])
+    if body3 < 0.6 * range3:
+        return None
+    if b3["o"] <= b3["c"]:  # bar[-3] must be bearish
+        return None
+    if body2 > 0.5 * range3:
+        return None
+    midpoint3 = (b3["o"] + b3["c"]) / 2
+    if b1["c"] > b1["o"] and b1["c"] > midpoint3:
+        return PatternHit("morning_star", "bull", 0.7, "candlestick")
     return None
+
 
 def detect_evening_star(bars: list[dict]) -> PatternHit | None:
+    if len(bars) < 3:
+        return None
+    b3, b2, b1 = bars[-3], bars[-2], bars[-1]
+    range3 = b3["h"] - b3["l"]
+    if range3 == 0:
+        return None
+    body3 = abs(b3["c"] - b3["o"])
+    body2 = abs(b2["c"] - b2["o"])
+    if body3 < 0.6 * range3:
+        return None
+    if b3["c"] <= b3["o"]:  # bar[-3] must be bullish
+        return None
+    if body2 > 0.5 * range3:
+        return None
+    midpoint3 = (b3["o"] + b3["c"]) / 2
+    if b1["o"] > b1["c"] and b1["c"] < midpoint3:
+        return PatternHit("evening_star", "bear", 0.7, "candlestick")
     return None
 
+
 def detect_doji(bars: list[dict]) -> PatternHit | None:
-    return None
+    if len(bars) < 10:
+        return None
+    b = bars[-1]
+    rng = b["h"] - b["l"]
+    if rng == 0:
+        return None
+    body = abs(b["c"] - b["o"])
+    if body > 0.05 * rng:
+        return None
+    sma10 = _sma([x["c"] for x in bars[-10:]])
+    direction = "bull" if b["c"] < sma10 else "bear"
+    return PatternHit("doji", direction, 0.4, "candlestick")
 
 
 # ---------------------------------------------------------------------------
