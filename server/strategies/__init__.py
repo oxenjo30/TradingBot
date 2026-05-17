@@ -12,6 +12,7 @@ from .crypto_rsi_bounce import CryptoRSIBounce
 from .crypto_volatility_breakout import CryptoVolatilityBreakout
 from .crypto_grid import CryptoGrid
 from .ema_confluence import EMAConfluence
+from .chart_patterns import ClassicPatterns
 
 REGISTRY: dict[str, type[Strategy]] = {
     cls.name: cls for cls in (
@@ -28,6 +29,7 @@ REGISTRY: dict[str, type[Strategy]] = {
         CryptoVolatilityBreakout,
         CryptoGrid,
         EMAConfluence,
+        ClassicPatterns,
     )
 }
 
