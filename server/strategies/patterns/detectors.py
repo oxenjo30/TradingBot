@@ -366,7 +366,7 @@ def detect_v_bottom(bars: list[dict]) -> PatternHit | None:
     mid_closes = [b["c"] for b in segment[5:10]]
     end_close = segment[-1]["c"]
     trough = min(mid_closes)
-    if trough == 0:
+    if trough == 0 or start_close == 0:
         return None
     decline = (start_close - trough) / start_close
     recovery = (end_close - trough) / trough

@@ -591,7 +591,7 @@ class TestClassicPatternsStrategy:
             signals = strat.evaluate({"AAPL": 5.0}, client=client)
         sells = [s for s in signals if s.side == "sell"]
         assert sells, "expected a sell on EMA48 cross"
-        assert "EMA48" in sells[0].reason or "trend invalidated" in sells[0].reason
+        assert "EMA48" in sells[0].reason and "trend invalidated" in sells[0].reason
 
     def test_no_buy_when_max_positions_reached(self):
         from server.strategies.chart_patterns import ClassicPatterns
