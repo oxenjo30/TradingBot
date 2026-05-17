@@ -105,7 +105,7 @@ def check_stored_license() -> dict:
         # Cache valid result for 1 hour
         _cache = {**result, "expires_at": now + _CACHE_TTL}
         return result
-    except LicenseError as e:
+    except (LicenseError, RuntimeError) as e:
         _cache = {}
         return {"valid": False, "reason": str(e), "days_remaining": 0}
 

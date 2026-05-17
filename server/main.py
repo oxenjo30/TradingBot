@@ -784,7 +784,8 @@ def assign_strategy_account(name: str, body: StrategyAccountAssign, request: Req
 @app.patch("/api/strategies/{name}/accounts/{account_id}")
 def patch_strategy_account(name: str, account_id: int, body: StrategyAccountPatch, request: Request):
     _require_auth(request)
-    db.update_strategy_account_enabled(name, account_id, body.enabled)
+    if not db.update_strategy_account_enabled(name, account_id, body.enabled):
+        raise HTTPException(status_code=404, detail="account not found")
     # Sync global enabled flag: on if any account has it enabled, off if none do
     account_list = db.get_strategy_account_list(name)
     globally_enabled = any(a["enabled"] for a in account_list)

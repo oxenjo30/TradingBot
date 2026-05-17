@@ -299,7 +299,15 @@ class TestOrderManagement:
             }
         ]
         client = self._make(mock_ex)
-        orders = client.get_orders()
+        # Patch server.db.get_conn so the symbol lookup returns only BTC/USDT,
+        # avoiding shared test-DB pollution from other tests' signals rows.
+        import server.db as db_mod
+        mock_conn = MagicMock()
+        mock_conn.__enter__ = lambda s: mock_conn
+        mock_conn.__exit__ = MagicMock(return_value=False)
+        mock_conn.execute.return_value.fetchall.return_value = [{"symbol": "BTC"}]
+        with patch.object(db_mod, "get_conn", return_value=mock_conn):
+            orders = client.get_orders()
         assert len(orders) == 1
         o = orders[0]
         assert o["id"] == "111"
