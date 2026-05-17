@@ -799,8 +799,11 @@ def assign_strategy_account(strategy_name: str, account_id: int, enabled: bool) 
 
 
 def update_strategy_account_enabled(strategy_name: str, account_id: int, enabled: bool) -> bool:
-    """Upsert the enabled flag — creates the row if it doesn't exist yet."""
+    """Upsert the enabled flag — creates the row if it doesn't exist yet. Returns False if account_id not found."""
     with get_conn() as c:
+        exists = c.execute("SELECT 1 FROM broker_accounts WHERE id=?", (account_id,)).fetchone()
+        if not exists:
+            return False
         c.execute(
             "INSERT INTO strategy_accounts (strategy_name, account_id, enabled) VALUES (?,?,?) "
             "ON CONFLICT(strategy_name, account_id) DO UPDATE SET enabled=excluded.enabled",

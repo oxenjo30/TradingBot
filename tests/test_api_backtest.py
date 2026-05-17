@@ -27,7 +27,8 @@ def mock_engine(monkeypatch):
     from datetime import date
 
     def _fake_run(self, strategy_name, symbols, start_date, end_date,
-                  initial_capital, position_size_pct, commission_pct, slippage_pct):
+                  initial_capital, position_size_pct, commission_pct, slippage_pct,
+                  strategy_params=None):
         result = dict(_BASE_RESULT)
         run_id = db_mod.save_backtest_run(
             {
