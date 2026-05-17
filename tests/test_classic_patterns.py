@@ -440,3 +440,219 @@ class TestContinuationDetectors:
         bars = _make_bars(closes)
         result = detect_bull_flag(bars)
         assert result is None
+
+
+# ---------------------------------------------------------------------------
+# ClassicPatterns strategy
+# ---------------------------------------------------------------------------
+
+class TestClassicPatternsStrategy:
+    def _uptrend_closes(self, n=250):
+        """Rising price series: all 4 EMAs below price, EMA200 well below."""
+        return [100.0 + i * 0.3 for i in range(n)]
+
+    def _downtrend_closes(self, n=250):
+        """Falling price series: all EMAs above price."""
+        return [200.0 - i * 0.3 for i in range(n)]
+
+    def test_buy_signal_emitted_for_bull_pattern_in_uptrend(self):
+        """A confirmed bull hit in uptrend (price > EMA200) should produce a buy."""
+        import server.strategies.chart_patterns as mod
+        from server.strategies.chart_patterns import ClassicPatterns
+        from server.strategies.patterns.detectors import PatternHit
+        from unittest.mock import patch
+        closes = self._uptrend_closes(250)
+        client = _mock_client(closes)
+        strat = ClassicPatterns({
+            "symbols": ["AAPL"], "use_scanner": False,
+            "enable_candlestick": True, "enable_reversal": False, "enable_continuation": False,
+            "min_confidence": 0.7, "scaled_sizing": False, "notional": 500,
+            "ema_exit": "48", "max_positions": 5,
+        })
+        fake_hit = PatternHit("hammer", "bull", 0.7, "candlestick")
+        with patch("server.strategies.chart_patterns.detect_all", return_value=[fake_hit]):
+            signals = strat.evaluate({}, client=client)
+        buys = [s for s in signals if s.side == "buy"]
+        assert buys, "expected a buy signal but got none"
+        assert buys[0].symbol == "AAPL"
+
+    def test_no_buy_when_price_below_ema200(self):
+        """Bull pattern but price < EMA200 → trend filter blocks buy."""
+        from server.strategies.chart_patterns import ClassicPatterns
+        from server.strategies.patterns.detectors import PatternHit
+        from unittest.mock import patch
+        closes = self._downtrend_closes(250)
+        client = _mock_client(closes)
+        strat = ClassicPatterns({
+            "symbols": ["AAPL"], "use_scanner": False,
+            "enable_candlestick": True, "enable_reversal": False, "enable_continuation": False,
+            "min_confidence": 0.7, "scaled_sizing": False, "notional": 500,
+            "ema_exit": "48", "max_positions": 5,
+        })
+        fake_hit = PatternHit("hammer", "bull", 0.7, "candlestick")
+        with patch("server.strategies.chart_patterns.detect_all", return_value=[fake_hit]):
+            signals = strat.evaluate({}, client=client)
+        assert not any(s.side == "buy" for s in signals)
+
+    def test_no_buy_below_min_confidence(self):
+        """Bull hit confidence 0.4 with min_confidence=0.7 should not buy."""
+        from server.strategies.chart_patterns import ClassicPatterns
+        from server.strategies.patterns.detectors import PatternHit
+        from unittest.mock import patch
+        closes = self._uptrend_closes(250)
+        client = _mock_client(closes)
+        strat = ClassicPatterns({
+            "symbols": ["AAPL"], "use_scanner": False,
+            "enable_candlestick": True, "enable_reversal": False, "enable_continuation": False,
+            "min_confidence": 0.7, "scaled_sizing": False, "notional": 500,
+            "ema_exit": "48", "max_positions": 5,
+        })
+        fake_hit = PatternHit("doji", "bull", 0.4, "candlestick")
+        with patch("server.strategies.chart_patterns.detect_all", return_value=[fake_hit]):
+            signals = strat.evaluate({}, client=client)
+        assert not any(s.side == "buy" for s in signals)
+
+    def test_scaled_sizing_uses_confidence(self):
+        """scaled_sizing=True with confidence 0.7 → notional * 0.7."""
+        from server.strategies.chart_patterns import ClassicPatterns
+        from server.strategies.patterns.detectors import PatternHit
+        from unittest.mock import patch
+        closes = self._uptrend_closes(250)
+        client = _mock_client(closes)
+        strat = ClassicPatterns({
+            "symbols": ["AAPL"], "use_scanner": False,
+            "enable_candlestick": True, "enable_reversal": False, "enable_continuation": False,
+            "min_confidence": 0.7, "scaled_sizing": True, "notional": 1000,
+            "ema_exit": "48", "max_positions": 5,
+        })
+        fake_hit = PatternHit("hammer", "bull", 0.7, "candlestick")
+        with patch("server.strategies.chart_patterns.detect_all", return_value=[fake_hit]):
+            signals = strat.evaluate({}, client=client)
+        buys = [s for s in signals if s.side == "buy"]
+        assert buys, "expected a buy signal"
+        assert buys[0].notional == pytest.approx(700.0)
+
+    def test_highest_confidence_hit_wins(self):
+        """When multiple bull hits pass filter, the highest-confidence one drives sizing."""
+        from server.strategies.chart_patterns import ClassicPatterns
+        from server.strategies.patterns.detectors import PatternHit
+        from unittest.mock import patch
+        closes = self._uptrend_closes(250)
+        client = _mock_client(closes)
+        strat = ClassicPatterns({
+            "symbols": ["AAPL"], "use_scanner": False,
+            "enable_candlestick": True, "enable_reversal": True, "enable_continuation": False,
+            "min_confidence": 0.7, "scaled_sizing": True, "notional": 1000,
+            "ema_exit": "48", "max_positions": 5,
+        })
+        hits = [
+            PatternHit("hammer", "bull", 0.7, "candlestick"),
+            PatternHit("double_bottom", "bull", 1.0, "reversal"),
+        ]
+        with patch("server.strategies.chart_patterns.detect_all", return_value=hits):
+            signals = strat.evaluate({}, client=client)
+        buys = [s for s in signals if s.side == "buy"]
+        assert buys, "expected a buy signal"
+        assert buys[0].notional == pytest.approx(1000.0)  # 1.0 confidence → full notional
+
+    def test_sell_on_bear_pattern_when_holding(self):
+        """Bear pattern hit while holding → sell (no EMA200 check on exits)."""
+        from server.strategies.chart_patterns import ClassicPatterns
+        from server.strategies.patterns.detectors import PatternHit
+        from unittest.mock import patch
+        closes = self._uptrend_closes(250)
+        client = _mock_client(closes)
+        strat = ClassicPatterns({
+            "symbols": ["AAPL"], "use_scanner": False,
+            "enable_candlestick": True, "enable_reversal": False, "enable_continuation": False,
+            "min_confidence": 0.7, "scaled_sizing": False, "notional": 500,
+            "ema_exit": "48", "max_positions": 5,
+        })
+        fake_hit = PatternHit("bearish_engulfing", "bear", 0.7, "candlestick")
+        with patch("server.strategies.chart_patterns.detect_all", return_value=[fake_hit]):
+            signals = strat.evaluate({"AAPL": 10.0}, client=client)
+        sells = [s for s in signals if s.side == "sell"]
+        assert sells, "expected a sell signal"
+        assert sells[0].qty == pytest.approx(10.0)
+
+    def test_sell_on_ema_exit_when_holding(self):
+        """Price below EMA48 while holding → sell with EMA reason string."""
+        from server.strategies.chart_patterns import ClassicPatterns
+        from unittest.mock import patch
+        closes = self._downtrend_closes(250)
+        client = _mock_client(closes)
+        strat = ClassicPatterns({
+            "symbols": ["AAPL"], "use_scanner": False,
+            "enable_candlestick": True, "enable_reversal": False, "enable_continuation": False,
+            "min_confidence": 0.7, "scaled_sizing": False, "notional": 500,
+            "ema_exit": "48", "max_positions": 5,
+        })
+        with patch("server.strategies.chart_patterns.detect_all", return_value=[]):
+            signals = strat.evaluate({"AAPL": 5.0}, client=client)
+        sells = [s for s in signals if s.side == "sell"]
+        assert sells, "expected a sell on EMA48 cross"
+        assert "EMA48" in sells[0].reason or "trend invalidated" in sells[0].reason
+
+    def test_no_buy_when_max_positions_reached(self):
+        from server.strategies.chart_patterns import ClassicPatterns
+        from server.strategies.patterns.detectors import PatternHit
+        from unittest.mock import patch
+        closes = self._uptrend_closes(250)
+        client = _mock_client(closes)
+        strat = ClassicPatterns({
+            "symbols": ["AAPL", "MSFT"], "use_scanner": False,
+            "enable_candlestick": True, "enable_reversal": False, "enable_continuation": False,
+            "min_confidence": 0.7, "scaled_sizing": False, "notional": 500,
+            "ema_exit": "48", "max_positions": 1,
+        })
+        fake_hit = PatternHit("hammer", "bull", 0.7, "candlestick")
+        with patch("server.strategies.chart_patterns.detect_all", return_value=[fake_hit]):
+            signals = strat.evaluate({"MSFT": 1.0}, client=client)
+        assert not any(s.side == "buy" for s in signals)
+
+    def test_skip_symbol_when_insufficient_bars(self):
+        from server.strategies.chart_patterns import ClassicPatterns
+        closes = [100.0 + i for i in range(50)]  # only 50 bars — not enough for EMA200
+        client = _mock_client(closes)
+        strat = ClassicPatterns({
+            "symbols": ["AAPL"], "use_scanner": False,
+            "enable_candlestick": True, "enable_reversal": True, "enable_continuation": True,
+            "min_confidence": 0.7, "scaled_sizing": False, "notional": 500,
+            "ema_exit": "48", "max_positions": 5,
+        })
+        signals = strat.evaluate({}, client=client)
+        assert signals == []
+
+    def test_buy_reason_string_format(self):
+        """Buy reason must contain pattern name, conf %, price, EMA200, and notional."""
+        from server.strategies.chart_patterns import ClassicPatterns
+        from server.strategies.patterns.detectors import PatternHit
+        from unittest.mock import patch
+        closes = self._uptrend_closes(250)
+        client = _mock_client(closes)
+        strat = ClassicPatterns({
+            "symbols": ["AAPL"], "use_scanner": False,
+            "enable_candlestick": True, "enable_reversal": False, "enable_continuation": False,
+            "min_confidence": 0.7, "scaled_sizing": False, "notional": 500,
+            "ema_exit": "48", "max_positions": 5,
+        })
+        fake_hit = PatternHit("hammer", "bull", 0.7, "candlestick")
+        with patch("server.strategies.chart_patterns.detect_all", return_value=[fake_hit]):
+            signals = strat.evaluate({}, client=client)
+        buys = [s for s in signals if s.side == "buy"]
+        assert buys
+        reason = buys[0].reason
+        assert "hammer" in reason
+        assert "70%" in reason
+        assert "EMA200" in reason
+        assert "notional" in reason.lower() or "$" in reason
+
+    def test_strategy_metadata(self):
+        from server.strategies.chart_patterns import ClassicPatterns
+        assert ClassicPatterns.name == "classic_patterns"
+        assert "alpaca" in ClassicPatterns.brokers
+        assert "binance" in ClassicPatterns.brokers
+
+    def test_registered_in_registry(self):
+        from server.strategies import REGISTRY
+        assert "classic_patterns" in REGISTRY
