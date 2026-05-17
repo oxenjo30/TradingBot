@@ -126,45 +126,61 @@
   <!-- Main content: two-column layout -->
   <main class="content" style="display:grid;grid-template-columns:1fr 300px;gap:1rem;align-items:start;">
 
-    <!-- Left column: Positions + Orders -->
-    <div style="display:flex;flex-direction:column;gap:1rem;min-width:0;">
+  <!-- Left column: tables -->
+  <div style="display:flex;flex-direction:column;gap:1rem;min-width:0;">
 
-      <!-- Open Positions card -->
-      <div class="card">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem;">
-          <div style="font-size:14px;font-weight:600;">Open Positions</div>
-          <div style="display:flex;align-items:center;gap:.5rem;">
-            <button id="btn-close-all" class="btn-close-all hidden">Close All</button>
-            <div id="pos-account-wrap"></div>
+    <!-- Open Positions card -->
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem;">
+        <div style="font-size:14px;font-weight:600;">Open Positions</div>
+        <div style="display:flex;align-items:center;gap:.5rem;">
+          <button id="btn-close-all" class="btn-close-all hidden">Close All</button>
+          <div id="pos-account-wrap"></div>
+        </div>
+      </div>
+      <!-- Summary strip -->
+      <div id="pos-summary" style="display:grid;grid-template-columns:repeat(4,1fr);gap:.5rem;margin-bottom:.75rem;"></div>
+      <div class="pos-table-wrap" style="overflow-x:auto;">
+        <table class="dtable pos-table">
+          <colgroup><col style="width:70px"><col style="width:50px"><col><col><col><col><col style="width:100px"><col style="width:36px"></colgroup>
+          <thead>
+            <tr>
+              <th>Symbol</th><th>Side</th><th>Qty</th><th>Avg Entry</th>
+              <th>Price</th><th>Market Value</th><th>Unrealized P&amp;L</th><th></th>
+            </tr>
+          </thead>
+          <tbody id="pos-body"><tr><td colspan="8" class="state-empty">Loading&hellip;</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Orders card -->
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem;">
+        <div style="display:flex;align-items:center;gap:.75rem;">
+          <div style="font-size:14px;font-weight:600;">Orders</div>
+          <!-- Stock / Crypto broker tab -->
+          <div style="display:flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;">
+            <button id="ord-tab-stock"  class="ord-broker-tab ord-broker-active" data-broker="stock">
+              <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/></svg>
+              Stock
+            </button>
+            <button id="ord-tab-crypto" class="ord-broker-tab" data-broker="crypto">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+              Crypto
+            </button>
           </div>
         </div>
-        <!-- Summary strip -->
-        <div id="pos-summary" style="display:grid;grid-template-columns:repeat(4,1fr);gap:.5rem;margin-bottom:.75rem;"></div>
-        <div class="pos-table-wrap" style="overflow-x:auto;">
-          <table class="dtable pos-table">
-            <colgroup><col style="width:70px"><col style="width:50px"><col><col><col><col><col style="width:100px"><col style="width:36px"></colgroup>
-            <thead>
-              <tr>
-                <th>Symbol</th><th>Side</th><th>Qty</th><th>Avg Entry</th>
-                <th>Price</th><th>Market Value</th><th>Unrealized P&amp;L</th><th></th>
-              </tr>
-            </thead>
-            <tbody id="pos-body"><tr><td colspan="8" class="state-empty">Loading&hellip;</td></tr></tbody>
-          </table>
+        <div style="display:flex;align-items:center;gap:.5rem;">
+          <button class="btn btn-sm" id="export-positions-btn" style="font-size:11px;padding:.25rem .6rem;">&darr; CSV</button>
+          <button class="range-tab active" data-status="all">All</button>
+          <button class="range-tab" data-status="open">Open</button>
+          <button class="range-tab" data-status="closed">Closed</button>
         </div>
       </div>
 
-      <!-- Orders card -->
-      <div class="card">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem;">
-          <div style="font-size:14px;font-weight:600;">Orders</div>
-          <div style="display:flex;align-items:center;gap:.5rem;">
-            <button class="btn btn-sm" id="export-positions-btn" style="font-size:11px;padding:.25rem .6rem;">&darr; Positions CSV</button>
-            <button class="range-tab active" data-status="all">All</button>
-            <button class="range-tab" data-status="open">Open</button>
-            <button class="range-tab" data-status="closed">Closed</button>
-          </div>
-        </div>
+      <!-- Stock orders table -->
+      <div id="ord-panel-stock">
         <div class="dtable-wrap" style="overflow-x:auto;">
           <table class="dtable">
             <colgroup><col style="width:90px"><col style="width:70px"><col style="width:50px"><col><col><col style="width:90px"></colgroup>
@@ -176,33 +192,63 @@
         </div>
       </div>
 
+      <!-- Crypto orders table -->
+      <div id="ord-panel-crypto" style="display:none;">
+        <div class="dtable-wrap" style="overflow-x:auto;">
+          <table class="dtable">
+            <colgroup><col style="width:90px"><col style="width:90px"><col style="width:50px"><col><col><col style="width:90px"><col style="width:110px"></colgroup>
+            <thead>
+              <tr><th>Submitted</th><th>Pair</th><th>Side</th><th>Qty</th><th>Status</th><th>Filled At</th><th>P&amp;L</th></tr>
+            </thead>
+            <tbody id="crypto-orders-body"><tr><td colspan="7" class="state-empty">Loading&hellip;</td></tr></tbody>
+          </table>
+        </div>
+      </div>
     </div>
 
-    <!-- Right column: Manual Order Ticket -->
-    <div style="position:sticky;top:1rem;">
-      <div class="card mot-card">
+  </div><!-- /left column -->
 
-        <!-- Title -->
-        <div class="mot-header">
-          <div class="mot-header-title">Manual Order</div>
+  <!-- Right column: sticky manual order -->
+  <div style="position:sticky;top:1rem;">
+
+    <!-- ── Manual Order — tabbed single card ── -->
+    <div class="card mot-card" id="mo-card" style="padding:1rem;">
+
+      <!-- Card header: title + Stock/Crypto tab switcher -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem;">
+        <div style="font-size:13px;font-weight:700;">Manual Order</div>
+        <div style="display:flex;border:1px solid var(--border);border-radius:7px;overflow:hidden;">
+          <button id="mo-tab-stock"  class="ord-broker-tab ord-broker-active" data-mo-broker="stock">
+            <svg width="10" height="10" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/></svg>
+            Stock
+          </button>
+          <button id="mo-tab-crypto" class="ord-broker-tab" data-mo-broker="crypto">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+            Crypto
+          </button>
+        </div>
+      </div>
+
+      <!-- ── Stock panel ── -->
+      <div id="mo-panel-stock">
+        <div id="mo-account-wrap" style="margin-bottom:.5rem;"></div>
+
+        <div class="mot-otype-bar">
+          <button id="mo-otype-market" class="mot-otype-tab mot-otype-active" data-type="market">Market</button>
+          <button id="mo-otype-limit"  class="mot-otype-tab" data-type="limit">Limit</button>
         </div>
 
-        <!-- Account selector -->
-        <div id="mo-account-wrap"></div>
-
-        <!-- Buy / Sell tabs -->
-        <div class="mot-tabs">
+        <div class="mot-tabs" style="margin-bottom:.5rem;">
           <button id="mo-buy-btn" class="mot-tab mot-tab-buy mot-tab-active">
-            <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+            <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
             Buy
           </button>
           <button id="mo-sell-btn" class="mot-tab mot-tab-sell">
-            <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></svg>
+            <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></svg>
             Sell
           </button>
         </div>
 
-        <!-- Symbol row -->
         <div class="mot-sym-row">
           <div class="mot-label">Symbol</div>
           <div class="mot-sym-wrap">
@@ -212,7 +258,6 @@
           <div id="mo-quote-display" class="mot-quote"></div>
         </div>
 
-        <!-- Amount type toggle -->
         <div class="mot-section">
           <div class="mot-label">Amount in</div>
           <div class="mot-toggle">
@@ -221,7 +266,6 @@
           </div>
         </div>
 
-        <!-- Quantity input -->
         <div class="mot-section">
           <div style="display:flex;align-items:center;justify-content:space-between;">
             <div class="mot-label" id="mo-qty-label">Shares</div>
@@ -232,29 +276,135 @@
           </div>
         </div>
 
-        <!-- Limit price -->
-        <div id="mo-price-wrap" class="mot-section">
-          <div style="display:flex;align-items:center;justify-content:space-between;">
-            <div class="mot-label">Limit Price</div>
-            <span style="font-size:11px;color:var(--muted);">optional</span>
-          </div>
+        <div id="mo-price-wrap" class="mot-section" style="display:none;">
+          <div class="mot-label">Limit Price (USD)</div>
           <div class="mot-qty-wrap">
             <span class="mot-qty-prefix">$</span>
-            <input id="mo-price-input" class="mot-qty-input mot-qty-with-prefix" type="number" min="0" step="0.01" placeholder="Market order if blank">
+            <input id="mo-price-input" class="mot-qty-input mot-qty-with-prefix" type="number" min="0" step="0.01" placeholder="e.g. 150.00">
           </div>
         </div>
 
-        <!-- Submit -->
+        <div style="height:1px;background:var(--border);margin:.5rem 0;"></div>
+
+        <div style="display:flex;flex-direction:column;gap:.2rem;margin-bottom:.5rem;">
+          <div style="display:flex;justify-content:space-between;font-size:11px;">
+            <span style="color:var(--muted);">Est. Total</span>
+            <span id="mo-est-total-row" style="font-weight:500;">—</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:11px;">
+            <span style="color:var(--muted);">Est. Fee</span>
+            <span style="color:var(--muted);">~0.05%</span>
+          </div>
+        </div>
+
         <button id="mo-submit" class="mot-submit mot-submit-buy">
           <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
           Place Buy Order
         </button>
-
-        <!-- Result message -->
         <div id="mo-result" class="mo-result" style="text-align:center;font-size:12px;min-height:16px;"></div>
-
       </div>
-    </div>
+
+      <!-- ── Crypto panel ── -->
+      <div id="mo-panel-crypto" style="display:none;">
+        <div style="margin-bottom:.5rem;">
+          <div style="font-size:11px;font-weight:500;color:var(--muted);margin-bottom:.28rem;">Account</div>
+          <div id="cmo-account-wrap"></div>
+        </div>
+
+        <div class="mot-otype-bar">
+          <button id="cmo-otype-limit"  class="mot-otype-tab cmo-otype-active" data-ctype="limit">Limit</button>
+          <button id="cmo-otype-market" class="mot-otype-tab" data-ctype="market">Market</button>
+        </div>
+
+        <div style="margin-bottom:.5rem;">
+          <div style="font-size:11px;font-weight:500;color:var(--muted);margin-bottom:.22rem;">Asset</div>
+          <input id="cmo-asset-input" type="text" placeholder="BTC, ETH, SOL…" autocomplete="off" spellcheck="false"
+            style="width:100%;padding:.4rem .6rem;border-radius:7px;font-size:12px;font-weight:500;background:var(--input-bg,rgba(255,255,255,.05));border:1px solid rgba(240,185,11,.3);color:var(--text);font-family:inherit;outline:none;">
+          <div id="cmo-quote-display" style="margin-top:.3rem;font-size:10px;padding:.28rem .45rem;border-radius:5px;background:rgba(240,185,11,.06);border:1px solid rgba(240,185,11,.18);display:none;line-height:1.5;"></div>
+        </div>
+
+        <!-- Buy / Sell columns side-by-side -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;">
+
+          <!-- BUY column -->
+          <div style="display:flex;flex-direction:column;gap:.35rem;">
+            <div style="font-size:10px;font-weight:700;color:var(--green,#10B981);padding-bottom:.3rem;border-bottom:1px solid var(--border);">&#9650; Buy</div>
+
+            <div id="cmo-buy-price-wrap">
+              <div style="font-size:10px;color:var(--muted);margin-bottom:.18rem;display:flex;justify-content:space-between;"><span>Price</span><span style="color:var(--muted2);">USDT</span></div>
+              <input id="cmo-buy-price" type="number" min="0" step="any" placeholder="0.00" autocomplete="off"
+                style="width:100%;padding:.35rem .45rem;border-radius:6px;font-size:11px;font-weight:500;background:var(--input-bg,rgba(255,255,255,.05));border:1px solid rgba(16,185,129,.35);color:var(--text);font-family:inherit;outline:none;">
+            </div>
+
+            <div>
+              <div style="font-size:10px;color:var(--muted);margin-bottom:.18rem;display:flex;justify-content:space-between;"><span>Amount</span><span id="cmo-buy-asset-label" style="color:var(--muted2);">Coin</span></div>
+              <input id="cmo-buy-amount" type="number" min="0" step="any" placeholder="0.0000" autocomplete="off"
+                style="width:100%;padding:.35rem .45rem;border-radius:6px;font-size:11px;font-weight:500;background:var(--input-bg,rgba(255,255,255,.05));border:1px solid rgba(16,185,129,.35);color:var(--text);font-family:inherit;outline:none;">
+            </div>
+
+            <div style="display:flex;gap:.2rem;">
+              <button class="cmo-pct-btn" data-side="buy" data-pct="25"  style="flex:1;padding:.22rem 0;text-align:center;font-size:9px;font-weight:600;border-radius:4px;cursor:pointer;border:1px solid var(--border);background:var(--pct-bg,rgba(255,255,255,.04));color:var(--muted);">25%</button>
+              <button class="cmo-pct-btn" data-side="buy" data-pct="50"  style="flex:1;padding:.22rem 0;text-align:center;font-size:9px;font-weight:600;border-radius:4px;cursor:pointer;border:1px solid var(--border);background:var(--pct-bg,rgba(255,255,255,.04));color:var(--muted);">50%</button>
+              <button class="cmo-pct-btn" data-side="buy" data-pct="75"  style="flex:1;padding:.22rem 0;text-align:center;font-size:9px;font-weight:600;border-radius:4px;cursor:pointer;border:1px solid var(--border);background:var(--pct-bg,rgba(255,255,255,.04));color:var(--muted);">75%</button>
+              <button class="cmo-pct-btn" data-side="buy" data-pct="100" style="flex:1;padding:.22rem 0;text-align:center;font-size:9px;font-weight:600;border-radius:4px;cursor:pointer;border:1px solid var(--border);background:var(--pct-bg,rgba(255,255,255,.04));color:var(--muted);">100%</button>
+            </div>
+
+            <div>
+              <div style="font-size:10px;color:var(--muted);margin-bottom:.18rem;display:flex;justify-content:space-between;"><span>Total</span><span style="color:var(--muted2);">USDT</span></div>
+              <input id="cmo-buy-total" type="number" min="0" step="any" placeholder="0.00" autocomplete="off"
+                style="width:100%;padding:.35rem .45rem;border-radius:6px;font-size:11px;font-weight:500;background:var(--input-bg,rgba(255,255,255,.05));border:1px solid rgba(16,185,129,.35);color:var(--text);font-family:inherit;outline:none;">
+            </div>
+
+            <div style="height:1px;background:var(--border);"></div>
+            <div style="font-size:9px;color:var(--muted);">Avbl <span id="cmo-buy-avbl" style="color:var(--text);font-weight:500;">—</span></div>
+            <div style="font-size:9px;color:var(--muted);">Fee <span id="cmo-buy-fee" style="color:var(--text);">—</span></div>
+
+            <button id="cmo-buy-submit" style="width:100%;padding:.45rem;border:none;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;background:var(--green,#10B981);color:#fff;">Buy</button>
+            <div id="cmo-buy-result" style="font-size:9px;text-align:center;min-height:14px;"></div>
+          </div>
+
+          <!-- SELL column -->
+          <div style="display:flex;flex-direction:column;gap:.35rem;">
+            <div style="font-size:10px;font-weight:700;color:var(--red,#EF4444);padding-bottom:.3rem;border-bottom:1px solid var(--border);">&#9660; Sell</div>
+
+            <div id="cmo-sell-price-wrap">
+              <div style="font-size:10px;color:var(--muted);margin-bottom:.18rem;display:flex;justify-content:space-between;"><span>Price</span><span style="color:var(--muted2);">USDT</span></div>
+              <input id="cmo-sell-price" type="number" min="0" step="any" placeholder="0.00" autocomplete="off"
+                style="width:100%;padding:.35rem .45rem;border-radius:6px;font-size:11px;font-weight:500;background:var(--input-bg,rgba(255,255,255,.05));border:1px solid rgba(239,68,68,.35);color:var(--text);font-family:inherit;outline:none;">
+            </div>
+
+            <div>
+              <div style="font-size:10px;color:var(--muted);margin-bottom:.18rem;display:flex;justify-content:space-between;"><span>Amount</span><span id="cmo-sell-asset-label" style="color:var(--muted2);">Coin</span></div>
+              <input id="cmo-sell-amount" type="number" min="0" step="any" placeholder="0.0000" autocomplete="off"
+                style="width:100%;padding:.35rem .45rem;border-radius:6px;font-size:11px;font-weight:500;background:var(--input-bg,rgba(255,255,255,.05));border:1px solid rgba(239,68,68,.35);color:var(--text);font-family:inherit;outline:none;">
+            </div>
+
+            <div style="display:flex;gap:.2rem;">
+              <button class="cmo-pct-btn" data-side="sell" data-pct="25"  style="flex:1;padding:.22rem 0;text-align:center;font-size:9px;font-weight:600;border-radius:4px;cursor:pointer;border:1px solid var(--border);background:var(--pct-bg,rgba(255,255,255,.04));color:var(--muted);">25%</button>
+              <button class="cmo-pct-btn" data-side="sell" data-pct="50"  style="flex:1;padding:.22rem 0;text-align:center;font-size:9px;font-weight:600;border-radius:4px;cursor:pointer;border:1px solid var(--border);background:var(--pct-bg,rgba(255,255,255,.04));color:var(--muted);">50%</button>
+              <button class="cmo-pct-btn" data-side="sell" data-pct="75"  style="flex:1;padding:.22rem 0;text-align:center;font-size:9px;font-weight:600;border-radius:4px;cursor:pointer;border:1px solid var(--border);background:var(--pct-bg,rgba(255,255,255,.04));color:var(--muted);">75%</button>
+              <button class="cmo-pct-btn" data-side="sell" data-pct="100" style="flex:1;padding:.22rem 0;text-align:center;font-size:9px;font-weight:600;border-radius:4px;cursor:pointer;border:1px solid var(--border);background:var(--pct-bg,rgba(255,255,255,.04));color:var(--muted);">100%</button>
+            </div>
+
+            <div>
+              <div style="font-size:10px;color:var(--muted);margin-bottom:.18rem;display:flex;justify-content:space-between;"><span>Total</span><span style="color:var(--muted2);">USDT</span></div>
+              <input id="cmo-sell-total" type="number" min="0" step="any" placeholder="0.00" autocomplete="off"
+                style="width:100%;padding:.35rem .45rem;border-radius:6px;font-size:11px;font-weight:500;background:var(--input-bg,rgba(255,255,255,.05));border:1px solid rgba(239,68,68,.35);color:var(--text);font-family:inherit;outline:none;">
+            </div>
+
+            <div style="height:1px;background:var(--border);"></div>
+            <div style="font-size:9px;color:var(--muted);">Avbl <span id="cmo-sell-avbl" style="color:var(--text);font-weight:500;">—</span></div>
+            <div style="font-size:9px;color:var(--muted);">Fee <span id="cmo-sell-fee" style="color:var(--text);">—</span></div>
+
+            <button id="cmo-sell-submit" style="width:100%;padding:.45rem;border:none;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;background:var(--red,#EF4444);color:#fff;">Sell</button>
+            <div id="cmo-sell-result" style="font-size:9px;text-align:center;min-height:14px;"></div>
+          </div>
+
+        </div><!-- /buy-sell split -->
+      </div><!-- /crypto panel -->
+
+    </div><!-- /mo-card -->
+  </div><!-- /right column -->
 
   </main>
 

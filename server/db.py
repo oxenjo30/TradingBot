@@ -560,10 +560,16 @@ def log_signal(strategy: str, symbol: str, side: str, qty: float, reason: str,
         return cur.lastrowid
 
 
-def recent_signals(limit: int = 100) -> list[dict]:
+def recent_signals(limit: int = 100, since: str | None = None, until: str | None = None) -> list[dict]:
+    where, args = [], []
+    if since:
+        where.append("ts >= ?"); args.append(since)
+    if until:
+        where.append("ts <= ?"); args.append(until + "T23:59:59")
+    clause = ("WHERE " + " AND ".join(where)) if where else ""
     with get_conn() as c:
         rows = c.execute(
-            "SELECT * FROM signals ORDER BY id DESC LIMIT ?", (limit,)
+            f"SELECT * FROM signals {clause} ORDER BY id DESC LIMIT ?", (*args, limit)
         ).fetchall()
     return [dict(r) for r in rows]
 
@@ -1533,10 +1539,16 @@ def log_audit(category: str, action: str, detail: str = "") -> None:
         pass
 
 
-def list_audit(limit: int = 200) -> list[dict]:
+def list_audit(limit: int = 200, since: str | None = None, until: str | None = None) -> list[dict]:
+    where, args = [], []
+    if since:
+        where.append("ts >= ?"); args.append(since)
+    if until:
+        where.append("ts <= ?"); args.append(until + " 23:59:59")
+    clause = ("WHERE " + " AND ".join(where)) if where else ""
     with get_conn() as c:
         rows = c.execute(
-            "SELECT id, ts, category, action, detail FROM audit_log ORDER BY ts DESC LIMIT ?",
-            (limit,),
+            f"SELECT id, ts, category, action, detail FROM audit_log {clause} ORDER BY ts DESC LIMIT ?",
+            (*args, limit),
         ).fetchall()
     return [dict(r) for r in rows]
