@@ -8,7 +8,7 @@ from . import db, notifications, strategies
 
 log = logging.getLogger("ai_tuner")
 
-MIN_TRADES = 0   # analyze all enabled strategies
+MIN_TRADES = 10  # require meaningful trade history before tuning
 
 
 def _tuner_provider() -> str:
@@ -181,8 +181,16 @@ def _bounds_summary(schema: list[dict]) -> str:
     return ", ".join(parts) if parts else "no numeric params"
 
 
-def _validate_params(proposed: dict, schema: list[dict]) -> dict | None:
-    """Return validated params restricted to tunable keys, or None if any value is out of bounds."""
+_MAX_CHANGE_PCT = 0.10  # AI may not move any param more than 10% per cycle
+
+
+def _validate_params(proposed: dict, schema: list[dict],
+                     current: dict) -> dict | None:
+    """Return validated params restricted to tunable keys, or None if any value is out of bounds.
+
+    Also clamps each proposed value to within MAX_CHANGE_PCT of its current value
+    so a single tuning cycle cannot make large, destabilising moves.
+    """
     validated = {}
     # Only allow keys the AI was told about — prevents touching grid_lower/grid_upper etc.
     tunable_keys = {p["key"]: p for p in _tunable_schema(schema)}
@@ -201,6 +209,16 @@ def _validate_params(proposed: dict, schema: list[dict]) -> dict | None:
         if (lo is not None and val < lo) or (hi is not None and val > hi):
             log.warning("Tuner: %s=%s out of bounds [%s, %s] — rejecting entire suggestion", key, val, lo, hi)
             return None
+        # Clamp to ±10% of current value so no single cycle can make a wild jump
+        cur = current.get(key)
+        if cur is not None:
+            try:
+                cur = float(cur)
+                if cur != 0:
+                    max_delta = abs(cur) * _MAX_CHANGE_PCT
+                    val = max(cur - max_delta, min(cur + max_delta, val))
+            except (TypeError, ValueError):
+                pass
         validated[key] = val
     return validated if validated else None
 
@@ -259,7 +277,7 @@ def run_tuning() -> dict:
             skipped += 1
             continue
 
-        validated = _validate_params(proposed_params, schema)
+        validated = _validate_params(proposed_params, schema, s["params"])
         if validated is None:
             log.warning("Tuner: out-of-bounds params for %s — skipping", s["name"])
             skipped += 1
@@ -268,6 +286,17 @@ def run_tuning() -> dict:
         # Merge validated changes onto existing params (only keys in schema)
         new_params = dict(s["params"])
         new_params.update(validated)
+
+        # Enforce fast < slow for SMA/EMA crossover strategies
+        for fast_key, slow_key in (("fast", "slow"), ("fast_ema", "slow_ema"), ("macd_fast", "macd_slow")):
+            if fast_key in new_params and slow_key in new_params:
+                fv = float(new_params[fast_key])
+                sv = float(new_params[slow_key])
+                if fv >= sv:
+                    log.warning("Tuner: %s fast(%s)=%s >= slow(%s)=%s — reverting crossover params",
+                                s["name"], fast_key, fv, slow_key, sv)
+                    new_params[fast_key] = s["params"].get(fast_key, fv)
+                    new_params[slow_key] = s["params"].get(slow_key, sv)
 
         if new_params == s["params"]:
             log.info("Tuner: no change suggested for %s", s["name"])

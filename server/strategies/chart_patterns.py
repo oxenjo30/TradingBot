@@ -54,11 +54,13 @@ class ClassicPatterns(Strategy):
         {"key": "scaled_sizing", "label": "Scale Size by Confidence", "type": "bool",
          "hint": "When on: confidence 1.0 = 100% notional, 0.7 = 70%, 0.4 = 40%. When off, always uses the full amount."},
         {"key": "notional", "label": "Amount per Trade (USD)", "type": "number", "min": 10, "max": 100000,
+         "ai_tunable": False,
          "hint": "Max USD per trade at confidence 1.0."},
         {"key": "ema_exit", "label": "EMA Exit Period", "type": "select",
          "options": ["48", "200"],
          "hint": "EMA period used as trend exit fallback. Price dropping below this EMA exits the position."},
         {"key": "max_positions", "label": "Max Open Positions", "type": "number", "min": 1, "max": 50,
+         "ai_tunable": False,
          "hint": "Maximum simultaneous open positions."},
     ]
 

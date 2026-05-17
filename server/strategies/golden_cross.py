@@ -40,6 +40,7 @@ class GoldenCross(Strategy):
         {"key": "slow", "label": "Slow SMA Period (days)", "type": "number", "min": 20, "max": 500,
          "hint": "The longer moving average. The classic Golden Cross uses 200 days. Must be larger than the fast period. This line represents the long-term trend."},
         {"key": "notional", "label": "Amount per Trade (USD)", "type": "number", "min": 10, "max": 100000,
+         "ai_tunable": False,
          "hint": "Dollar amount to spend on each buy signal. Because this strategy holds positions for weeks or months, a larger amount is common (e.g. $1000)."},
     ]
 
