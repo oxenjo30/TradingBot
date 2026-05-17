@@ -46,10 +46,12 @@ class EMAConfluence(Strategy):
         {"key": "scaled_sizing", "label": "Scale Size by Score", "type": "bool",
          "hint": "When on: score 4 uses 100% of the notional amount, score 3 uses 70%, score 2 uses 40%. When off, always trades the full amount."},
         {"key": "notional", "label": "Amount per Trade (USD)", "type": "number", "min": 10, "max": 100000,
+         "ai_tunable": False,
          "hint": "Maximum USD to spend on a single buy. At confluence score 4 the full amount is used; lower scores use a fraction when scaled sizing is on."},
         {"key": "avoid_earnings", "label": "Skip Earnings Days", "type": "bool",
          "hint": "Skip symbols that have an earnings announcement within 2 days. Alpaca only -- crypto is always exempt."},
         {"key": "max_positions", "label": "Max Open Positions", "type": "number", "min": 1, "max": 50,
+         "ai_tunable": False,
          "hint": "Maximum number of symbols this strategy can hold at the same time."},
     ]
 

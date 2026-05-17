@@ -63,8 +63,10 @@ class MomentumBreakout(Strategy):
         {"key": "rsi_exit_overbought", "label": "RSI Exit (Overbought)", "type": "number", "min": 50, "max": 99,
          "hint": "If RSI rises above this level while holding a position, the strategy sells — the stock is considered overextended."},
         {"key": "notional", "label": "Amount per Trade (USD)", "type": "number", "min": 10, "max": 100000,
+         "ai_tunable": False,
          "hint": "Dollar amount to spend on each buy signal. Example: 500 buys $500 worth of the stock."},
         {"key": "max_positions", "label": "Max Open Positions", "type": "number", "min": 1, "max": 50,
+         "ai_tunable": False,
          "hint": "Maximum number of stocks this strategy can hold at the same time. Helps manage risk and spread capital."},
     ]
 

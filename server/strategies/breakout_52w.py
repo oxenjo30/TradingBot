@@ -65,11 +65,13 @@ class Breakout52Week(Strategy):
          "hint": "Today's volume must be at least this many times the average to confirm a real breakout. 1.2 means 20% above average. Higher values reduce false breakouts."},
         {"key": "rsi_exhaustion", "label": "RSI Exhaustion Exit", "type": "number", "min": 60, "max": 99,
          "hint": "If RSI rises above this level while holding, the strategy sells — the stock may be running out of buyers. 80 is a strong overbought signal."},
-        {"key": "stop_pct", "label": "Trailing Stop (%)", "type": "number", "min": 1, "max": 50,
+        {"key": "stop_pct", "label": "Trailing Stop (%)", "type": "number", "min": 1, "max": 15,
          "hint": "The strategy sells if the price falls this many percent below the 52-week high at entry. For example, 7 means sell if the price drops 7% from the breakout level."},
         {"key": "notional", "label": "Amount per Trade (USD)", "type": "number", "min": 10, "max": 100000,
+         "ai_tunable": False,
          "hint": "Dollar amount to spend on each buy signal. Example: 500 buys $500 worth of the stock."},
         {"key": "max_positions", "label": "Max Open Positions", "type": "number", "min": 1, "max": 50,
+         "ai_tunable": False,
          "hint": "Maximum number of stocks this strategy can hold at once. Limits exposure and spreads your capital across different names."},
     ]
 

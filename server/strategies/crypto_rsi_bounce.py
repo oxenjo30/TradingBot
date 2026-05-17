@@ -49,8 +49,10 @@ class CryptoRSIBounce(Strategy):
         {"key": "rsi_overbought", "label": "RSI Overbought Exit", "type": "number", "min": 51, "max": 90,
          "hint": "RSI above this level while holding triggers a sell. Default 65 (tighter than stock's 70)."},
         {"key": "notional", "label": "Amount per Trade (USD)", "type": "number", "min": 10, "max": 100000,
+         "ai_tunable": False,
          "hint": "Dollar amount to spend on each buy signal."},
         {"key": "max_positions", "label": "Max Open Positions", "type": "number", "min": 1, "max": 20,
+         "ai_tunable": False,
          "hint": "Maximum number of crypto pairs to hold at once."},
     ]
 

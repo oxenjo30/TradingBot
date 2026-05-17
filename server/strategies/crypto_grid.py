@@ -45,8 +45,10 @@ class CryptoGrid(Strategy):
         {"key": "trend_sma", "label": "Trend Filter SMA (days)", "type": "number", "min": 20, "max": 200,
          "hint": "Only buy when price is above this SMA (uptrend filter). Set to 0 to disable."},
         {"key": "notional", "label": "Amount per Trade (USD)", "type": "number", "min": 10, "max": 100000,
+         "ai_tunable": False,
          "hint": "Dollar amount to spend on each buy signal."},
         {"key": "max_positions", "label": "Max Open Positions", "type": "number", "min": 1, "max": 20,
+         "ai_tunable": False,
          "hint": "Maximum number of crypto pairs to hold at once."},
     ]
 

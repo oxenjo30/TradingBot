@@ -75,6 +75,7 @@ class BollingerBandMeanReversion(Strategy):
         {"key": "rsi_exit", "label": "RSI Exit Level", "type": "number", "min": 40, "max": 99,
          "hint": "If RSI rises above this level while holding a position, the strategy sells. Indicates the stock has recovered."},
         {"key": "notional", "label": "Amount per Trade (USD)", "type": "number", "min": 10, "max": 100000,
+         "ai_tunable": False,
          "hint": "Dollar amount to spend on each buy signal. Example: 500 buys $500 worth of the stock."},
     ]
 

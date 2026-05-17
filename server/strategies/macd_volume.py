@@ -76,6 +76,7 @@ class MACDVolume(Strategy):
         {"key": "volume_multiplier", "label": "Volume Confirmation (multiplier)", "type": "number", "min": 1.0, "max": 10.0,
          "hint": "Today's volume must be at least this many times the average to confirm the MACD crossover. 1.1 means 10% above average. Helps filter out weak signals."},
         {"key": "notional", "label": "Amount per Trade (USD)", "type": "number", "min": 10, "max": 100000,
+         "ai_tunable": False,
          "hint": "Dollar amount to spend on each buy signal. Example: 500 buys $500 worth of the stock."},
     ]
 

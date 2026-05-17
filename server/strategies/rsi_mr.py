@@ -52,8 +52,10 @@ class RSIMeanReversion(Strategy):
         {"key": "exit", "label": "Exit RSI Level", "type": "number", "min": 40, "max": 99,
          "hint": "RSI level above which the strategy sells the position. The stock has recovered enough — time to take profit."},
         {"key": "notional", "label": "Amount per Trade (USD)", "type": "number", "min": 10, "max": 100000,
+         "ai_tunable": False,
          "hint": "Dollar amount to spend on each buy signal. Example: 500 buys $500 worth of the stock."},
         {"key": "qty", "label": "Shares per Trade", "type": "number", "min": 1, "max": 10000,
+         "ai_tunable": False,
          "hint": "Fixed number of shares to buy per signal. If you set a dollar amount above, leave this blank."},
     ]
 

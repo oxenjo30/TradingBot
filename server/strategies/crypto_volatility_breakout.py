@@ -66,8 +66,10 @@ class CryptoVolatilityBreakout(Strategy):
         {"key": "stop_pct", "label": "Stop Loss %", "type": "number", "min": 1.0, "max": 10.0,
          "hint": "Sell if price drops this % below entry price to limit losses."},
         {"key": "notional", "label": "Amount per Trade (USD)", "type": "number", "min": 10, "max": 100000,
+         "ai_tunable": False,
          "hint": "Dollar amount to spend on each buy signal."},
         {"key": "max_positions", "label": "Max Open Positions", "type": "number", "min": 1, "max": 20,
+         "ai_tunable": False,
          "hint": "Maximum number of crypto pairs to hold at once."},
     ]
 

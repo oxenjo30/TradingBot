@@ -38,8 +38,10 @@ class CryptoTrend(Strategy):
         {"key": "slow_ema", "label": "Slow EMA Period (days)", "type": "number", "min": 5, "max": 200,
          "hint": "Long moving average period. Default is 21. Must be greater than Fast EMA."},
         {"key": "notional", "label": "Amount per Trade (USD)", "type": "number", "min": 10, "max": 100000,
+         "ai_tunable": False,
          "hint": "Dollar amount to spend on each buy signal."},
         {"key": "max_positions", "label": "Max Open Positions", "type": "number", "min": 1, "max": 20,
+         "ai_tunable": False,
          "hint": "Maximum number of crypto pairs to hold at once."},
     ]
 
