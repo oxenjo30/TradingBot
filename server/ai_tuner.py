@@ -161,33 +161,46 @@ def _build_prompt(strategy_label: str, current_params: dict,
     )
 
 
+def _tunable_schema(schema: list[dict]) -> list[dict]:
+    """Return only params that the AI is allowed to tune.
+
+    Excluded: params with ai_tunable=False, params missing a max bound
+    (unbounded params like grid_lower/grid_upper cannot be safely AI-tuned).
+    """
+    return [
+        p for p in schema
+        if p.get("type") == "number"
+        and p.get("ai_tunable", True)
+        and p.get("max") is not None
+    ]
+
+
 def _bounds_summary(schema: list[dict]) -> str:
-    parts = []
-    for p in schema:
-        if p.get("type") == "number":
-            parts.append(f"{p['key']}: [{p.get('min', '?')}–{p.get('max', '?')}]")
+    tunable = _tunable_schema(schema)
+    parts = [f"{p['key']}: [{p.get('min', '?')}–{p['max']}]" for p in tunable]
     return ", ".join(parts) if parts else "no numeric params"
 
 
 def _validate_params(proposed: dict, schema: list[dict]) -> dict | None:
-    """Return validated params or None if any value is out of bounds."""
+    """Return validated params restricted to tunable keys, or None if any value is out of bounds."""
     validated = {}
-    schema_map = {p["key"]: p for p in schema}
+    # Only allow keys the AI was told about — prevents touching grid_lower/grid_upper etc.
+    tunable_keys = {p["key"]: p for p in _tunable_schema(schema)}
     for key, val in proposed.items():
-        if key not in schema_map:
+        if key not in tunable_keys:
+            log.warning("Tuner: AI proposed non-tunable key %r — ignoring", key)
             continue
-        p = schema_map[key]
-        if p.get("type") == "number":
-            try:
-                val = float(val)
-            except (TypeError, ValueError):
-                log.warning("Tuner: non-numeric value for %s: %r", key, val)
-                return None
-            lo = p.get("min")
-            hi = p.get("max")
-            if (lo is not None and val < lo) or (hi is not None and val > hi):
-                log.warning("Tuner: %s=%s out of bounds [%s, %s]", key, val, lo, hi)
-                return None
+        p = tunable_keys[key]
+        try:
+            val = float(val)
+        except (TypeError, ValueError):
+            log.warning("Tuner: non-numeric value for %s: %r", key, val)
+            return None
+        lo = p.get("min")
+        hi = p.get("max")
+        if (lo is not None and val < lo) or (hi is not None and val > hi):
+            log.warning("Tuner: %s=%s out of bounds [%s, %s] — rejecting entire suggestion", key, val, lo, hi)
+            return None
         validated[key] = val
     return validated if validated else None
 
