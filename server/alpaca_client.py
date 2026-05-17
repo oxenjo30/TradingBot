@@ -340,7 +340,29 @@ class AccountClient:
             time_in_force=TimeInForce.DAY,
             client_order_id=client_order_id,
         )
-        o = self._t.submit_order(req)
+        try:
+            o = self._t.submit_order(req)
+        except Exception as e:
+            # Alpaca rejects notional/fractional orders for non-fractionable assets.
+            # Fall back to a whole-share qty order derived from the notional amount.
+            if "not fractionable" in str(e) and notional and not qty:
+                quote = get_latest_quote(symbol)
+                price = quote.get("ask") or quote.get("bid")
+                whole_qty = int(notional // float(price)) if price else 0
+                if whole_qty < 1:
+                    raise ValueError(
+                        f"{symbol} is not fractionable and notional ${notional} is less than one share"
+                    ) from e
+                req2 = MarketOrderRequest(
+                    symbol=symbol.upper(),
+                    qty=whole_qty,
+                    side=req.side,
+                    time_in_force=req.time_in_force,
+                    client_order_id=client_order_id,
+                )
+                o = self._t.submit_order(req2)
+            else:
+                raise
         return {
             "id": str(o.id),
             "symbol": o.symbol,

@@ -1,4 +1,4 @@
-"""Weekly strategy parameter tuner — uses Ollama to suggest param improvements."""
+"""Weekly strategy parameter tuner — uses Ollama or Claude to suggest param improvements."""
 import json
 import logging
 import urllib.error
@@ -8,7 +8,11 @@ from . import db, notifications, strategies
 
 log = logging.getLogger("ai_tuner")
 
-MIN_TRADES = 10
+MIN_TRADES = 0   # analyze all enabled strategies
+
+
+def _tuner_provider() -> str:
+    return db.get_app_config("ai_tuner_provider", "ollama")  # "ollama" or "claude"
 
 
 def _ollama_url() -> str:
@@ -19,8 +23,27 @@ def _ollama_model() -> str:
     return db.get_app_config("ai_ollama_model", "llama3")
 
 
+def _claude_api_key() -> str:
+    return db.get_app_config("ai_claude_api_key", "")
+
+
+def _claude_model() -> str:
+    return db.get_app_config("ai_claude_model", "claude-haiku-4-5-20251001")
+
+
 def _tuner_enabled() -> bool:
     return db.get_app_config("ai_tuner_enabled", "true") == "true"
+
+
+def _target_win_rate() -> float:
+    return float(db.get_app_config("ai_target_win_rate", "51"))
+
+
+def active_provider_label() -> str:
+    """Return a display string for the active provider + model."""
+    if _tuner_provider() == "claude" and _claude_api_key():
+        return f"Claude ({_claude_model()})"
+    return f"Ollama ({_ollama_model()})"
 
 
 def _call_ollama(prompt: str) -> str | None:
@@ -43,20 +66,98 @@ def _call_ollama(prompt: str) -> str | None:
         return None
 
 
+def _call_claude(prompt: str) -> str | None:
+    api_key = _claude_api_key()
+    if not api_key:
+        return None
+    payload = json.dumps({
+        "model": _claude_model(),
+        "max_tokens": 1024,
+        "messages": [{"role": "user", "content": prompt}],
+    }).encode()
+    req = urllib.request.Request(
+        "https://api.anthropic.com/v1/messages",
+        data=payload,
+        headers={
+            "Content-Type": "application/json",
+            "x-api-key": api_key,
+            "anthropic-version": "2023-06-01",
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            data = json.loads(resp.read())
+            return data["content"][0]["text"].strip()
+    except urllib.error.HTTPError as e:
+        body = e.read().decode(errors="replace")
+        log.warning("Tuner: Claude HTTP %d — %s", e.code, body[:300])
+        return None
+    except (urllib.error.URLError, OSError, json.JSONDecodeError, KeyError, IndexError) as e:
+        log.warning("Tuner: Claude call error — %s", e)
+        return None
+
+
+def _call_ai(prompt: str) -> str | None:
+    """Call the configured AI provider. Falls back to Ollama if Claude key missing."""
+    if _tuner_provider() == "claude" and _claude_api_key():
+        result = _call_claude(prompt)
+        if result is not None:
+            return result
+        log.warning("Tuner: Claude call failed, falling back to Ollama")
+    return _call_ollama(prompt)
+
+
 def _build_prompt(strategy_label: str, current_params: dict,
                   bounds_summary: str, perf: dict) -> str:
+    target = _target_win_rate()
+    if perf["total_trades"] == 0:
+        perf_section = "Performance: No completed trades yet — suggest conservative, well-proven default parameters for this strategy type."
+        guidance = (
+            f"The target win rate is {target}%+. Suggest parameters that are conservative and proven:\n"
+            "- Prefer tighter entry conditions over frequent signals\n"
+            "- Favor higher thresholds that filter out noise\n"
+        )
+    else:
+        win_rate = perf["win_rate"]
+        avg_pnl  = perf["avg_pnl"]
+        perf_section = (
+            f"Performance last 90 days:\n"
+            f"- Total trades: {perf['total_trades']}, "
+            f"Win rate: {win_rate}%, "
+            f"Avg P&L: ${avg_pnl}"
+        )
+        if win_rate < target - 15:
+            guidance = (
+                f"Win rate is critically low at {win_rate}% vs target of {target}%. Make significant parameter changes to filter bad trades:\n"
+                "- Raise entry thresholds to require stronger signals before buying\n"
+                "- Widen stop-loss or tighten take-profit to cut losers faster\n"
+                "- Reduce position frequency (raise RSI thresholds, widen BB bands, etc.)\n"
+                f"Target: reach at least {target}% win rate."
+            )
+        elif win_rate < target:
+            guidance = (
+                f"Win rate is {win_rate}% — below the {target}% target. Tighten entry conditions:\n"
+                "- Increase oversold/overbought thresholds for stronger confirmation\n"
+                "- Consider slightly wider bands or longer periods to reduce false signals\n"
+                f"Target: reach at least {target}% win rate."
+            )
+        else:
+            guidance = (
+                f"Win rate is {win_rate}% — at or above {target}% target. Fine-tune to maintain or improve it:\n"
+                "- Small adjustments only; don't break what's working\n"
+                "- Consider whether avg P&L can be improved without hurting win rate"
+            )
     return (
-        "You are a trading strategy optimizer. Suggest parameter adjustments "
-        "as valid JSON only — no explanation outside the JSON block.\n\n"
+        "You are an expert trading strategy optimizer. Your goal is to maximize win rate above 51%.\n"
+        "Reply with ONLY valid JSON — no explanation, no markdown fences.\n\n"
         f"Strategy: {strategy_label}\n"
         f"Current params: {json.dumps(current_params)}\n"
         f"Param bounds: {bounds_summary}\n\n"
-        "Performance last 90 days:\n"
-        f"- Total trades: {perf['total_trades']}, "
-        f"Win rate: {perf['win_rate']}%, "
-        f"Avg P&L: ${perf['avg_pnl']}\n\n"
-        "Suggest new params that may improve win rate.\n"
-        'Reply with ONLY: {"params": {...}, "rationale": "..."}'
+        f"{perf_section}\n\n"
+        f"{guidance}\n\n"
+        "Only include numeric params listed in bounds. Make meaningful changes, not tiny tweaks.\n"
+        'Reply with ONLY: {"params": {...}, "rationale": "one sentence explaining the key change"}'
     )
 
 
@@ -103,6 +204,10 @@ def run_tuning() -> dict:
     all_strats = db.get_strategies()
     tuned_results = []
     skipped = 0
+    provider = _tuner_provider()
+    used_claude = provider == "claude" and _claude_api_key()
+    active_provider = "claude" if used_claude else "ollama"
+    active_model    = _claude_model() if used_claude else _ollama_model()
 
     for s in all_strats:
         if not s["enabled"]:
@@ -122,10 +227,10 @@ def run_tuning() -> dict:
 
         strat_label = s["name"].replace("_", " ").title()
         prompt = _build_prompt(strat_label, s["params"], _bounds_summary(schema), perf)
-        raw = _call_ollama(prompt)
+        raw = _call_ai(prompt)
         if raw is None:
-            log.warning("Tuner: Ollama unreachable — aborting tuning run")
-            return {"tuned": 0, "skipped": skipped, "error": "Ollama unreachable"}
+            log.warning("Tuner: AI provider unreachable — aborting tuning run")
+            return {"tuned": 0, "skipped": skipped, "error": "AI provider unreachable"}
 
         # Extract JSON — Ollama sometimes wraps it in markdown fences
         try:
@@ -137,7 +242,7 @@ def run_tuning() -> dict:
             proposed_params = parsed["params"]
             rationale = str(parsed.get("rationale", ""))
         except (json.JSONDecodeError, KeyError, TypeError) as exc:
-            log.warning("Tuner: malformed JSON from Ollama for %s: %s", s["name"], exc)
+            log.warning("Tuner: malformed JSON from AI provider for %s: %s", s["name"], exc)
             skipped += 1
             continue
 
@@ -156,7 +261,8 @@ def run_tuning() -> dict:
             skipped += 1
             continue
 
-        db.log_tuning_run(s["name"], s["params"], new_params, rationale, perf["win_rate"])
+        db.log_tuning_run(s["name"], s["params"], new_params, rationale, perf["win_rate"],
+                          ai_provider=active_provider, ai_model=active_model)
         db.upsert_strategy(s["name"], enabled=s["enabled"], params=new_params)
         tuned_results.append({
             "strategy": strat_label,

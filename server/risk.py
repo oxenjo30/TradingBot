@@ -99,6 +99,22 @@ def check_all(symbol: str, side: str, account: dict, day_trade_count: int,
     settings = get_settings()
     is_crypto = broker.lower() in _CRYPTO_BROKERS
 
+    # Route every check to its own independent stock or crypto setting
+    if is_crypto:
+        max_daily_loss = settings["max_daily_loss_pct_crypto"]
+        max_open_pos   = settings["max_open_positions_crypto"]
+        max_sym_exp    = settings["max_symbol_exposure_pct_crypto"]
+        consec_limit   = settings["consecutive_loss_limit_crypto"]
+        weekly_limit   = settings["weekly_loss_limit_pct_crypto"]
+        max_ord        = settings["max_orders_per_day_crypto"]
+    else:
+        max_daily_loss = settings["max_daily_loss_pct"]
+        max_open_pos   = settings["max_open_positions"]
+        max_sym_exp    = settings["max_symbol_exposure_pct"]
+        consec_limit   = settings["consecutive_loss_limit"]
+        weekly_limit   = settings["weekly_loss_limit_pct"]
+        max_ord        = settings["max_orders_per_day"]
+
     # 1. Kill switch
     if settings["kill_switch"]:
         raise RiskViolation("kill switch is active — all auto-trading halted")
@@ -114,46 +130,46 @@ def check_all(symbol: str, side: str, account: dict, day_trade_count: int,
         raise RiskViolation(f"{symbol} is on the no-trade blacklist")
 
     # 3. Trading hours guard (ET) — skipped for 24/7 crypto brokers
-    start_str = settings.get("trading_hours_start", "")
-    end_str   = settings.get("trading_hours_end", "")
-    if start_str and end_str and not is_crypto:
-        try:
-            from zoneinfo import ZoneInfo
-            et_now = datetime.now(ZoneInfo("America/New_York")).time()
-            sh, sm = map(int, start_str.split(":"))
-            eh, em = map(int, end_str.split(":"))
-            if not (time(sh, sm) <= et_now <= time(eh, em)):
-                raise RiskViolation(
-                    f"outside allowed trading hours ({start_str}–{end_str} ET)"
-                )
-        except RiskViolation:
-            raise
-        except Exception:
-            pass  # malformed time setting — skip check
+    if not is_crypto:
+        start_str = settings.get("trading_hours_start", "")
+        end_str   = settings.get("trading_hours_end", "")
+        if start_str and end_str:
+            try:
+                from zoneinfo import ZoneInfo
+                et_now = datetime.now(ZoneInfo("America/New_York")).time()
+                sh, sm = map(int, start_str.split(":"))
+                eh, em = map(int, end_str.split(":"))
+                if not (time(sh, sm) <= et_now <= time(eh, em)):
+                    raise RiskViolation(
+                        f"outside allowed trading hours ({start_str}--{end_str} ET)"
+                    )
+            except RiskViolation:
+                raise
+            except Exception:
+                pass  # malformed time setting — skip check
 
     # 4. Daily loss limit
     day_pl_pct = account.get("day_pl_pct", 0.0)
-    max_loss = -abs(settings["max_daily_loss_pct"])
+    max_loss = -abs(max_daily_loss)
     if day_pl_pct <= max_loss:
         set_kill_switch(True)
         raise RiskViolation(
-            f"daily loss limit hit: {day_pl_pct:.2f}% ≤ {max_loss:.2f}% "
-            f"— kill switch auto-engaged"
+            f"daily loss limit hit: {day_pl_pct:.2f}% <= {max_loss:.2f}% "
+            f"-- kill switch auto-engaged"
         )
 
     # 5. Weekly loss limit
-    weekly_limit = settings.get("weekly_loss_limit_pct", 0.0)
     if weekly_limit > 0:
         week_pl_pct = _get_weekly_pl_pct(account)
         if week_pl_pct <= -abs(weekly_limit):
             set_kill_switch(True)
             raise RiskViolation(
-                f"weekly loss limit hit: {week_pl_pct:.2f}% ≤ -{weekly_limit:.2f}% "
-                f"— kill switch auto-engaged"
+                f"weekly loss limit hit: {week_pl_pct:.2f}% <= -{weekly_limit:.2f}% "
+                f"-- kill switch auto-engaged"
             )
 
-    # 6. PDT guard (buy side only, accounts < $25k)
-    if side == "buy":
+    # 6. PDT guard (buy side only, stock accounts < $25k, N/A for crypto)
+    if side == "buy" and not is_crypto:
         equity = account.get("equity", 0.0)
         if equity < PDT_EQUITY_THRESHOLD:
             max_dt = settings["max_day_trades"]
@@ -164,14 +180,12 @@ def check_all(symbol: str, side: str, account: dict, day_trade_count: int,
                 )
 
     # 7. Max open positions (buy side only)
-    max_pos = settings.get("max_open_positions", 0)
-    if side == "buy" and max_pos > 0 and open_positions_count >= max_pos:
+    if side == "buy" and max_open_pos > 0 and open_positions_count >= max_open_pos:
         raise RiskViolation(
-            f"max open positions reached: {open_positions_count}/{max_pos}"
+            f"max open positions reached: {open_positions_count}/{max_open_pos}"
         )
 
     # 8. Max symbol exposure (buy side only)
-    max_sym_exp = settings.get("max_symbol_exposure_pct", 0.0)
     if side == "buy" and max_sym_exp > 0 and current_symbol_value > 0:
         portfolio_value = account.get("portfolio_value", 0.0)
         if portfolio_value > 0:
@@ -182,7 +196,6 @@ def check_all(symbol: str, side: str, account: dict, day_trade_count: int,
                 )
 
     # 9. Max orders per day
-    max_ord = settings.get("max_orders_per_day", 0)
     if max_ord > 0:
         today_count = db.count_signals_today()
         if today_count >= max_ord:
@@ -191,7 +204,6 @@ def check_all(symbol: str, side: str, account: dict, day_trade_count: int,
             )
 
     # 10. Consecutive loss limit
-    consec_limit = settings.get("consecutive_loss_limit", 0)
     if consec_limit > 0:
         consec = db.get_consecutive_losses()
         if consec >= consec_limit:
@@ -204,13 +216,18 @@ def check_all(symbol: str, side: str, account: dict, day_trade_count: int,
 # ── Position sizing ───────────────────────────────────────────────────────────
 
 def calc_qty(symbol: str, side: str, fixed_qty: float,
-             account: dict, current_price: float | None) -> float:
+             account: dict, current_price: float | None,
+             broker: str = "alpaca") -> float:
     """
     Returns the qty to trade after applying position sizing rules.
     Falls back to fixed_qty if price is unavailable or mode is 'fixed'.
     """
     settings = get_settings()
-    mode = settings["position_size_mode"]
+    is_crypto = broker.lower() in _CRYPTO_BROKERS
+
+    mode        = settings["position_size_mode_crypto"]  if is_crypto else settings["position_size_mode"]
+    size_pct    = settings["position_size_pct_crypto"]   if is_crypto else settings["position_size_pct"]
+    max_pos_pct = settings["max_position_pct_crypto"]    if is_crypto else settings["max_position_pct"]
 
     if mode == "fixed" or current_price is None or current_price <= 0:
         return fixed_qty
@@ -220,16 +237,16 @@ def calc_qty(symbol: str, side: str, fixed_qty: float,
         return fixed_qty
 
     if mode == "pct_portfolio":
-        dollar_target = portfolio_value * settings["position_size_pct"] / 100.0
+        dollar_target = portfolio_value * size_pct / 100.0
         qty = max(1.0, round(dollar_target / current_price, 4))
 
-        max_dollars = portfolio_value * settings["max_position_pct"] / 100.0
+        max_dollars = portfolio_value * max_pos_pct / 100.0
         max_qty = max(1.0, round(max_dollars / current_price, 4))
         qty = min(qty, max_qty)
 
         log.info(
-            "%s size: pct_portfolio %.1f%% of $%.0f → %.4f shares @ $%.2f",
-            symbol, settings["position_size_pct"], portfolio_value, qty, current_price,
+            "%s size: pct_portfolio %.1f%% of $%.0f -> %.4f shares @ $%.2f",
+            symbol, size_pct, portfolio_value, qty, current_price,
         )
         return qty
 

@@ -63,7 +63,10 @@
       "mcp__Claude_in_Chrome__read_console_messages",
       "Bash(powershell -Command 'Get-WmiObject Win32_Process | Where-Object { $_.Name -like '\\\\''python*'\\\\'' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }')",
       "Bash(curl -s --ssl-no-revoke http://127.0.0.1:8000/api/settings/broker/test -H \"Cookie: session=test\")",
-      "Bash(curl -s --ssl-no-revoke http://127.0.0.1:8000/api/scanner)"
+      "Bash(curl -s --ssl-no-revoke http://127.0.0.1:8000/api/scanner)",
+      "Bash(python -c \"from server.db import get_watchlists, create_watchlist; print\\(create_watchlist\\('Test'\\)\\); print\\(get_watchlists\\(\\)\\)\")",
+      "Bash(cat \"\\\\tmp\\\\brainstorm\\\\state\\\\events\" 2>/dev/null || echo \"no events file\")",
+      "Read(//c/tmp/brainstorm/state/**)"
     ]
   }
 }

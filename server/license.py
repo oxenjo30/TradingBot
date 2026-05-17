@@ -10,21 +10,20 @@ import uuid
 
 MACHINE_ANY = "ANY"
 
-# Embedded fallback — never changes, survives .env edits or deletions
-_EMBEDDED_SECRET = "tradebot-seller-secret-key-2024!!"
-
 # In-process cache: once valid, skip re-verification for 1 hour
 _cache: dict = {}
 _CACHE_TTL = 3600  # seconds
 
 
 def _get_seller_secret() -> str:
-    """Return the seller secret. Env var takes priority; embedded constant is the fallback."""
-    return (
-        os.environ.get("TRADEBOT_LICENSE_SECRET")
-        or _read_env_secret()
-        or _EMBEDDED_SECRET
-    )
+    """Return the seller secret from env var or .env file. Raises if not set."""
+    secret = os.environ.get("TRADEBOT_LICENSE_SECRET") or _read_env_secret()
+    if not secret:
+        raise RuntimeError(
+            "TRADEBOT_LICENSE_SECRET is not set. "
+            "Add it to your .env file or environment variables."
+        )
+    return secret
 
 
 def _read_env_secret() -> str:
