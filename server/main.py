@@ -64,6 +64,11 @@ def _get_token(request: Request) -> str | None:
 
 def _require_auth(request: Request):
     if not auth.password_is_set():
+        # Allow through only during initial setup wizard. Once setup is marked
+        # complete the password_hash row must exist — treat absence as corruption
+        # and reject rather than silently granting unauthenticated access.
+        if auth.setup_complete():
+            raise HTTPException(401, "Unauthorized")
         return
     if not auth.validate_session(_get_token(request)):
         raise HTTPException(401, "Unauthorized")
@@ -248,6 +253,8 @@ def logout(request: Request, response: Response):
 
 @app.post("/api/setup/complete")
 def setup_complete(body: SetupCompleteIn):
+    if auth.setup_complete():
+        raise HTTPException(409, "Setup already completed")
     # 1. Ensure DB_SECRET_KEY exists in .env (generate once; preserve everything else)
     env_path = BASE_DIR / ".env"
     existing_secret = os.environ.get("DB_SECRET_KEY") or _read_env_key("DB_SECRET_KEY")
