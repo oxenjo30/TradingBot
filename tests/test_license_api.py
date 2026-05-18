@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 
 import server.auth as _auth
 _auth.password_is_set = lambda: False
+_auth.setup_complete  = lambda: False
 
 
 @pytest.fixture
@@ -48,6 +49,7 @@ def test_license_status_without_key_returns_invalid(tmp_path, monkeypatch):
     db_mod.init_db()
     import server.auth as auth_mod
     monkeypatch.setattr(auth_mod, "password_is_set", lambda: False)
+    monkeypatch.setattr(auth_mod, "setup_complete", lambda: False)
     from fastapi.testclient import TestClient
     from server.main import app as _app
     c = TestClient(_app)
@@ -63,6 +65,7 @@ def test_delete_license_deactivates(tmp_path, monkeypatch):
     db_mod.init_db()
     import server.auth as auth_mod
     monkeypatch.setattr(auth_mod, "password_is_set", lambda: False)
+    monkeypatch.setattr(auth_mod, "setup_complete", lambda: False)
     import server.license as lic_mod
     key = lic_mod.mint_key("test-secret-32-chars-seller-key!!", "ANY", 30)
     db_mod.set_license_key(key)
