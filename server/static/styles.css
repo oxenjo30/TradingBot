@@ -390,6 +390,9 @@ button { cursor: pointer; font-family: inherit; }
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.dtable td.col-badge {
+  overflow: visible;
+}
 /* Reason / detail columns wrap */
 .dtable td.col-reason,
 .dtable td.col-detail {
