@@ -1008,6 +1008,7 @@ async function initDashboard() {
         cells.forEach((text, i) => {
           const td = document.createElement('td');
           if (i === 2) {
+            td.className = 'col-badge';
             const tag = document.createElement('span');
             tag.className = 'badge ' + (o.side === 'buy' ? 'b-buy' : 'b-sell');
             tag.textContent = o.side === 'buy' ? 'Buy' : 'Sell';
@@ -2036,6 +2037,7 @@ async function initPositions() {
       fields.forEach((v, i) => {
         const td = document.createElement('td');
         if (i === 2) {
+          td.className = 'col-badge';
           const tag = document.createElement('span');
           tag.className = 'badge ' + (o.side === 'buy' ? 'b-buy' : 'b-sell');
           tag.textContent = o.side === 'buy' ? 'Buy' : 'Sell';
@@ -2086,6 +2088,7 @@ async function initPositions() {
       fields.forEach((v, i) => {
         const td = document.createElement('td');
         if (i === 2) {
+          td.className = 'col-badge';
           const tag = document.createElement('span');
           tag.className = 'badge ' + (side === 'buy' ? 'b-buy' : 'b-sell');
           tag.textContent = side === 'buy' ? 'Buy' : 'Sell';
@@ -2711,6 +2714,7 @@ async function initPerformance() {
         fields.forEach((v, i) => {
           const td = document.createElement('td');
           if (i === 3) {
+            td.className = 'col-badge';
             const tag = document.createElement('span');
             tag.className = 'badge ' + (s.side === 'buy' ? 'b-buy' : 'b-sell');
             tag.textContent = s.side === 'buy' ? 'Buy' : 'Sell';
@@ -2720,6 +2724,7 @@ async function initPerformance() {
             td.title = v;
             td.textContent = v;
           } else if (i === 5) {
+            td.className = 'col-badge';
             const badge = document.createElement('span');
             badge.className = 'badge ' + statusCls;
             badge.textContent = s.status;
@@ -3813,6 +3818,7 @@ async function initLogs() {
       fields.forEach((v, i) => {
         const td = document.createElement('td');
         if (i === 3) {
+          td.className = 'col-badge';
           const tag = document.createElement('span');
           tag.className = 'badge ' + (s.side === 'buy' ? 'b-buy' : 'b-sell');
           tag.textContent = s.side === 'buy' ? 'Buy' : 'Sell';
@@ -3822,6 +3828,7 @@ async function initLogs() {
           td.title = v;
           td.textContent = v;
         } else if (i === 6) {
+          td.className = 'col-badge';
           const badge = document.createElement('span');
           badge.className = 'badge ' + (statusCls[s.status] || 'b-disabled');
           badge.textContent = s.status;
@@ -3903,6 +3910,7 @@ async function initLogs() {
       [fmt.time(r.ts), '', r.action, r.detail].forEach((v, i) => {
         const td = document.createElement('td');
         if (i === 1) {
+          td.className = 'col-badge';
           const badge = document.createElement('span');
           badge.className = 'badge ' + (catCls[r.category] || 'b-disabled');
           badge.textContent = r.category;
