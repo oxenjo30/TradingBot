@@ -4177,12 +4177,17 @@ async function initApiKeys() {
   initClockChip(document.getElementById('market-chip'));
 
   // ── Type selector helpers ─────────────────────────────────────────
-  function updateKeyPlaceholders(type, prefix) {
+  function updateKeyPlaceholders(type, prefix, broker) {
     const isPaper = type === 'paper';
+    const brokerId = broker || (prefix === 'add' ? (document.getElementById('add-broker')?.value || 'alpaca') : 'alpaca');
+    const isBinance = brokerId === 'binance';
 
     // API key placeholder
     const keyEl = document.getElementById(`${prefix}-api-key`);
-    if (keyEl) keyEl.placeholder = isPaper ? 'PK… paper key' : 'AK… live key';
+    if (keyEl) {
+      if (isBinance) keyEl.placeholder = isPaper ? 'Demo API key (from demo.binance.com)' : 'Live API key (from binance.com)';
+      else keyEl.placeholder = isPaper ? 'PK… paper key' : 'AK… live key';
+    }
 
     // Coloured banner
     const banner = document.getElementById(`${prefix}-creds-banner`);
@@ -4191,9 +4196,15 @@ async function initApiKeys() {
       banner.className = 'acct-creds-banner ' + (isPaper ? 'acct-creds-banner-paper' : 'acct-creds-banner-live');
     }
     if (bannerText) {
-      bannerText.innerHTML = isPaper
-        ? 'Paper API keys start with <strong>PK</strong> &mdash; get them from alpaca.markets &rarr; Paper Trading'
-        : 'Live API keys start with <strong>AK</strong> &mdash; get them from alpaca.markets &rarr; Live Trading';
+      if (isBinance) {
+        bannerText.innerHTML = isPaper
+          ? 'Demo keys are separate &mdash; generate them at <strong>demo.binance.com</strong> &rarr; API Management'
+          : 'Live keys &mdash; generate them at <strong>binance.com</strong> &rarr; API Management';
+      } else {
+        bannerText.innerHTML = isPaper
+          ? 'Paper API keys start with <strong>PK</strong> &mdash; get them from alpaca.markets &rarr; Paper Trading'
+          : 'Live API keys start with <strong>AK</strong> &mdash; get them from alpaca.markets &rarr; Live Trading';
+      }
     }
 
     // Header band colour
@@ -4376,6 +4387,7 @@ async function initApiKeys() {
     if (keyEl) keyEl.value = '';
     if (secEl) secEl.value = '';
     setTypeSelector('edit-type-selector', 'edit-account-type', acct.account_type, 'edit');
+    updateKeyPlaceholders(acct.account_type, 'edit', acct.broker || 'alpaca');
     document.getElementById('edit-error').classList.add('hidden');
 
     openModal(document.getElementById('modal-edit-account'), async () => {
@@ -4500,6 +4512,8 @@ async function initApiKeys() {
     document.querySelectorAll('.broker-hint').forEach(el => el.classList.add('hidden'));
     const hint = document.getElementById(`${b.id}-hint`);
     if (hint) hint.classList.remove('hidden');
+    // Update placeholders/banner for the selected broker + current type
+    updateKeyPlaceholders(document.getElementById('add-account-type').value, 'add', b.id);
     document.getElementById('add-step-1').classList.add('hidden');
     document.getElementById('add-step-2').classList.remove('hidden');
   });
