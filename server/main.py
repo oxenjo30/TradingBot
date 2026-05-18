@@ -4,6 +4,10 @@ import io
 import logging
 import os
 import threading
+
+# Load .env before any module reads os.environ (e.g. DB_SECRET_KEY, TRADEBOT_LICENSE_SECRET)
+from dotenv import load_dotenv as _load_dotenv
+_load_dotenv()
 from contextlib import asynccontextmanager
 from datetime import date
 from typing import Literal
