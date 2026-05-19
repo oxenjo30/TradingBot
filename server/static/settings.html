@@ -349,6 +349,52 @@
       </div>
     </div>
 
+    <!-- ── Software Updates ── -->
+    <div class="card" id="update-card">
+      <div class="settings-section-head">
+        <div class="icon-circle icon-purple" style="width:38px;height:38px;flex-shrink:0;">
+          <svg width="17" height="17" fill="none" stroke="#8B5CF6" stroke-width="2" viewBox="0 0 24 24">
+            <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+          </svg>
+        </div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:14px;font-weight:600;">Software Updates</div>
+          <div class="text-muted" style="font-size:12px;margin-top:2px;" id="update-meta">Check GitHub for the latest TradeBot release</div>
+        </div>
+      </div>
+
+      <div style="border-top:1px solid var(--border);margin:1rem 0;"></div>
+
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
+        <div>
+          <div style="font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);">Installed Version</div>
+          <div style="font-size:22px;font-weight:700;letter-spacing:-.02em;" id="update-installed">—</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;" id="update-actions">
+          <!-- JS renders state here -->
+        </div>
+      </div>
+
+      <div id="update-release-box" style="display:none;margin-top:1rem;background:rgba(0,0,0,.15);border:1px solid var(--border);border-radius:10px;padding:1rem;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.6rem;">
+          <span style="font-size:13px;font-weight:600;" id="update-release-title">What's new</span>
+          <span style="font-size:11px;font-weight:600;color:var(--blue);background:rgba(59,130,246,.1);padding:2px 8px;border-radius:6px;">Latest release</span>
+        </div>
+        <div id="update-release-notes" style="font-size:12px;color:var(--muted);line-height:1.65;white-space:pre-wrap;"></div>
+        <a id="update-release-link" href="#" target="_blank" rel="noopener noreferrer"
+           style="display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--blue);margin-top:.75rem;text-decoration:none;">
+          View full release on GitHub
+          <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+            <polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+          </svg>
+        </a>
+      </div>
+
+      <div id="update-error" class="field-msg err" style="display:none;margin-top:.75rem;"></div>
+    </div>
+
     <!-- ── Save Bar ── -->
     <div style="display:flex;align-items:center;justify-content:flex-end;gap:.75rem;padding-bottom:.5rem;">
       <span id="settings-save-msg" class="field-msg hidden"></span>
