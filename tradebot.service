@@ -1,0 +1,24 @@
+# TradeBot systemd service file
+# Install: sudo cp tradebot.service /etc/systemd/system/
+#          sudo systemctl daemon-reload
+#          sudo systemctl enable --now tradebot
+
+[Unit]
+Description=TradeBot — Automated Trading Bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/tradebot
+EnvironmentFile=/opt/tradebot/.env
+ExecStart=/opt/tradebot/.venv/bin/python -m uvicorn server.main:app --host 0.0.0.0 --port 8000
+Restart=always
+RestartSec=10
+StandardOutput=append:/opt/tradebot/server.log
+StandardError=append:/opt/tradebot/server.err
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
