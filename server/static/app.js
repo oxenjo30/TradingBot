@@ -5439,7 +5439,11 @@ function initUpdateCard() {
     }
 
     else if (state === 'update-available') {
-      metaEl.innerHTML = `Latest: <strong style="color:var(--orange);">${data.latest}</strong> is available`;
+      metaEl.textContent = '';
+      const _latestStrong = document.createElement('strong');
+      _latestStrong.style.color = 'var(--orange)';
+      _latestStrong.textContent = data.latest;
+      metaEl.append('Latest: ', _latestStrong, ' is available');
       const badge = document.createElement('span');
       badge.className = 'badge b-notrun';
       badge.innerHTML = `<span style="width:7px;height:7px;border-radius:50%;background:var(--orange);box-shadow:0 0 6px rgba(245,158,11,.5);flex-shrink:0;display:inline-block;"></span> Update available`;
