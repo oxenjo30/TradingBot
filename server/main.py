@@ -1251,7 +1251,10 @@ def scanner_universe(min_price: float = 5.0, max_price: float = 1000.0,
 @app.get("/api/risk")
 def risk_status(request: Request):
     _require_auth(request)
-    acct = alpaca_client.get_account_summary()
+    try:
+        acct = alpaca_client.get_account_summary()
+    except Exception:
+        acct = {}
     try:
         tc = alpaca_client.trading()
         a = tc.get_account()

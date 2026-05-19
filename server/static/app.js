@@ -1477,7 +1477,7 @@ async function initBots() {
         api('/api/engine',          { key: 'bots-engine'   }),
         api('/api/risk',            { key: 'bots-risk'     }),
       ]);
-    } catch { return; }
+    } catch (e) { console.error('Bots loadData failed:', e); return; }
 
     applyKillSwitchUI(risk.kill_switch);
 
