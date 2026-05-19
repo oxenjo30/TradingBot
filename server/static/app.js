@@ -4423,13 +4423,13 @@ async function initApiKeys() {
             key: 'rotate-account',
           });
         }
-        await loadAccounts();
         const toast = document.getElementById('acct-toast');
         if (toast) {
           toast.textContent = `✓ ${label} saved successfully.`;
           toast.classList.remove('hidden');
           setTimeout(() => toast.classList.add('hidden'), 4000);
         }
+        await loadAccounts();
       } catch (e) {
         errEl.textContent = 'Save failed: ' + (e.message || 'server error');
         errEl.classList.remove('hidden');
