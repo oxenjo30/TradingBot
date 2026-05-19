@@ -4549,6 +4549,7 @@ async function initApiKeys() {
       const broker      = document.getElementById('add-broker').value || 'alpaca';
       const errEl       = document.getElementById('add-error');
       const confBtn     = document.querySelector('#modal-add-account [data-action="confirm"]');
+      if (confBtn) { confBtn.disabled = false; confBtn.textContent = 'Add Account'; }
       if (!label || !apiKey || !apiSecret) {
         errEl.textContent = 'All fields are required.';
         errEl.classList.remove('hidden');
