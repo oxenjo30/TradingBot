@@ -489,11 +489,13 @@ def quote(symbol: str, request: Request, account_id: int | None = None):
             raise
         except Exception as e:
             raise HTTPException(400, str(e))
-    # Default: try Alpaca, fall back to Binance
-    try:
-        return alpaca_client.get_latest_quote(symbol)
-    except Exception:
-        pass
+    # Default: try first Alpaca DB account, fall back to Binance
+    alpaca_accts = [a for a in db.get_broker_accounts() if (a.get("broker") or "alpaca") == "alpaca"]
+    if alpaca_accts:
+        try:
+            return _get_broker_client(alpaca_accts[0]["id"]).get_latest_quote(symbol)
+        except Exception:
+            pass
     binance_accts = [a for a in db.get_broker_accounts() if a.get("broker") == "binance"]
     if binance_accts:
         try:
@@ -715,6 +717,7 @@ def rotate_broker_credentials(account_id: int, body: BrokerCredentialsUpdate, re
         crypto.encrypt(body.api_key),
         crypto.encrypt(body.api_secret),
     )
+    _broker_client_cache.pop(account_id, None)  # force re-init with new creds
     db.log_audit("account", f"rotated credentials #{account_id}", "API key + secret replaced")
     return _mask_account(db.get_broker_account(account_id))
 
@@ -858,7 +861,8 @@ def performance_data(request: Request):
 
     # Enrich with live unrealized P&L from open positions
     try:
-        positions = alpaca_client.get_positions()
+        alpaca_accts = [a for a in db.get_broker_accounts() if (a.get("broker") or "alpaca") == "alpaca"]
+        positions = _get_broker_client(alpaca_accts[0]["id"]).get_positions() if alpaca_accts else []
         open_count = len(positions)
         total_upl  = sum(p["unrealized_pl"] for p in positions)
     except Exception:
@@ -1083,7 +1087,11 @@ def export_trades(request: Request, limit: int = 5000):
 def export_positions(request: Request, account_id: int | None = None):
     _require_auth(request)
     try:
-        raw = alpaca_client.get_positions()
+        if account_id is not None:
+            raw = _get_broker_client(account_id).get_positions()
+        else:
+            alpaca_accts = [a for a in db.get_broker_accounts() if (a.get("broker") or "alpaca") == "alpaca"]
+            raw = _get_broker_client(alpaca_accts[0]["id"]).get_positions() if alpaca_accts else []
     except Exception as e:
         raise HTTPException(502, f"Broker error: {e}")
     output = io.StringIO()
@@ -1139,7 +1147,8 @@ def webhook_signal(body: WebhookSignal, request: Request):
         if acct_client:
             acct_summary = acct_client.get_account_summary()
         else:
-            acct_summary = alpaca_client.get_account_summary()
+            alpaca_accts = [a for a in db.get_broker_accounts() if (a.get("broker") or "alpaca") == "alpaca"]
+            acct_summary = _get_broker_client(alpaca_accts[0]["id"]).get_account_summary() if alpaca_accts else {}
         risk.check_all(body.symbol, body.side, acct_summary, 0, account_id=body.account_id)
     except risk.RiskViolation as rv:
         db.log_signal(body.strategy, body.symbol, body.side, body.qty or 0,

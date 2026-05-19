@@ -2,15 +2,16 @@
 import logging
 import time
 import httpx
-from .config import ALPACA_API_KEY, ALPACA_API_SECRET
 
 log = logging.getLogger("scanner")
 
 _BASE = "https://data.alpaca.markets/v1beta1/screener/stocks"
-_HEADERS = {
-    "APCA-API-KEY-ID": ALPACA_API_KEY,
-    "APCA-API-SECRET-KEY": ALPACA_API_SECRET,
-}
+
+
+def _headers() -> dict:
+    from .alpaca_client import _db_alpaca_creds
+    key, secret, _ = _db_alpaca_creds()
+    return {"APCA-API-KEY-ID": key, "APCA-API-SECRET-KEY": secret}
 
 _cache: dict = {"ts": 0.0, "actives": [], "gainers": [], "losers": []}
 _TTL = 300  # 5-min cache
@@ -33,8 +34,9 @@ def _fetch():
     if now - _cache["ts"] < _TTL:
         return
 
+    hdrs = _headers()
     try:
-        r1 = httpx.get(f"{_BASE}/most-actives", headers=_HEADERS,
+        r1 = httpx.get(f"{_BASE}/most-actives", headers=hdrs,
                         params={"by": "volume", "top": 100}, timeout=15)
         r1.raise_for_status()
         actives_raw = r1.json().get("most_actives", [])
@@ -43,7 +45,7 @@ def _fetch():
         actives_raw = []
 
     try:
-        r2 = httpx.get(f"{_BASE}/movers", headers=_HEADERS,
+        r2 = httpx.get(f"{_BASE}/movers", headers=hdrs,
                         params={"top": 100}, timeout=15)
         r2.raise_for_status()
         data = r2.json()

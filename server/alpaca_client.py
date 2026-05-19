@@ -13,22 +13,40 @@ from .config import ALPACA_API_KEY, ALPACA_API_SECRET, PAPER
 
 _bt = threading.local()
 
+
+def _db_alpaca_creds() -> tuple[str, str, bool]:
+    """Return (api_key, api_secret, paper) from the first Alpaca DB account.
+    Falls back to .env values if no DB account exists or decryption fails."""
+    try:
+        from . import crypto, db
+        for acct in db.get_broker_accounts():
+            if (acct.get("broker") or "alpaca") == "alpaca":
+                creds = db.get_broker_account_credentials(acct["id"])
+                key    = crypto.decrypt(creds["api_key"])
+                secret = crypto.decrypt(creds["api_secret"])
+                paper  = acct.get("account_type", "paper") == "paper"
+                return key, secret, paper
+    except Exception:
+        pass
+    return ALPACA_API_KEY, ALPACA_API_SECRET, PAPER
+
 _trading: TradingClient | None = None
 _data: StockHistoricalDataClient | None = None
 
 
 def trading() -> TradingClient:
     global _trading
-    from .config import ALPACA_API_KEY, ALPACA_API_SECRET, PAPER  # re-read after setup
-    if _trading is None or not ALPACA_API_KEY:
-        _trading = TradingClient(ALPACA_API_KEY, ALPACA_API_SECRET, paper=PAPER)
+    key, secret, paper = _db_alpaca_creds()
+    if _trading is None or not key:
+        _trading = TradingClient(key, secret, paper=paper)
     return _trading
 
 
 def data() -> StockHistoricalDataClient:
     global _data
     if _data is None:
-        _data = StockHistoricalDataClient(ALPACA_API_KEY, ALPACA_API_SECRET)
+        key, secret, _ = _db_alpaca_creds()
+        _data = StockHistoricalDataClient(key, secret)
     return _data
 
 
