@@ -4424,6 +4424,12 @@ async function initApiKeys() {
           });
         }
         await loadAccounts();
+        const toast = document.getElementById('acct-toast');
+        if (toast) {
+          toast.textContent = `✓ ${label} saved successfully.`;
+          toast.classList.remove('hidden');
+          setTimeout(() => toast.classList.add('hidden'), 4000);
+        }
       } catch (e) {
         errEl.textContent = 'Save failed: ' + (e.message || 'server error');
         errEl.classList.remove('hidden');
