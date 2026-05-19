@@ -97,3 +97,4 @@ def test_check_github_non_200_returns_502(client):
     with patch("httpx.get", return_value=mock_resp):
         r = client.get("/api/update/check")
     assert r.status_code == 502
+    assert "GitHub" in r.json()["detail"]

@@ -301,7 +301,11 @@ def health():
         "has_password": auth.password_is_set(),
     }
 
+
+# ── Update check ──────────────────────────────────────────────────────────────
+
 _GITHUB_RELEASES_URL = "https://api.github.com/repos/oxenjo30/TradingBot/releases/latest"
+
 
 @app.get("/api/update/check")
 def check_for_update(request: Request):
