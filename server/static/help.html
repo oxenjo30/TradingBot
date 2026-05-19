@@ -9,6 +9,7 @@
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="/static/styles.css">
   <style>
+    /* ── Layout ─────────────────────────────────────────────────────────── */
     .help-layout {
       display: grid;
       grid-template-columns: 220px 1fr;
@@ -20,7 +21,7 @@
       border-right: 1px solid var(--border);
       overflow-y: auto;
       padding: 1.25rem 0;
-      background: rgba(8,13,20,.5);
+      background: var(--help-nav-bg);
       scrollbar-width: thin;
       scrollbar-color: var(--border) transparent;
     }
@@ -38,8 +39,8 @@
       cursor: pointer; transition: color .12s, background .12s;
       text-decoration: none; border-left: 2px solid transparent;
     }
-    .help-nav-item:hover { color: var(--text); background: rgba(59,130,246,.05); }
-    .help-nav-item.active { color: var(--blue); border-left-color: var(--blue); background: rgba(59,130,246,.07); }
+    .help-nav-item:hover { color: var(--text); background: rgba(59,130,246,.06); }
+    .help-nav-item.active { color: var(--blue); border-left-color: var(--blue); background: rgba(59,130,246,.08); }
     .help-nav-item svg { flex-shrink: 0; }
 
     .help-content {
@@ -50,6 +51,7 @@
     .help-content::-webkit-scrollbar { width: 4px; }
     .help-content::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
 
+    /* ── Typography ─────────────────────────────────────────────────────── */
     .help-section { max-width: 760px; margin-bottom: 3.5rem; }
     .help-section:last-child { margin-bottom: 0; padding-bottom: 4rem; }
     .help-h1 { font-size: 26px; font-weight: 700; color: var(--text); letter-spacing: -.02em; margin-bottom: .35rem; }
@@ -61,9 +63,10 @@
     }
     .help-h2:first-of-type { margin-top: 0; padding-top: 0; border-top: none; }
     .help-h3 { font-size: 13px; font-weight: 700; color: var(--text); margin: 1.1rem 0 .4rem; text-transform: uppercase; letter-spacing: .05em; }
-    .help-p { font-size: 13.5px; color: rgba(230,235,245,.75); line-height: 1.7; margin-bottom: .85rem; }
+    .help-p { font-size: 13.5px; color: var(--help-body); line-height: 1.7; margin-bottom: .85rem; }
     .help-p:last-child { margin-bottom: 0; }
 
+    /* ── Steps ──────────────────────────────────────────────────────────── */
     .help-steps { display: flex; flex-direction: column; gap: .75rem; margin: .75rem 0 1rem; }
     .help-step { display: flex; gap: .875rem; align-items: flex-start; }
     .help-step-num {
@@ -77,39 +80,44 @@
     .help-step-title { font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: .2rem; }
     .help-step-desc  { font-size: 12.5px; color: var(--muted); line-height: 1.6; }
 
+    /* ── Callouts ───────────────────────────────────────────────────────── */
     .help-callout {
       border-radius: 10px; padding: .85rem 1rem; margin: 1rem 0;
       font-size: 12.5px; line-height: 1.65; display: flex; gap: .75rem; align-items: flex-start;
     }
     .help-callout svg { flex-shrink: 0; margin-top: 1px; }
-    .help-callout.tip    { background: rgba(59,130,246,.08);  border: 1px solid rgba(59,130,246,.2);  color: #93C5FD; }
-    .help-callout.warn   { background: rgba(245,158,11,.08);  border: 1px solid rgba(245,158,11,.2);  color: #FCD34D; }
-    .help-callout.danger { background: rgba(239,68,68,.08);   border: 1px solid rgba(239,68,68,.2);   color: #FCA5A5; }
-    .help-callout.good   { background: rgba(16,185,129,.08);  border: 1px solid rgba(16,185,129,.2);  color: #6EE7B7; }
+    .help-callout.tip    { background: rgba(59,130,246,.09);  border: 1px solid rgba(59,130,246,.25);  color: var(--callout-tip); }
+    .help-callout.warn   { background: rgba(245,158,11,.09);  border: 1px solid rgba(245,158,11,.25);  color: var(--callout-warn); }
+    .help-callout.danger { background: rgba(239,68,68,.09);   border: 1px solid rgba(239,68,68,.25);   color: var(--callout-danger); }
+    .help-callout.good   { background: rgba(16,185,129,.09);  border: 1px solid rgba(16,185,129,.25);  color: var(--callout-good); }
 
+    /* ── Cards ──────────────────────────────────────────────────────────── */
     .help-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: .75rem; margin: 1rem 0; }
     .help-card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: .9rem 1rem; }
     .help-card-icon { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; margin-bottom: .6rem; }
     .help-card-title { font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: .25rem; }
     .help-card-desc  { font-size: 12px; color: var(--muted); line-height: 1.55; }
 
+    /* ── Inline code ────────────────────────────────────────────────────── */
     .help-code {
       font-family: 'Courier New', monospace;
-      background: rgba(30,45,69,.7); border: 1px solid var(--border);
-      border-radius: 5px; padding: 1px 6px; font-size: 12px; color: #93C5FD;
+      background: var(--help-code-bg); border: 1px solid var(--border);
+      border-radius: 5px; padding: 1px 6px; font-size: 12px; color: var(--help-code-color);
     }
 
+    /* ── Tables ─────────────────────────────────────────────────────────── */
     .help-table { width: 100%; border-collapse: collapse; font-size: 12.5px; margin: .75rem 0 1rem; border-radius: 10px; overflow: hidden; border: 1px solid var(--border); }
     .help-table thead th { background: var(--card); padding: .55rem .9rem; text-align: left; font-size: 10.5px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; border-bottom: 1px solid var(--border); }
-    .help-table tbody td { padding: .6rem .9rem; color: var(--text); border-bottom: 1px solid rgba(30,45,69,.6); vertical-align: top; line-height: 1.55; }
+    .help-table tbody td { padding: .6rem .9rem; color: var(--text); border-bottom: 1px solid var(--border); vertical-align: top; line-height: 1.55; }
     .help-table tbody tr:last-child td { border-bottom: none; }
     .help-table tbody tr:hover td { background: rgba(59,130,246,.04); }
     .help-table td:first-child { font-weight: 600; white-space: nowrap; }
 
     .help-divider { height: 1px; background: var(--border); margin: 2rem 0; }
 
+    /* ── Hero block ─────────────────────────────────────────────────────── */
     .help-hero {
-      background: linear-gradient(135deg, rgba(59,130,246,.12), rgba(139,92,246,.08));
+      background: var(--help-hero-bg);
       border: 1px solid rgba(59,130,246,.2); border-radius: 14px; padding: 1.75rem;
       margin-bottom: 2rem; position: relative; overflow: hidden;
     }
@@ -117,13 +125,63 @@
     .help-hero-title { font-size: 20px; font-weight: 800; color: var(--text); margin-bottom: .4rem; }
     .help-hero-sub   { font-size: 13px; color: var(--muted); line-height: 1.6; }
 
+    /* ── Badges ─────────────────────────────────────────────────────────── */
     .help-badge { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; }
-    .help-badge.blue   { background: rgba(59,130,246,.15);  color: #93C5FD; }
-    .help-badge.green  { background: rgba(16,185,129,.15);  color: #6EE7B7; }
-    .help-badge.orange { background: rgba(245,158,11,.15);  color: #FCD34D; }
-    .help-badge.red    { background: rgba(239,68,68,.15);   color: #FCA5A5; }
-    .help-badge.purple { background: rgba(139,92,246,.15);  color: #C4B5FD; }
-    .help-badge.yellow { background: rgba(234,179,8,.15);   color: #FDE047; }
+    .help-badge.blue   { background: rgba(59,130,246,.15);  color: var(--badge-blue); }
+    .help-badge.green  { background: rgba(16,185,129,.15);  color: var(--badge-green); }
+    .help-badge.orange { background: rgba(245,158,11,.15);  color: var(--badge-orange); }
+    .help-badge.red    { background: rgba(239,68,68,.15);   color: var(--badge-red); }
+    .help-badge.purple { background: rgba(139,92,246,.15);  color: var(--badge-purple); }
+    .help-badge.yellow { background: rgba(234,179,8,.15);   color: var(--badge-yellow); }
+
+    /* ── Dark defaults ── */
+    [data-theme="dark"] {
+      --help-nav-bg:      rgba(8,13,20,.5);
+      --help-body:        rgba(230,235,245,.78);
+      --help-code-bg:     rgba(30,45,69,.7);
+      --help-code-color:  #93C5FD;
+      --help-hero-bg:     linear-gradient(135deg, rgba(59,130,246,.12), rgba(139,92,246,.08));
+      --callout-tip:      #93C5FD;
+      --callout-warn:     #FCD34D;
+      --callout-danger:   #FCA5A5;
+      --callout-good:     #6EE7B7;
+      --badge-blue:       #93C5FD;
+      --badge-green:      #6EE7B7;
+      --badge-orange:     #FCD34D;
+      --badge-red:        #FCA5A5;
+      --badge-purple:     #C4B5FD;
+      --badge-yellow:     #FDE047;
+    }
+
+    /* ── Light mode — declared after dark so it wins at equal specificity ── */
+    [data-theme="light"] {
+      --help-nav-bg:      rgba(241,245,249,.8);
+      --help-body:        #334155;
+      --help-code-bg:     #EFF6FF;
+      --help-code-color:  #2563EB;
+      --help-hero-bg:     linear-gradient(135deg, rgba(59,130,246,.07), rgba(139,92,246,.05));
+      --callout-tip:      #1D4ED8;
+      --callout-warn:     #92400E;
+      --callout-danger:   #991B1B;
+      --callout-good:     #065F46;
+      --badge-blue:       #1D4ED8;
+      --badge-green:      #065F46;
+      --badge-orange:     #92400E;
+      --badge-red:        #991B1B;
+      --badge-purple:     #5B21B6;
+      --badge-yellow:     #78350F;
+    }
+    [data-theme="light"] .help-callout.tip    { background: rgba(59,130,246,.08); border-color: rgba(59,130,246,.3); }
+    [data-theme="light"] .help-callout.warn   { background: rgba(245,158,11,.08); border-color: rgba(245,158,11,.3); }
+    [data-theme="light"] .help-callout.danger { background: rgba(239,68,68,.08);  border-color: rgba(239,68,68,.3); }
+    [data-theme="light"] .help-callout.good   { background: rgba(16,185,129,.08); border-color: rgba(16,185,129,.3); }
+    [data-theme="light"] .help-badge.blue   { background: rgba(59,130,246,.12); }
+    [data-theme="light"] .help-badge.green  { background: rgba(16,185,129,.12); }
+    [data-theme="light"] .help-badge.orange { background: rgba(245,158,11,.12); }
+    [data-theme="light"] .help-badge.red    { background: rgba(239,68,68,.12);  }
+    [data-theme="light"] .help-badge.purple { background: rgba(139,92,246,.12); }
+    [data-theme="light"] .help-badge.yellow { background: rgba(234,179,8,.12);  }
+    [data-theme="light"] .help-step-num { background: rgba(59,130,246,.1); border-color: rgba(59,130,246,.25); }
   </style>
 </head>
 <body data-page="help">
