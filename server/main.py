@@ -118,9 +118,14 @@ class WebhookSignal(BaseModel):
 _broker_client_cache: dict[int, object] = {}
 
 def _get_broker_client(account_id: int | None):
-    """Return a broker client for the given account_id, or fall back to the global alpaca client."""
+    """Return a broker client for the given account_id.
+    If account_id is None, uses the first available Alpaca account from DB."""
     if account_id is None:
-        return alpaca_client
+        alpaca_accts = [a for a in db.get_broker_accounts() if (a.get("broker") or "alpaca") == "alpaca"]
+        if alpaca_accts:
+            account_id = alpaca_accts[0]["id"]
+        else:
+            return alpaca_client  # falls back to module-level (will raise if no .env creds)
     if account_id in _broker_client_cache:
         return _broker_client_cache[account_id]
     acct = db.get_broker_account_credentials(account_id)
@@ -394,7 +399,10 @@ def crypto_pnl(request: Request, account_id: int):
 
 @app.get("/api/clock")
 def clock():
-    return alpaca_client.get_clock()
+    try:
+        return alpaca_client.get_clock()
+    except Exception:
+        return {"is_open": False, "next_open": None, "next_close": None, "timestamp": None}
 
 @app.get("/api/positions")
 def positions(request: Request, account_id: int | None = None):
