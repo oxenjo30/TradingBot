@@ -378,7 +378,11 @@ def license_deactivate(request: Request):
 @app.get("/api/account")
 def account(request: Request, account_id: int | None = None):
     _require_auth(request)
-    summary = _get_broker_client(account_id).get_account_summary()
+    try:
+        summary = _get_broker_client(account_id).get_account_summary()
+    except Exception as e:
+        log.warning("account %s fetch failed: %s", account_id, e)
+        raise HTTPException(503, f"Broker connection failed: {e}")
     # For Binance accounts, attach signals-based P&L (more accurate than cost_basis table)
     if account_id is not None:
         acct_row = db.get_broker_account(account_id)
@@ -407,12 +411,20 @@ def clock():
 @app.get("/api/positions")
 def positions(request: Request, account_id: int | None = None):
     _require_auth(request)
-    return _get_broker_client(account_id).get_positions()
+    try:
+        return _get_broker_client(account_id).get_positions()
+    except Exception as e:
+        log.warning("positions %s fetch failed: %s", account_id, e)
+        raise HTTPException(503, f"Broker connection failed: {e}")
 
 @app.get("/api/orders")
 def orders(request: Request, status: str = "all", limit: int = 50, account_id: int | None = None):
     _require_auth(request)
-    return _get_broker_client(account_id).get_orders(limit=limit, status=status)
+    try:
+        return _get_broker_client(account_id).get_orders(limit=limit, status=status)
+    except Exception as e:
+        log.warning("orders %s fetch failed: %s", account_id, e)
+        raise HTTPException(503, f"Broker connection failed: {e}")
 
 @app.post("/api/orders")
 def submit_order(o: OrderIn, request: Request):

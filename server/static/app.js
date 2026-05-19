@@ -781,8 +781,14 @@ async function initDashboard() {
 
     } catch (e) {
       if (e.name === 'AbortError') return;
-      showError(document.getElementById('balance-val'));
-      throw e;
+      const msg = e.message && e.message.includes('decrypt')
+        ? 'API key error — re-enter in Settings'
+        : (e.message && e.message.includes('Broker connection failed')
+          ? 'Broker offline — check API Keys in Settings'
+          : 'Failed to load — retrying in 30s');
+      showError(document.getElementById('balance-val'), msg);
+      document.getElementById('sys-api').textContent = 'Disconnected';
+      document.getElementById('sys-api-dot').classList.add('off');
     }
   }
 
@@ -4277,9 +4283,40 @@ async function initApiKeys() {
         grid.innerHTML = '<div class="state-empty">No broker accounts yet. Click <strong>Add Account</strong> to connect your first broker.</div>';
         return;
       }
-      accounts.forEach(acct => grid.appendChild(buildCard(acct)));
+      accounts.forEach(acct => {
+        const wrap = buildCard(acct);
+        grid.appendChild(wrap);
+        // Auto-test each account on load to detect stale/wrong credentials
+        const statusEl = wrap.querySelector('span[data-status]') || wrap.querySelectorAll('span')[1];
+        autoTestAccount(acct.id, wrap);
+      });
     } catch {
       grid.innerHTML = '<div class="state-error">Failed to load accounts.</div>';
+    }
+  }
+
+  async function autoTestAccount(accountId, wrap) {
+    try {
+      const result = await api(`/api/broker-accounts/${accountId}/status`, { key: `auto-test-${accountId}` });
+      // Mark as connected — find status element in the card
+      const statusEls = wrap.querySelectorAll('span');
+      const statusEl = Array.from(statusEls).find(el => el.style.fontSize === '11px' && el.style.fontWeight === '500');
+      if (statusEl) {
+        statusEl.style.color = '#10B981';
+        statusEl.textContent = `✓ Connected · ${fmt.usd(result.equity)}`;
+      }
+    } catch (e) {
+      if (e.name === 'AbortError') return;
+      const statusEls = wrap.querySelectorAll('span');
+      const statusEl = Array.from(statusEls).find(el => el.style.fontSize === '11px' && el.style.fontWeight === '500');
+      if (statusEl) {
+        statusEl.style.color = '#EF4444';
+        const msg = e.message || 'Connection failed';
+        statusEl.textContent = msg.includes('decrypt') ? '✗ Re-enter API keys below' : `✗ ${msg}`;
+      }
+      // Add a red border to the card to make it obvious
+      const card = wrap.querySelector('.broker-card');
+      if (card) card.style.borderLeft = '3px solid #EF4444';
     }
   }
 
