@@ -855,9 +855,8 @@ async function initDashboard() {
 
       const ranMap = {};
       (engine.ran || []).forEach(r => { ranMap[r.strategy] = r; });
-      const listEl = document.getElementById('bot-status-list');
-      listEl.innerHTML = '';
-      strats.forEach(s => {
+
+      function buildBotRow(s) {
         const row = document.createElement('div');
         row.style.cssText = 'display:flex;align-items:center;gap:8px;min-width:0;';
 
@@ -883,7 +882,7 @@ async function initDashboard() {
         } else if (ranEntry && ranEntry.error) {
           badgeClass = 'b-error'; badgeText = 'Error';
         } else if (ranEntry && !ranEntry.skipped) {
-          badgeClass = 'b-enabled'; badgeText = '';  // ran this cycle → Running
+          badgeClass = 'b-enabled'; badgeText = '';
         } else if (ranEntry && ranEntry.skipped === 'market_closed') {
           badgeClass = 'b-notrun'; badgeText = 'Mkt Closed';
         } else if (ranEntry && ranEntry.skipped === 'mode_mismatch') {
@@ -895,7 +894,7 @@ async function initDashboard() {
         } else if (ranEntry && ranEntry.skipped === 'no_accounts') {
           badgeClass = 'b-disabled'; badgeText = 'No Accounts';
         } else if (s.enabled) {
-          badgeClass = 'b-notrun'; badgeText = 'Waiting'; // enabled but engine hasn't ticked yet
+          badgeClass = 'b-notrun'; badgeText = 'Waiting';
         } else {
           badgeClass = 'b-notrun'; badgeText = 'Idle';
         }
@@ -914,8 +913,21 @@ async function initDashboard() {
         row.appendChild(ic);
         row.appendChild(name);
         row.appendChild(badge);
-        listEl.appendChild(row);
+        return row;
+      }
+
+      const stockList  = document.getElementById('bot-status-list-stock');
+      const cryptoList = document.getElementById('bot-status-list-crypto');
+      stockList.innerHTML = '';
+      cryptoList.innerHTML = '';
+
+      strats.forEach(s => {
+        const isCrypto = (s.brokers || []).includes('binance') && !(s.brokers || []).includes('alpaca');
+        (isCrypto ? cryptoList : stockList).appendChild(buildBotRow(s));
       });
+
+      if (!stockList.children.length)  stockList.innerHTML  = '<div style="font-size:12px;color:var(--muted);">No stock strategies.</div>';
+      if (!cryptoList.children.length) cryptoList.innerHTML = '<div style="font-size:12px;color:var(--muted);">No crypto strategies.</div>';
 
       document.getElementById('sys-lastrun').textContent = engine.ts ? fmt.time(engine.ts) : 'Never';
 
