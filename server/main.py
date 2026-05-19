@@ -1,5 +1,6 @@
 import asyncio
 import csv
+import httpx
 import io
 import logging
 import os
@@ -17,7 +18,7 @@ from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from . import ai_explainer, ai_tuner, alpaca_client, auth, backtest as bt_mod, crypto, db, engine, notifications, risk, scanner, sentiment, strategies
+from . import ai_explainer, ai_tuner, alpaca_client, auth, backtest as bt_mod, crypto, db, engine, notifications, risk, scanner, sentiment, strategies, version
 from .config import STATIC_DIR, BASE_DIR
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
@@ -298,6 +299,34 @@ def health():
         "ok": True,
         "setup_complete": auth.setup_complete(),
         "has_password": auth.password_is_set(),
+    }
+
+_GITHUB_RELEASES_URL = "https://api.github.com/repos/oxenjo30/TradingBot/releases/latest"
+
+@app.get("/api/update/check")
+def check_for_update(request: Request):
+    _require_auth(request)
+    try:
+        resp = httpx.get(
+            _GITHUB_RELEASES_URL,
+            headers={"User-Agent": "TradeBot-UpdateCheck/1.0"},
+            timeout=10.0,
+        )
+        if resp.status_code != 200:
+            raise HTTPException(502, "Unable to reach GitHub")
+        data = resp.json()
+    except httpx.RequestError:
+        raise HTTPException(502, "Unable to reach GitHub")
+    installed = version.INSTALLED_VERSION
+    latest = data.get("tag_name", installed)
+    notes = (data.get("body") or "")[:1000]
+    release_url = data.get("html_url", _GITHUB_RELEASES_URL)
+    return {
+        "installed": installed,
+        "latest": latest,
+        "up_to_date": installed == latest,
+        "release_notes": notes,
+        "release_url": release_url,
     }
 
 
