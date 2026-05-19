@@ -262,13 +262,29 @@ def get_clock() -> dict:
 
 
 def get_portfolio_history(period: str = "1M", timeframe: str = "1D") -> dict:
-    """Equity curve via Alpaca portfolio history."""
+    """Equity curve via Alpaca portfolio history — uses first active Alpaca account from DB."""
     import httpx
-    base = "https://paper-api.alpaca.markets" if PAPER else "https://api.alpaca.markets"
+    from . import crypto, db
+
+    # Prefer DB credentials (entered via Settings) over stale .env values
+    api_key, api_secret, paper = ALPACA_API_KEY, ALPACA_API_SECRET, PAPER
+    accounts = db.get_broker_accounts()
+    for acct in accounts:
+        if (acct.get("broker") or "alpaca") == "alpaca":
+            try:
+                creds = db.get_broker_account_credentials(acct["id"])
+                api_key   = crypto.decrypt(creds["api_key"])
+                api_secret = crypto.decrypt(creds["api_secret"])
+                paper = acct.get("account_type", "paper") == "paper"
+                break
+            except Exception:
+                continue
+
+    base = "https://paper-api.alpaca.markets" if paper else "https://api.alpaca.markets"
     url = f"{base}/v2/account/portfolio/history"
     headers = {
-        "APCA-API-KEY-ID": ALPACA_API_KEY,
-        "APCA-API-SECRET-KEY": ALPACA_API_SECRET,
+        "APCA-API-KEY-ID": api_key,
+        "APCA-API-SECRET-KEY": api_secret,
     }
     params = {"period": period, "timeframe": timeframe}
     r = httpx.get(url, headers=headers, params=params, timeout=15.0)
