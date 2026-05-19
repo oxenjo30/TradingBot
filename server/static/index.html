@@ -280,10 +280,8 @@
       </div>
     </div>
 
-    <!-- Row 2: Performance Chart + Bot Status -->
-    <div class="row-2col" style="grid-template-columns:3fr 2fr;">
-
-      <!-- Performance Chart -->
+    <!-- Row 2: Performance Chart -->
+    <div>
       <div class="card">
         <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
           <div>
@@ -301,24 +299,24 @@
         </div>
         <div id="perf-chart" style="min-height:220px;"></div>
       </div>
+    </div>
 
-      <!-- Bot Status -->
-      <div class="card" style="display:flex;flex-direction:column;gap:1rem;overflow-y:auto;max-height:420px;">
-        <!-- Stock strategies -->
-        <div>
-          <div style="font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin-bottom:.5rem;">Stock — Alpaca</div>
-          <div id="bot-status-list-stock" style="display:flex;flex-direction:column;gap:.5rem;">
-            <div class="skeleton" style="height:28px;"></div>
-            <div class="skeleton" style="height:28px;"></div>
-          </div>
+    <!-- Row 2b: Bot Status (Stock + Crypto separate cards) -->
+    <div class="row-2col">
+      <!-- Stock Bot Status -->
+      <div class="card" style="overflow-y:auto;max-height:280px;">
+        <div style="font-size:13px;font-weight:600;margin-bottom:.75rem;">Bot Status — Stock (Alpaca)</div>
+        <div id="bot-status-list-stock" style="display:flex;flex-direction:column;gap:.5rem;">
+          <div class="skeleton" style="height:28px;"></div>
+          <div class="skeleton" style="height:28px;"></div>
         </div>
-        <!-- Crypto strategies -->
-        <div>
-          <div style="font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin-bottom:.5rem;">Crypto — Binance</div>
-          <div id="bot-status-list-crypto" style="display:flex;flex-direction:column;gap:.5rem;">
-            <div class="skeleton" style="height:28px;"></div>
-            <div class="skeleton" style="height:28px;"></div>
-          </div>
+      </div>
+      <!-- Crypto Bot Status -->
+      <div class="card" style="overflow-y:auto;max-height:280px;">
+        <div style="font-size:13px;font-weight:600;margin-bottom:.75rem;">Bot Status — Crypto (Binance)</div>
+        <div id="bot-status-list-crypto" style="display:flex;flex-direction:column;gap:.5rem;">
+          <div class="skeleton" style="height:28px;"></div>
+          <div class="skeleton" style="height:28px;"></div>
         </div>
       </div>
     </div>
