@@ -4844,7 +4844,7 @@ async function initSettings() {
         tr.innerHTML = `
           <td>${a.symbol}</td>
           <td>${dirLabel} $${Number(a.target_price).toFixed(2)}</td>
-          <td><span class="badge ${statusCls}">${statusLabel}</span></td>
+          <td class="col-badge"><span class="badge ${statusCls}">${statusLabel}</span></td>
           <td>${a.note || '—'}</td>
           <td><button class="btn btn-ghost" style="font-size:11px;padding:.2rem .5rem;"
             onclick="window._deleteAlert(${a.id})">Remove</button></td>`;

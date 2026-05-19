@@ -214,7 +214,7 @@ def _validate_params(proposed: dict, schema: list[dict],
         if cur is not None:
             try:
                 cur = float(cur)
-                if cur != 0:
+                if cur != 0:  # skip: delta would be 0, permanently locking param at 0
                     max_delta = abs(cur) * _MAX_CHANGE_PCT
                     val = max(cur - max_delta, min(cur + max_delta, val))
             except (TypeError, ValueError):
