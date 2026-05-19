@@ -408,3 +408,39 @@ class AccountClient:
             "qty": float(o.qty) if o.qty else None,
             "status": str(o.status).lower().replace("orderstatus.", ""),
         }
+
+    def get_orders(self, limit: int = 50, status: str = "all") -> list[dict]:
+        status_map = {
+            "all": QueryOrderStatus.ALL,
+            "open": QueryOrderStatus.OPEN,
+            "closed": QueryOrderStatus.CLOSED,
+        }
+        req = GetOrdersRequest(status=status_map.get(status, QueryOrderStatus.ALL), limit=limit)
+        out = []
+        for o in self._t.get_orders(filter=req):
+            out.append({
+                "id": str(o.id),
+                "client_order_id": o.client_order_id,
+                "symbol": o.symbol,
+                "side": str(o.side).lower().replace("orderside.", ""),
+                "qty": float(o.qty) if o.qty else None,
+                "filled_qty": float(o.filled_qty) if o.filled_qty else 0.0,
+                "filled_avg_price": float(o.filled_avg_price) if o.filled_avg_price else None,
+                "type": str(o.order_type).lower().replace("ordertype.", ""),
+                "status": str(o.status).lower().replace("orderstatus.", ""),
+                "submitted_at": o.submitted_at.isoformat() if o.submitted_at else None,
+                "filled_at": o.filled_at.isoformat() if o.filled_at else None,
+            })
+        return out
+
+    def cancel_order(self, order_id: str):
+        self._t.cancel_order_by_id(order_id)
+
+    def cancel_all_orders(self):
+        self._t.cancel_orders()
+
+    def close_position(self, symbol: str):
+        self._t.close_position(symbol.upper())
+
+    def close_all_positions(self):
+        self._t.close_all_positions(cancel_orders=True)
