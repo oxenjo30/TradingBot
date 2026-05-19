@@ -1144,6 +1144,11 @@ button { cursor: pointer; font-family: inherit; }
 .blacklist-chip button:hover { opacity: 1; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
+/* ── Software Updates card ── */
+[data-theme="light"] #update-release-box {
+  background: #F8FAFC;
+}
+
 /* ── Manual order result ── */
 .mo-result { font-size:12px; transition:color .15s; }
 .mo-result.ok  { color: var(--green); }
