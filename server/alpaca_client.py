@@ -37,16 +37,20 @@ _data: StockHistoricalDataClient | None = None
 def trading() -> TradingClient:
     global _trading
     key, secret, paper = _db_alpaca_creds()
-    if _trading is None or not key:
-        _trading = TradingClient(key, secret, paper=paper)
+    if not key:
+        raise ValueError("No Alpaca credentials configured. Add an Alpaca account in Settings.")
+    # Always re-create so credential rotations take effect without restart
+    _trading = TradingClient(key, secret, paper=paper)
     return _trading
 
 
 def data() -> StockHistoricalDataClient:
     global _data
-    if _data is None:
-        key, secret, _ = _db_alpaca_creds()
-        _data = StockHistoricalDataClient(key, secret)
+    key, secret, _ = _db_alpaca_creds()
+    if not key:
+        raise ValueError("No Alpaca credentials configured. Add an Alpaca account in Settings.")
+    # Always re-create so credential rotations take effect without restart
+    _data = StockHistoricalDataClient(key, secret)
     return _data
 
 
