@@ -98,3 +98,36 @@ def test_check_github_non_200_returns_502(client):
         r = client.get("/api/update/check")
     assert r.status_code == 502
     assert "GitHub" in r.json()["detail"]
+
+
+def test_check_release_url_validated(client, monkeypatch):
+    """release_url with non-github.com prefix is replaced with the fallback API URL."""
+    import server.version as ver
+    monkeypatch.setattr(ver, "INSTALLED_VERSION", "v1.0.0")
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.json.return_value = {
+        "tag_name": "v1.2.0",
+        "body": "Notes",
+        "html_url": "javascript:alert(1)",
+    }
+    with patch("httpx.get", return_value=mock_resp):
+        r = client.get("/api/update/check")
+    assert r.status_code == 200
+    assert r.json()["release_url"].startswith("https://")
+    assert "github.com" in r.json()["release_url"]
+
+
+def test_check_requires_auth(tmp_path, monkeypatch):
+    """GET /api/update/check returns 401 when setup is complete but no session cookie."""
+    import server.db as db_mod
+    monkeypatch.setattr(db_mod, "DB_PATH", tmp_path / "auth_test.db")
+    with patch("server.auth.password_is_set", return_value=True), \
+         patch("server.auth.setup_complete", return_value=True):
+        with patch("server.engine.start"), patch("server.engine.shutdown"):
+            from server.main import app
+            with TestClient(app, raise_server_exceptions=True) as tc:
+                r = tc.get("/api/update/check")
+    assert r.status_code == 401, (
+        f"Expected 401 for unauthenticated update check, got {r.status_code}"
+    )

@@ -324,7 +324,9 @@ def check_for_update(request: Request):
     installed = version.INSTALLED_VERSION
     latest = data.get("tag_name", installed)
     notes = (data.get("body") or "")[:1000]
-    release_url = data.get("html_url", _GITHUB_RELEASES_URL)
+    release_url = data.get("html_url", "")
+    if not isinstance(release_url, str) or not release_url.startswith("https://github.com/"):
+        release_url = _GITHUB_RELEASES_URL
     return {
         "installed": installed,
         "latest": latest,
