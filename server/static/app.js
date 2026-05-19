@@ -4956,6 +4956,7 @@ async function initSettings() {
   });
 
   loadAiSettings();
+  initUpdateCard();
 }
 
 // ─────────────────────────────────────────
@@ -5377,3 +5378,111 @@ window.saveSentimentThresholds = async function() {
     if (msg) { msg.style.color='var(--red)'; msg.textContent=`Error: ${e.message}`; msg.style.display=''; }
   }
 };
+
+// ─────────────────────────────────────────
+// initUpdateCard — Software Updates card on settings.html
+// ─────────────────────────────────────────
+function initUpdateCard() {
+  const card = document.getElementById('update-card');
+  if (!card) return;
+
+  const installedEl  = document.getElementById('update-installed');
+  const actionsEl    = document.getElementById('update-actions');
+  const releaseBox   = document.getElementById('update-release-box');
+  const releaseTitle = document.getElementById('update-release-title');
+  const releaseNotes = document.getElementById('update-release-notes');
+  const releaseLink  = document.getElementById('update-release-link');
+  const errorEl      = document.getElementById('update-error');
+  const metaEl       = document.getElementById('update-meta');
+
+  // SVG icons used in multiple states
+  const refreshIcon = `<svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+    <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
+    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+  </svg>`;
+
+  function setState(state, data) {
+    actionsEl.innerHTML = '';
+    releaseBox.style.display = 'none';
+    errorEl.style.display = 'none';
+
+    if (state === 'default') {
+      metaEl.textContent = 'Check GitHub for the latest TradeBot release';
+      const btn = document.createElement('button');
+      btn.className = 'btn btn-primary';
+      btn.innerHTML = refreshIcon + ' Check for Updates';
+      btn.onclick = doCheck;
+      actionsEl.appendChild(btn);
+    }
+
+    else if (state === 'checking') {
+      metaEl.textContent = 'Contacting GitHub…';
+      const badge = document.createElement('span');
+      badge.className = 'badge b-enabled';
+      badge.style.cssText = 'background:rgba(59,130,246,.12);color:var(--blue);border:1px solid rgba(59,130,246,.2);';
+      badge.innerHTML = `<svg style="animation:spin 1s linear infinite" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+        <path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg> Checking…`;
+      actionsEl.appendChild(badge);
+    }
+
+    else if (state === 'up-to-date') {
+      metaEl.textContent = 'Last checked: just now';
+      const badge = document.createElement('span');
+      badge.className = 'badge b-enabled';
+      badge.innerHTML = `<span style="width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 6px rgba(16,185,129,.5);flex-shrink:0;display:inline-block;"></span> Up to date`;
+      actionsEl.appendChild(badge);
+      const btn = document.createElement('button');
+      btn.className = 'btn btn-ghost';
+      btn.innerHTML = refreshIcon + ' Check Again';
+      btn.onclick = doCheck;
+      actionsEl.appendChild(btn);
+    }
+
+    else if (state === 'update-available') {
+      metaEl.innerHTML = `Latest: <strong style="color:var(--orange);">${data.latest}</strong> is available`;
+      const badge = document.createElement('span');
+      badge.className = 'badge b-notrun';
+      badge.innerHTML = `<span style="width:7px;height:7px;border-radius:50%;background:var(--orange);box-shadow:0 0 6px rgba(245,158,11,.5);flex-shrink:0;display:inline-block;"></span> Update available`;
+      actionsEl.appendChild(badge);
+      const btn = document.createElement('button');
+      btn.className = 'btn btn-ghost';
+      btn.innerHTML = refreshIcon + ' Check Again';
+      btn.onclick = doCheck;
+      actionsEl.appendChild(btn);
+      // Release notes box
+      releaseTitle.textContent = `What's new in ${data.latest}`;
+      releaseNotes.textContent = data.release_notes;
+      releaseLink.href = data.release_url;
+      releaseBox.style.display = data.release_notes ? '' : 'none';
+    }
+
+    else if (state === 'error') {
+      metaEl.textContent = 'Check GitHub for the latest TradeBot release';
+      errorEl.textContent = 'Unable to reach GitHub. Try again later.';
+      errorEl.style.display = '';
+      const btn = document.createElement('button');
+      btn.className = 'btn btn-primary';
+      btn.innerHTML = refreshIcon + ' Check for Updates';
+      btn.onclick = doCheck;
+      actionsEl.appendChild(btn);
+    }
+  }
+
+  async function doCheck() {
+    setState('checking');
+    try {
+      const data = await api('/api/update/check', { key: 'update-check' });
+      if (installedEl) installedEl.textContent = data.installed;
+      setState(data.up_to_date ? 'up-to-date' : 'update-available', data);
+    } catch (e) {
+      setState('error');
+    }
+  }
+
+  // Render default state immediately; populate installed version on first successful check
+  setState('default');
+  // Pre-populate installed version label by fetching the check once silently on load
+  api('/api/update/check', { key: 'update-check-prefetch' })
+    .then(data => { if (installedEl) installedEl.textContent = data.installed; })
+    .catch(() => {});
+}
