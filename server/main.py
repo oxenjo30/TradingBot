@@ -63,6 +63,14 @@ app.add_middleware(NoCacheStaticMiddleware)
 def _get_token(request: Request) -> str | None:
     return request.cookies.get("tb_session")
 
+def _require_license():
+    """Raise 402 if the stored license key is missing or invalid."""
+    from .license import check_stored_license
+    result = check_stored_license()
+    if not result.get("valid"):
+        raise HTTPException(402, result.get("reason", "License required"))
+
+
 def _require_auth(request: Request):
     if not auth.password_is_set():
         # Allow through only during initial setup wizard. Once setup is marked
@@ -73,6 +81,7 @@ def _require_auth(request: Request):
         return
     if not auth.validate_session(_get_token(request)):
         raise HTTPException(401, "Unauthorized")
+    _require_license()
 
 
 def _read_env_key(name: str) -> str:
