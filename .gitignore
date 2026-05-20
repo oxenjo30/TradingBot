@@ -23,3 +23,18 @@ Thumbs.db
 # Editor
 .vscode/
 *.swp
+
+# Claude Code local settings (may contain API keys from permission allowlists)
+.claude/settings.local.json
+
+# Internal dev / seller-only files
+docs/superpowers/
+generate_guide.py
+guide_v2.pdf
+guide_test.pdf
+dashboard_mockup.html
+move_to_local.bat
+server/static/mockup-*.html
+backfill_perf.py
+check_db.py
+fix_encoding.py
