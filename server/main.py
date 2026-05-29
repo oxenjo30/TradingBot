@@ -44,7 +44,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="TradeBot", lifespan=lifespan)
 
-# ── No-cache middleware for static assets (dev) ────────────────────────────────
+# ── No-cache middleware for static assets ─────────────────────────────────────
 from starlette.middleware.base import BaseHTTPMiddleware
 
 class NoCacheStaticMiddleware(BaseHTTPMiddleware):
@@ -223,6 +223,8 @@ class StrategyAccountAssign(BaseModel):
 
 class StrategyAccountPatch(BaseModel):
     enabled: bool
+    active_start: str | None = None
+    active_end:   str | None = None
 
 
 class AiSettingsBody(BaseModel):
@@ -309,6 +311,7 @@ def setup_complete(body: SetupCompleteIn):
 
 @app.get("/api/health")
 def health():
+    # Intentionally public — needed by setup wizard before auth exists
     return {
         "ok": True,
         "setup_complete": auth.setup_complete(),
@@ -411,7 +414,8 @@ def crypto_pnl(request: Request, account_id: int):
 
 
 @app.get("/api/clock")
-def clock():
+def clock(request: Request):
+    _require_auth(request)
     try:
         return alpaca_client.get_clock()
     except Exception:
@@ -509,6 +513,7 @@ def close_all(request: Request, account_id: int | None = None):
 
 @app.get("/api/quote/{symbol}")
 def quote(symbol: str, request: Request, account_id: int | None = None):
+    _require_auth(request)
     # If a specific account is requested, use that broker's quote
     if account_id is not None:
         try:
@@ -600,7 +605,8 @@ def portfolio_history(request: Request, period: str = "1M", timeframe: str = "1D
 # ── Strategies ─────────────────────────────────────────────────────────────────
 
 @app.get("/api/strategies")
-def list_strategies(response: Response):
+def list_strategies(request: Request, response: Response):
+    _require_auth(request)
     response.headers["Cache-Control"] = "no-store"
     saved = {s["name"]: s for s in db.get_strategies()}
     out = []
@@ -790,6 +796,11 @@ def broker_account_strategy_view(account_id: int, request: Request):
     broker = (acct.get("broker") or "alpaca").lower()
     assignments = db.get_account_strategy_assignments(account_id)
     global_strats = {s["name"]: s for s in db.get_strategies()}
+    # Per-account windows: keyed by strategy name
+    acct_windows = {
+        row["strategy_name"]: {"active_start": row["active_start"], "active_end": row["active_end"]}
+        for row in db.get_strategy_account_windows(account_id)
+    }
     return [
         {
             "name": name,
@@ -797,8 +808,8 @@ def broker_account_strategy_view(account_id: int, request: Request):
             "description": cls.description,
             "assigned": name in assignments,
             "enabled": assignments.get(name, False),
-            "active_start": global_strats.get(name, {}).get("active_start"),
-            "active_end":   global_strats.get(name, {}).get("active_end"),
+            "active_start": acct_windows.get(name, {}).get("active_start"),
+            "active_end":   acct_windows.get(name, {}).get("active_end"),
             "params": global_strats.get(name, {}).get("params") or cls.default_params,
             "params_schema": cls.params_schema,
         }
@@ -864,6 +875,9 @@ def patch_strategy_account(name: str, account_id: int, body: StrategyAccountPatc
     _require_auth(request)
     if not db.update_strategy_account_enabled(name, account_id, body.enabled):
         raise HTTPException(status_code=404, detail="account not found")
+    # Save per-account time window if provided
+    if body.active_start is not None or body.active_end is not None:
+        db.update_strategy_account_window(name, account_id, body.active_start, body.active_end)
     # Sync global enabled flag: on if any account has it enabled, off if none do
     account_list = db.get_strategy_account_list(name)
     globally_enabled = any(a["enabled"] for a in account_list)
@@ -955,7 +969,8 @@ def signals(request: Request, limit: int = 100, since: str | None = None, until:
     return db.recent_signals(limit=limit, since=since, until=until)
 
 @app.get("/api/engine")
-def engine_status():
+def engine_status(request: Request):
+    _require_auth(request)
     return engine.last_run()
 
 @app.post("/api/engine/run_now")
@@ -1275,12 +1290,14 @@ def remove_symbol(wl_id: int, symbol: str, request: Request):
 # ── Scanner ────────────────────────────────────────────────────────────────────
 
 @app.get("/api/scanner")
-def scanner_data():
+def scanner_data(request: Request):
+    _require_auth(request)
     return scanner.get_raw()
 
 @app.get("/api/scanner/universe")
-def scanner_universe(min_price: float = 5.0, max_price: float = 1000.0,
+def scanner_universe(request: Request, min_price: float = 5.0, max_price: float = 1000.0,
                      top_actives: int = 20, top_gainers: int = 10):
+    _require_auth(request)
     return scanner.get_scanner_universe(min_price, max_price, top_actives, top_gainers)
 
 
@@ -1300,6 +1317,24 @@ def risk_status(request: Request):
     except Exception:
         dtc = 0
     return risk.status_summary(acct, dtc)
+
+@app.get("/api/risk/stock-window")
+def get_stock_window(request: Request):
+    _require_auth(request)
+    return {
+        "stock_trading_start": db.get_app_config("stock_trading_start", ""),
+        "stock_trading_end":   db.get_app_config("stock_trading_end",   ""),
+    }
+
+@app.post("/api/risk/stock-window")
+def set_stock_window(body: dict, request: Request):
+    _require_auth(request)
+    start = (body.get("stock_trading_start") or "").strip()
+    end   = (body.get("stock_trading_end")   or "").strip()
+    db.set_app_config("stock_trading_start", start)
+    db.set_app_config("stock_trading_end",   end)
+    db.log_audit("risk", "set global stock trading window", f"{start or 'any'}–{end or 'any'}")
+    return {"stock_trading_start": start, "stock_trading_end": end}
 
 @app.post("/api/risk/kill_switch")
 def set_kill(body: dict, request: Request):
