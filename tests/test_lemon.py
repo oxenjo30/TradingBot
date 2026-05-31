@@ -1,6 +1,17 @@
+import hashlib
+import hmac
+import json
+import os
 import pytest
 import sqlite3
 from pathlib import Path
+
+
+SIGNING_SECRET = "test-signing-secret-abc123"
+
+
+def _make_signature(body: bytes, secret: str) -> str:
+    return hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
 
 
 @pytest.fixture
@@ -68,3 +79,62 @@ def test_count_issued_licenses(tmp_db):
 
 def test_get_issued_license_not_found(tmp_db):
     assert tmp_db.get_issued_license(9999) is None
+
+
+def test_verify_signature_valid():
+    from server.lemon import verify_signature
+    body = b'{"meta":{"event_name":"order_created"}}'
+    sig = _make_signature(body, SIGNING_SECRET)
+    verify_signature(body, sig, SIGNING_SECRET)  # should not raise
+
+
+def test_verify_signature_invalid():
+    from server.lemon import verify_signature, LemonWebhookError
+    body = b'{"meta":{"event_name":"order_created"}}'
+    with pytest.raises(LemonWebhookError, match="signature"):
+        verify_signature(body, "badsignature", SIGNING_SECRET)
+
+
+def test_extract_order_data_valid():
+    from server.lemon import extract_order_data
+    payload = {
+        "meta": {"event_name": "order_created"},
+        "data": {
+            "id": "ls_order_123",
+            "attributes": {
+                "user_email": "buyer@example.com",
+                "status": "paid",
+            }
+        }
+    }
+    order_id, email = extract_order_data(payload)
+    assert order_id == "ls_order_123"
+    assert email == "buyer@example.com"
+
+
+def test_extract_order_data_not_paid():
+    from server.lemon import extract_order_data, LemonWebhookError
+    payload = {
+        "meta": {"event_name": "order_created"},
+        "data": {
+            "id": "ls_order_456",
+            "attributes": {
+                "user_email": "buyer@example.com",
+                "status": "pending",
+            }
+        }
+    }
+    with pytest.raises(LemonWebhookError, match="not paid"):
+        extract_order_data(payload)
+
+
+def test_build_license_email_html():
+    from server.lemon import build_license_email_html
+    html = build_license_email_html(
+        buyer_email="buyer@example.com",
+        license_key="TB-TESTKEY-12345",
+        download_url="https://lemonsqueezy.com/download/abc",
+    )
+    assert "TB-TESTKEY-12345" in html
+    assert "https://lemonsqueezy.com/download/abc" in html
+    assert "buyer@example.com" in html
