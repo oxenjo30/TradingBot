@@ -88,6 +88,10 @@ def run_tick():
 
     CRYPTO_BROKERS = {"binance"}
 
+    # Global stock trading window (applies to all stock broker accounts)
+    _stock_global_start = db.get_app_config("stock_trading_start", "") or ""
+    _stock_global_end   = db.get_app_config("stock_trading_end",   "") or ""
+
     if risk.is_killed():
         _last_run["error"] = "kill switch active"
         log.warning("kill switch active; skipping tick")
@@ -112,14 +116,6 @@ def run_tick():
         cls = strategies.REGISTRY[s["name"]]
         if not cls.auto_trade:
             continue
-        # Per-strategy time window check (ET)
-        if s.get("active_start") and s.get("active_end"):
-            if not (s["active_start"] <= now_time <= s["active_end"]):
-                log.debug("strategy %s skipped — outside window %s–%s (now %s ET)",
-                          s["name"], s["active_start"], s["active_end"], now_time)
-                _last_run["ran"].append({"strategy": s["name"], "skipped": "window"})
-                continue
-
         accounts = db.get_strategy_accounts(s["name"])
         if not accounts:
             _last_run["ran"].append({"strategy": s["name"], "skipped": "no_accounts"})
@@ -136,6 +132,24 @@ def run_tick():
                 continue
             acct_id = acct["id"]
             broker  = (acct.get("broker") or "alpaca").lower()
+
+            # Global stock trading window — applied to all non-crypto accounts
+            if broker not in CRYPTO_BROKERS and _stock_global_start and _stock_global_end:
+                if not (_stock_global_start <= now_time <= _stock_global_end):
+                    log.debug("strategy %s acct %d skipped — outside global stock window %s–%s (now %s ET)",
+                              s["name"], acct_id, _stock_global_start, _stock_global_end, now_time)
+                    _skip_reasons.add("window")
+                    continue
+
+            # Per-strategy per-account active time window
+            acct_start = acct.get("active_start")
+            acct_end   = acct.get("active_end")
+            if acct_start and acct_end:
+                if not (acct_start <= now_time <= acct_end):
+                    log.debug("strategy %s acct %d skipped — outside window %s–%s (now %s ET)",
+                              s["name"], acct_id, acct_start, acct_end, now_time)
+                    _skip_reasons.add("window")
+                    continue
 
             # Stock brokers only trade during US market hours.
             # Crypto brokers (Binance) run 24/7 — skip the clock gate.

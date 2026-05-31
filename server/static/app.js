@@ -851,10 +851,20 @@ async function initDashboard() {
   // ── Fetch strategies → active bots + bot status panel ──
   async function fetchStrategies() {
     try {
-      const [strats, engine] = await Promise.all([
+      const accounts = await api('/api/broker-accounts', { key: 'idx-all-accts' }).catch(() => []);
+      const binanceAcct = (accounts || []).find(a => a.broker === 'binance');
+      const alpacaAcct  = (accounts || []).find(a => a.broker === 'alpaca');
+
+      const [strats, engine, binanceStrats, alpacaStrats] = await Promise.all([
         api('/api/strategies', { key: 'idx-strategies' }),
         api('/api/engine',     { key: 'idx-engine' }),
+        binanceAcct ? api(`/api/broker-accounts/${binanceAcct.id}/strategies`, { key: 'idx-bots-binance' }).catch(() => []) : Promise.resolve([]),
+        alpacaAcct  ? api(`/api/broker-accounts/${alpacaAcct.id}/strategies`,  { key: 'idx-bots-alpaca'  }).catch(() => []) : Promise.resolve([]),
       ]);
+
+      // Build sets of strategy names enabled per broker account
+      const binanceEnabled = new Set((binanceStrats || []).filter(s => s.enabled).map(s => s.name));
+      const alpacaEnabled  = new Set((alpacaStrats  || []).filter(s => s.enabled).map(s => s.name));
       const botsEl = document.getElementById('bots-val');
       clearState(botsEl);
       botsEl.textContent = strats.filter(s => s.enabled).length;
@@ -928,8 +938,11 @@ async function initDashboard() {
       cryptoList.innerHTML = '';
 
       strats.forEach(s => {
-        const isCrypto = (s.brokers || []).includes('binance') && !(s.brokers || []).includes('alpaca');
-        (isCrypto ? cryptoList : stockList).appendChild(buildBotRow(s));
+        const onBinance = binanceEnabled.has(s.name);
+        const onAlpaca  = alpacaEnabled.has(s.name);
+        const cryptoOnly = (s.brokers || []).includes('binance') && !(s.brokers || []).includes('alpaca');
+        if (onBinance) cryptoList.appendChild(buildBotRow(s));
+        if (onAlpaca || (!onBinance && !cryptoOnly)) stockList.appendChild(buildBotRow(s));
       });
 
       if (!stockList.children.length)  stockList.innerHTML  = '<div style="font-size:12px;color:var(--muted);">No stock strategies.</div>';
@@ -1676,10 +1689,10 @@ async function initBots() {
     const saveSchedule = async (start, end) => {
       const msgEl = document.getElementById(`sched-msg-${s.name}`);
       try {
-        await api(`/api/strategies/${s.name}`, {
+        await api(`/api/strategies/${s.name}/accounts/${acct.id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ active_start: start, active_end: end }),
+          body: JSON.stringify({ enabled: s.enabled, active_start: start || null, active_end: end || null }),
           key: `sched-${s.name}`,
         });
         // Update inline label
@@ -3141,6 +3154,15 @@ async function initRisk() {
       // Blacklist
       if (r.blacklist) renderBlacklist(r.blacklist);
 
+      // Global stock trading window
+      try {
+        const sw = await api('/api/risk/stock-window', { key: 'risk-stock-window' });
+        const startEl = document.getElementById('stock-window-start');
+        const endEl   = document.getElementById('stock-window-end');
+        if (startEl) startEl.value = sw.stock_trading_start || '';
+        if (endEl)   endEl.value   = sw.stock_trading_end   || '';
+      } catch (e) { console.error('stock window load failed', e); }
+
       setSizingMode(r.position_size_mode);
       applyLiveStatus(r);
     } catch { /* silent */ }
@@ -3534,6 +3556,40 @@ async function initRisk() {
 
   await loadRisk();
   loadAccountKillSwitches();
+
+  // ── Global stock trading window ──
+  async function saveStockWindow(start, end) {
+    const msgEl = document.getElementById('stock-window-msg');
+    try {
+      await fetch('/api/risk/stock-window', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stock_trading_start: start, stock_trading_end: end }),
+      });
+      if (msgEl) { msgEl.textContent = 'Saved'; msgEl.style.color = '#10B981'; msgEl.style.display = 'inline'; setTimeout(() => msgEl.style.display = 'none', 2000); }
+    } catch {
+      if (msgEl) { msgEl.textContent = 'Failed'; msgEl.style.color = '#EF4444'; msgEl.style.display = 'inline'; setTimeout(() => msgEl.style.display = 'none', 2500); }
+    }
+  }
+
+  document.getElementById('btn-stock-window-save')?.addEventListener('click', () => {
+    const start = document.getElementById('stock-window-start')?.value || '';
+    const end   = document.getElementById('stock-window-end')?.value   || '';
+    if (start && !end || !start && end) {
+      const msgEl = document.getElementById('stock-window-msg');
+      if (msgEl) { msgEl.textContent = 'Enter both times or clear both'; msgEl.style.color = '#F59E0B'; msgEl.style.display = 'inline'; setTimeout(() => msgEl.style.display = 'none', 2500); }
+      return;
+    }
+    saveStockWindow(start, end);
+  });
+
+  document.getElementById('btn-stock-window-clear')?.addEventListener('click', () => {
+    const startEl = document.getElementById('stock-window-start');
+    const endEl   = document.getElementById('stock-window-end');
+    if (startEl) startEl.value = '';
+    if (endEl)   endEl.value   = '';
+    saveStockWindow('', '');
+  });
 }
 
 // ─────────────────────────────────────────

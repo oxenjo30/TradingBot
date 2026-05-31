@@ -485,6 +485,33 @@
       </div>
     </div>
 
+    <!-- ── Global Stock Trading Window ── -->
+    <div class="card">
+      <div class="risk-section-hd">
+        <div class="risk-section-title">Stock Trading Hours</div>
+        <div class="risk-section-desc">Global time window for all stock strategies (ET). Leave blank to trade any time market is open.</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;margin-top:.75rem;">
+        <div style="display:flex;align-items:center;gap:.5rem;">
+          <label style="font-size:12px;color:var(--muted);white-space:nowrap;">From</label>
+          <input id="stock-window-start" type="time" class="input-field"
+            style="width:130px;padding:.3rem .5rem;font-size:13px;height:32px;color-scheme:dark;">
+        </div>
+        <div style="display:flex;align-items:center;gap:.5rem;">
+          <label style="font-size:12px;color:var(--muted);white-space:nowrap;">To</label>
+          <input id="stock-window-end" type="time" class="input-field"
+            style="width:130px;padding:.3rem .5rem;font-size:13px;height:32px;color-scheme:dark;">
+        </div>
+        <button id="btn-stock-window-save" class="btn btn-primary btn-sm">Save</button>
+        <button id="btn-stock-window-clear" class="btn btn-ghost btn-sm">Clear</button>
+        <span id="stock-window-msg" style="font-size:12px;color:#10B981;display:none;">Saved</span>
+      </div>
+      <div style="margin-top:.5rem;font-size:11px;color:var(--muted);">
+        Typical US market: <strong style="color:var(--text);">09:30</strong> to <strong style="color:var(--text);">16:00</strong> &nbsp;&middot;&nbsp;
+        Avoid first 30 min: <strong style="color:var(--text);">10:00</strong> to <strong style="color:var(--text);">15:30</strong>
+      </div>
+    </div>
+
     <!-- ── Risk Limits (Stock) ── -->
     <div class="card">
       <div class="risk-section-hd">
