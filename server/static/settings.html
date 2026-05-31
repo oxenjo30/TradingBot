@@ -395,6 +395,75 @@
       <div id="update-error" class="field-msg err" style="display:none;margin-top:.75rem;"></div>
     </div>
 
+    <!-- ── License Management ─────────────────────────────────────────────── -->
+    <div class="card" id="license-mgmt-section">
+      <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;"
+           onclick="toggleLicenseMgmt()">
+        <div>
+          <div style="font-size:14px;font-weight:600;">License Management</div>
+          <div class="text-muted" style="font-size:12px;margin-top:2px;">View, revoke, and resend issued license keys</div>
+        </div>
+        <svg id="license-mgmt-chevron" width="16" height="16" fill="none"
+             stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"
+             style="transition:transform .2s;flex-shrink:0;">
+          <polyline points="6 9 12 15 18 9"/>
+        </svg>
+      </div>
+
+      <div id="license-mgmt-body" style="display:none;margin-top:1rem;">
+
+        <!-- Stats row -->
+        <div style="display:flex;gap:1rem;margin-bottom:1rem;flex-wrap:wrap;align-items:center;">
+          <div style="font-size:12px;background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:8px;padding:4px 12px;">
+            Total: <strong id="lm-total">—</strong>
+          </div>
+          <div style="font-size:12px;background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:8px;padding:4px 12px;">
+            Active: <strong id="lm-active">—</strong>
+          </div>
+          <div style="font-size:12px;background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:8px;padding:4px 12px;">
+            Revoked: <strong id="lm-revoked">—</strong>
+          </div>
+          <button class="btn btn-sm btn-ghost" style="margin-left:auto;"
+                  onclick="exportLicenses()">&#8595; Export CSV</button>
+        </div>
+
+        <!-- Search -->
+        <div style="margin-bottom:.75rem;">
+          <input id="lm-search" class="input-field" style="max-width:280px;font-size:13px;"
+                 placeholder="Search by email…"
+                 oninput="loadLicenses(1)">
+        </div>
+
+        <!-- Table -->
+        <div class="dtable-wrap">
+          <table class="dtable" id="lm-table" style="font-size:12px;width:100%;">
+            <thead>
+              <tr>
+                <th>Email</th>
+                <th>Order ID</th>
+                <th>Issued</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="lm-tbody">
+              <tr><td colspan="5" class="state-empty">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Pagination -->
+        <div style="display:flex;gap:.5rem;justify-content:flex-end;margin-top:.75rem;align-items:center;">
+          <button class="btn btn-sm btn-ghost" id="lm-prev" onclick="loadLicenses(lmPage-1)">
+            &larr; Prev</button>
+          <span id="lm-page-info" style="font-size:12px;color:var(--muted);"></span>
+          <button class="btn btn-sm btn-ghost" id="lm-next" onclick="loadLicenses(lmPage+1)">
+            Next &rarr;</button>
+        </div>
+
+      </div>
+    </div>
+
     <!-- ── Save Bar ── -->
     <div style="display:flex;align-items:center;justify-content:flex-end;gap:.75rem;padding-bottom:.5rem;">
       <span id="settings-save-msg" class="field-msg hidden"></span>
@@ -481,5 +550,127 @@
 </div>
 
 <script src="/static/app.js"></script>
+<script>
+// ── License Management ──────────────────────────────────────────────────────
+let lmPage = 1;
+const LM_PER_PAGE = 20;
+let lmOpen = false;
+
+function toggleLicenseMgmt() {
+  lmOpen = !lmOpen;
+  const body    = document.getElementById('license-mgmt-body');
+  const chevron = document.getElementById('license-mgmt-chevron');
+  body.style.display    = lmOpen ? 'block' : 'none';
+  chevron.style.transform = lmOpen ? 'rotate(180deg)' : '';
+  if (lmOpen) loadLicenses(1);
+}
+
+async function loadLicenses(page) {
+  page = Math.max(1, page || 1);
+  lmPage = page;
+  const search = document.getElementById('lm-search')?.value || '';
+  let resp;
+  try {
+    resp = await api(
+      `/api/admin/licenses?page=${lmPage}&per_page=${LM_PER_PAGE}&search=${encodeURIComponent(search)}`
+    );
+  } catch (e) {
+    document.getElementById('lm-tbody').innerHTML =
+      `<tr><td colspan="5" class="state-error">Failed to load: ${_esc(e.message)}</td></tr>`;
+    return;
+  }
+  if (!resp || !resp.licenses) return;
+
+  const total   = resp.total || 0;
+  const rows    = resp.licenses || [];
+  const active  = rows.filter(l => !l.revoked).length;
+  const revoked = rows.filter(l =>  l.revoked).length;
+
+  document.getElementById('lm-total').textContent   = total;
+  document.getElementById('lm-active').textContent  = active;
+  document.getElementById('lm-revoked').textContent = revoked;
+
+  const totalPages = Math.max(1, Math.ceil(total / LM_PER_PAGE));
+  document.getElementById('lm-page-info').textContent = `Page ${lmPage} of ${totalPages}`;
+  document.getElementById('lm-prev').disabled = lmPage <= 1;
+  document.getElementById('lm-next').disabled = lmPage >= totalPages;
+
+  const tbody = document.getElementById('lm-tbody');
+  if (!rows.length) {
+    tbody.innerHTML = `<tr><td colspan="5" class="state-empty">No licenses found</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = rows.map(l => {
+    const statusBadge = l.revoked
+      ? `<span class="badge b-disabled">Revoked</span>`
+      : `<span class="badge b-enabled">Active</span>`;
+    const issued = l.issued_at ? l.issued_at.slice(0, 10) : '—';
+    const safeKey = (l.license_key || '').replace(/'/g, "\\'");
+    return `<tr>
+      <td>${_esc(l.buyer_email)}</td>
+      <td style="font-family:monospace;font-size:11px;">${_esc(l.order_id)}</td>
+      <td>${issued}</td>
+      <td class="col-badge">${statusBadge}</td>
+      <td>
+        <div style="display:flex;gap:.3rem;flex-wrap:wrap;">
+          <button class="btn btn-sm btn-ghost" style="font-size:11px;"
+                  onclick="lmCopyKey('${safeKey}', this)">Copy Key</button>
+          <button class="btn btn-sm btn-ghost" style="font-size:11px;"
+                  onclick="lmResend(${l.id}, this)">Resend</button>
+          ${!l.revoked ? `<button class="btn btn-sm" style="font-size:11px;background:rgba(239,68,68,.1);color:#EF4444;border-color:rgba(239,68,68,.3);"
+                  onclick="lmRevoke(${l.id}, this)">Revoke</button>` : ''}
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+async function lmRevoke(id, btn) {
+  if (!confirm('Revoke this license? The buyer will no longer be able to activate it.')) return;
+  btn.disabled = true;
+  try {
+    await api(`/api/admin/licenses/${id}/revoke`, { method: 'POST' });
+  } catch (e) {
+    btn.disabled = false;
+    alert('Revoke failed: ' + e.message);
+    return;
+  }
+  loadLicenses(lmPage);
+}
+
+async function lmResend(id, btn) {
+  btn.disabled = true;
+  btn.textContent = 'Sending…';
+  try {
+    const resp = await api(`/api/admin/licenses/${id}/resend`, { method: 'POST' });
+    btn.textContent = (resp && resp.ok) ? 'Sent ✓' : 'Failed';
+    if (!resp || !resp.ok) btn.disabled = false;
+  } catch (e) {
+    btn.textContent = 'Failed';
+    btn.disabled = false;
+  }
+}
+
+function exportLicenses() {
+  window.location.href = '/api/admin/licenses/export';
+}
+
+function lmCopyKey(text, btn) {
+  navigator.clipboard.writeText(text).then(() => {
+    const orig = btn.textContent;
+    btn.textContent = 'Copied!';
+    setTimeout(() => { btn.textContent = orig; }, 1500);
+  });
+}
+
+function _esc(s) {
+  return String(s || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+</script>
 </body>
 </html>
