@@ -155,6 +155,16 @@ CREATE TABLE IF NOT EXISTS crypto_cost_basis (
   updated_at  TEXT NOT NULL DEFAULT (datetime('now')),
   PRIMARY KEY (account_id, symbol)
 );
+
+CREATE TABLE IF NOT EXISTS issued_licenses (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    order_id    TEXT UNIQUE NOT NULL,
+    buyer_email TEXT NOT NULL,
+    license_key TEXT NOT NULL,
+    issued_at   TEXT NOT NULL DEFAULT (datetime('now')),
+    revoked     INTEGER NOT NULL DEFAULT 0,
+    resent_at   TEXT
+);
 """
 
 RISK_DEFAULTS = {
@@ -257,6 +267,13 @@ def init_db():
             c.execute("ALTER TABLE strategies ADD COLUMN active_start TEXT DEFAULT NULL")
         if "active_end" not in cols:
             c.execute("ALTER TABLE strategies ADD COLUMN active_end TEXT DEFAULT NULL")
+    # Migration: add per-account active_start / active_end to strategy_accounts if missing
+    with get_conn() as c:
+        cols = [r[1] for r in c.execute("PRAGMA table_info(strategy_accounts)")]
+        if "active_start" not in cols:
+            c.execute("ALTER TABLE strategy_accounts ADD COLUMN active_start TEXT DEFAULT NULL")
+        if "active_end" not in cols:
+            c.execute("ALTER TABLE strategy_accounts ADD COLUMN active_end TEXT DEFAULT NULL")
     # Migration: create watchlists table if missing (added after initial schema)
     with get_conn() as c:
         tables = [r[0] for r in c.execute("SELECT name FROM sqlite_master WHERE type='table'")]
@@ -421,6 +438,72 @@ def get_license_key() -> str:
 
 def set_license_key(key: str) -> None:
     set_app_config("license_key", key)
+
+
+# ── Issued licenses (Lemon Squeezy automation) ────────────────────────────────
+
+def add_issued_license(order_id: str, buyer_email: str, license_key: str) -> None:
+    """Insert a new issued license. Silently ignores duplicate order_id."""
+    with get_conn() as c:
+        c.execute(
+            "INSERT OR IGNORE INTO issued_licenses (order_id, buyer_email, license_key) "
+            "VALUES (?, ?, ?)",
+            (order_id, buyer_email, license_key),
+        )
+
+
+def list_issued_licenses(search: str = "", page: int = 1,
+                         per_page: int = 20) -> list[dict]:
+    offset = (page - 1) * per_page
+    with get_conn() as c:
+        if search:
+            rows = c.execute(
+                "SELECT * FROM issued_licenses WHERE buyer_email LIKE ? "
+                "ORDER BY issued_at DESC LIMIT ? OFFSET ?",
+                (f"%{search}%", per_page, offset),
+            ).fetchall()
+        else:
+            rows = c.execute(
+                "SELECT * FROM issued_licenses ORDER BY issued_at DESC "
+                "LIMIT ? OFFSET ?",
+                (per_page, offset),
+            ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def count_issued_licenses(search: str = "") -> int:
+    with get_conn() as c:
+        if search:
+            row = c.execute(
+                "SELECT COUNT(*) FROM issued_licenses WHERE buyer_email LIKE ?",
+                (f"%{search}%",),
+            ).fetchone()
+        else:
+            row = c.execute("SELECT COUNT(*) FROM issued_licenses").fetchone()
+    return row[0]
+
+
+def get_issued_license(license_id: int) -> dict | None:
+    with get_conn() as c:
+        row = c.execute(
+            "SELECT * FROM issued_licenses WHERE id=?", (license_id,)
+        ).fetchone()
+    return dict(row) if row else None
+
+
+def revoke_issued_license(license_id: int) -> None:
+    with get_conn() as c:
+        c.execute(
+            "UPDATE issued_licenses SET revoked=1 WHERE id=?", (license_id,)
+        )
+
+
+def update_resent_at(license_id: int) -> None:
+    with get_conn() as c:
+        c.execute(
+            "UPDATE issued_licenses SET resent_at=datetime('now') WHERE id=?",
+            (license_id,),
+        )
 
 
 def get_webhook_token() -> str:
@@ -767,7 +850,8 @@ def get_strategy_accounts(strategy_name: str) -> list[dict]:
     """Return enabled (strategy, account) pairs with ciphertext credentials. Used by engine."""
     with get_conn() as c:
         return [dict(r) for r in c.execute(
-            """SELECT sa.account_id AS id, ba.label, ba.api_key, ba.api_secret, ba.account_type, ba.broker
+            """SELECT sa.account_id AS id, ba.label, ba.api_key, ba.api_secret,
+                      ba.account_type, ba.broker, sa.active_start, sa.active_end
                FROM strategy_accounts sa
                JOIN broker_accounts ba ON ba.id = sa.account_id
                WHERE sa.strategy_name = ? AND sa.enabled = 1""",
@@ -779,7 +863,8 @@ def get_strategy_account_list(strategy_name: str) -> list[dict]:
     """Return all assigned accounts with enabled flag. Used by API endpoint."""
     with get_conn() as c:
         return [dict(r) for r in c.execute(
-            """SELECT ba.id, ba.label, ba.account_type, sa.enabled, sa.created_at
+            """SELECT ba.id, ba.label, ba.account_type, sa.enabled, sa.created_at,
+                      sa.active_start, sa.active_end
                FROM strategy_accounts sa
                JOIN broker_accounts ba ON ba.id = sa.account_id
                WHERE sa.strategy_name = ?
@@ -810,6 +895,27 @@ def update_strategy_account_enabled(strategy_name: str, account_id: int, enabled
             (strategy_name, account_id, int(enabled))
         )
         return True
+
+
+def get_strategy_account_windows(account_id: int) -> list[dict]:
+    """Return per-account active_start/active_end for all strategies assigned to this account."""
+    with get_conn() as c:
+        return [dict(r) for r in c.execute(
+            "SELECT strategy_name, active_start, active_end FROM strategy_accounts WHERE account_id=?",
+            (account_id,)
+        )]
+
+
+def update_strategy_account_window(strategy_name: str, account_id: int,
+                                    active_start: str | None, active_end: str | None) -> bool:
+    """Set per-account active time window. Returns False if the row doesn't exist."""
+    with get_conn() as c:
+        cur = c.execute(
+            "UPDATE strategy_accounts SET active_start=?, active_end=? "
+            "WHERE strategy_name=? AND account_id=?",
+            (active_start or None, active_end or None, strategy_name, account_id)
+        )
+        return cur.rowcount > 0
 
 
 def unassign_strategy_account(strategy_name: str, account_id: int) -> None:
