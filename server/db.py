@@ -454,6 +454,7 @@ def add_issued_license(order_id: str, buyer_email: str, license_key: str) -> Non
 
 def list_issued_licenses(search: str = "", page: int = 1,
                          per_page: int = 20) -> list[dict]:
+    page = max(1, page)
     offset = (page - 1) * per_page
     with get_conn() as c:
         if search:

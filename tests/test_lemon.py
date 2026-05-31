@@ -56,3 +56,15 @@ def test_update_resent_at(tmp_db):
     tmp_db.update_resent_at(row["id"])
     updated = tmp_db.get_issued_license(row["id"])
     assert updated["resent_at"] is not None
+
+
+def test_count_issued_licenses(tmp_db):
+    assert tmp_db.count_issued_licenses() == 0
+    tmp_db.add_issued_license("order_c1", "count@test.com", "KEY-CNT")
+    assert tmp_db.count_issued_licenses() == 1
+    assert tmp_db.count_issued_licenses(search="count") == 1
+    assert tmp_db.count_issued_licenses(search="nomatch") == 0
+
+
+def test_get_issued_license_not_found(tmp_db):
+    assert tmp_db.get_issued_license(9999) is None
