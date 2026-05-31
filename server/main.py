@@ -385,6 +385,84 @@ def license_deactivate(request: Request):
     return {"ok": True}
 
 
+# ── Lemon Squeezy webhook + admin ─────────────────────────────────────────────
+
+@app.post("/api/lemon/webhook")
+async def lemon_webhook(request: Request):
+    """Receive Lemon Squeezy payment webhook, issue license key, email buyer."""
+    from .lemon import process_webhook, LemonWebhookError
+    body = await request.body()
+    signature = request.headers.get("X-Signature", "")
+    try:
+        result = process_webhook(body, signature)
+        return result
+    except LemonWebhookError as e:
+        if "signature" in str(e):
+            raise HTTPException(401, str(e))
+        log.warning("lemon webhook skipped: %s", e)
+        return {"skipped": True, "reason": str(e)}
+    except RuntimeError as e:
+        raise HTTPException(500, str(e))
+
+
+@app.get("/api/admin/licenses")
+def admin_list_licenses(request: Request, page: int = 1,
+                        per_page: int = 20, search: str = ""):
+    _require_auth(request)
+    licenses = db.list_issued_licenses(search=search, page=page, per_page=per_page)
+    total = db.count_issued_licenses(search=search)
+    return {"total": total, "page": page, "per_page": per_page, "licenses": licenses}
+
+
+@app.post("/api/admin/licenses/{license_id}/revoke")
+def admin_revoke_license(request: Request, license_id: int):
+    _require_auth(request)
+    row = db.get_issued_license(license_id)
+    if not row:
+        raise HTTPException(404, "License not found")
+    db.revoke_issued_license(license_id)
+    return {"ok": True}
+
+
+@app.post("/api/admin/licenses/{license_id}/resend")
+def admin_resend_license(request: Request, license_id: int):
+    _require_auth(request)
+    from .lemon import build_license_email_html
+    from .notifications import send_email_direct
+    row = db.get_issued_license(license_id)
+    if not row:
+        raise HTTPException(404, "License not found")
+    download_url = os.environ.get("LICENSE_DOWNLOAD_URL", "")
+    html = build_license_email_html(row["buyer_email"], row["license_key"], download_url)
+    smtp_host = db.get_app_config("email_smtp", "")
+    smtp_port = int(db.get_app_config("email_port", "587"))
+    smtp_user = db.get_app_config("email_user", "")
+    smtp_pass = db.get_app_config("email_pass", "")
+    if not smtp_host or not smtp_user or not smtp_pass:
+        raise HTTPException(400, "SMTP not configured in Settings")
+    send_email_direct(row["buyer_email"], smtp_host, smtp_port,
+                      smtp_user, smtp_pass, "Your TradeBot License Key", html)
+    db.update_resent_at(license_id)
+    return {"ok": True}
+
+
+@app.get("/api/admin/licenses/export")
+def admin_export_licenses(request: Request):
+    _require_auth(request)
+    import csv
+    import io
+    rows = db.list_issued_licenses(per_page=100000)
+    out = io.StringIO()
+    w = csv.writer(out)
+    w.writerow(["order_id", "buyer_email", "license_key", "issued_at", "revoked", "resent_at"])
+    for r in rows:
+        w.writerow([r["order_id"], r["buyer_email"], r["license_key"],
+                    r["issued_at"], r["revoked"], r.get("resent_at", "")])
+    from fastapi.responses import Response
+    return Response(content=out.getvalue(), media_type="text/csv",
+                    headers={"Content-Disposition": "attachment; filename=licenses.csv"})
+
+
 # ── Account & market ───────────────────────────────────────────────────────────
 
 @app.get("/api/account")

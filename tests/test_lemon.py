@@ -138,3 +138,70 @@ def test_build_license_email_html():
     assert "TB-TESTKEY-12345" in html
     assert "https://lemonsqueezy.com/download/abc" in html
     assert "buyer@example.com" in html
+
+
+from fastapi.testclient import TestClient
+
+
+@pytest.fixture
+def client(tmp_path, monkeypatch):
+    import server.db as db_mod
+    monkeypatch.setattr(db_mod, "DB_PATH", tmp_path / "test.db")
+    db_mod.init_db()
+    monkeypatch.setenv("LEMON_SQUEEZY_SIGNING_SECRET", SIGNING_SECRET)
+    monkeypatch.setenv("TRADEBOT_LICENSE_SECRET", "test-seller-secret-32-chars-long!")
+    monkeypatch.setenv("LICENSE_DURATION_DAYS", "36500")
+    monkeypatch.setenv("LICENSE_DOWNLOAD_URL", "https://lemonsqueezy.com/dl/test")
+    from server.main import app
+    return TestClient(app)
+
+
+def _webhook_payload(order_id="ls_001", email="buyer@test.com", status="paid"):
+    return json.dumps({
+        "meta": {"event_name": "order_created"},
+        "data": {
+            "id": order_id,
+            "attributes": {"user_email": email, "status": status}
+        }
+    }).encode()
+
+
+def test_webhook_valid_signature(client):
+    body = _webhook_payload()
+    sig = _make_signature(body, SIGNING_SECRET)
+    resp = client.post("/api/lemon/webhook",
+                       content=body,
+                       headers={"X-Signature": sig,
+                                "Content-Type": "application/json"})
+    assert resp.status_code == 200
+    assert resp.json()["order_id"] == "ls_001"
+
+
+def test_webhook_bad_signature(client):
+    body = _webhook_payload()
+    resp = client.post("/api/lemon/webhook",
+                       content=body,
+                       headers={"X-Signature": "badsig",
+                                "Content-Type": "application/json"})
+    assert resp.status_code == 401
+
+
+def test_webhook_not_paid(client):
+    body = _webhook_payload(status="pending")
+    sig = _make_signature(body, SIGNING_SECRET)
+    resp = client.post("/api/lemon/webhook",
+                       content=body,
+                       headers={"X-Signature": sig,
+                                "Content-Type": "application/json"})
+    assert resp.status_code == 200  # not paid = skip gracefully
+
+
+def test_webhook_duplicate_idempotent(client):
+    body = _webhook_payload()
+    sig = _make_signature(body, SIGNING_SECRET)
+    client.post("/api/lemon/webhook", content=body,
+                headers={"X-Signature": sig, "Content-Type": "application/json"})
+    resp2 = client.post("/api/lemon/webhook", content=body,
+                        headers={"X-Signature": sig, "Content-Type": "application/json"})
+    assert resp2.status_code == 200
+    assert resp2.json()["duplicate"] is True
