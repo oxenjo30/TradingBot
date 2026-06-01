@@ -89,19 +89,6 @@
     @media (max-width: 600px) { .nav-links .nav-link { display: none; } }
 
     /* ── Hero ────────────────────────────────────────────────────────────── */
-    .hero {
-      padding: 140px 0 100px;
-      text-align: center;
-      position: relative;
-      overflow: hidden;
-    }
-    .hero::before {
-      content: '';
-      position: absolute; top: -200px; left: 50%; transform: translateX(-50%);
-      width: 800px; height: 800px; border-radius: 50%;
-      background: radial-gradient(circle, rgba(59,130,246,.12) 0%, transparent 70%);
-      pointer-events: none;
-    }
     .hero-eyebrow {
       display: inline-flex; align-items: center; gap: 6px;
       background: rgba(59,130,246,.1); border: 1px solid rgba(59,130,246,.2);
@@ -145,21 +132,7 @@
       margin-top: 20px; font-size: 12px; color: var(--muted2);
     }
 
-    /* ── Stats bar ───────────────────────────────────────────────────────── */
-    .stats-bar {
-      border-top: 1px solid var(--border);
-      border-bottom: 1px solid var(--border);
-      padding: 28px 0;
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 0;
-    }
-    .stat-item {
-      text-align: center;
-      border-right: 1px solid var(--border);
-      padding: 8px 0;
-    }
-    .stat-item:last-child { border-right: none; }
+    /* ── Stat tiles ──────────────────────────────────────────────────────── */
     .stat-num {
       font-size: 32px; font-weight: 900; letter-spacing: -.02em;
       background: linear-gradient(135deg, var(--blue), var(--purple));
@@ -167,12 +140,6 @@
       background-clip: text;
     }
     .stat-label { font-size: 12px; color: var(--muted); margin-top: 4px; }
-    @media (max-width: 600px) {
-      .stats-bar { grid-template-columns: repeat(2, 1fr); }
-      .stat-item:nth-child(2) { border-right: none; }
-      .stat-item:nth-child(3) { border-top: 1px solid var(--border); }
-      .stat-item:nth-child(4) { border-top: 1px solid var(--border); border-right: none; }
-    }
 
     /* ── Section layout ──────────────────────────────────────────────────── */
     section { padding: 90px 0; }
@@ -467,7 +434,7 @@
 
     /* ── Screenshot showcase ─────────────────────────────────────────────── */
     #showcase .show-row { display: grid; grid-template-columns: 1fr 1fr; gap: 44px; align-items: center; margin-top: 64px; }
-    #showcase .show-row:nth-child(even) .show-text { order: 2; }
+    #showcase .show-row:nth-of-type(even) .show-text { order: 2; }
     #showcase .show-eyebrow { font-size: 11px; font-weight: 700; color: var(--blue); text-transform: uppercase; letter-spacing: .12em; margin-bottom: 12px; }
     #showcase .show-title { font-size: clamp(22px, 3vw, 32px); font-weight: 800; letter-spacing: -.02em; line-height: 1.18; margin-bottom: 12px; }
     #showcase .show-desc { font-size: 15px; color: var(--muted); line-height: 1.65; }
