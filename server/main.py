@@ -103,7 +103,11 @@ def owner_mode_enabled() -> bool:
 
 
 def _require_owner(request: Request):
-    """Require auth AND owner mode. Buyers get 403 on seller-only endpoints."""
+    """Require auth AND owner mode for seller-only endpoints.
+
+    Unauthenticated callers get 401 (from _require_auth, which runs first so the
+    endpoint's existence is never leaked); authenticated non-owners get 403.
+    """
     _require_auth(request)
     if not owner_mode_enabled():
         raise HTTPException(403, "owner only")
