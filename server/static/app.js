@@ -4260,15 +4260,25 @@ async function initApiKeys() {
 
   // ── Type selector helpers ─────────────────────────────────────────
   function updateKeyPlaceholders(type, prefix, broker) {
-    const isPaper = type === 'paper';
+    const isPaper  = type === 'paper';
     const brokerId = broker || (prefix === 'add' ? (document.getElementById('add-broker')?.value || 'alpaca') : 'alpaca');
     const isBinance = brokerId === 'binance';
+    const isTradier = brokerId === 'tradier';
 
     // API key placeholder
     const keyEl = document.getElementById(`${prefix}-api-key`);
     if (keyEl) {
       if (isBinance) keyEl.placeholder = isPaper ? 'Demo API key (from demo.binance.com)' : 'Live API key (from binance.com)';
+      else if (isTradier) keyEl.placeholder = 'Access token from sandbox.tradier.com or tradier.com';
       else keyEl.placeholder = isPaper ? 'PK… paper key' : 'AK… live key';
+    }
+
+    // Hide API secret field for Tradier (uses single token, no secret)
+    const secretWrap = document.getElementById(`${prefix}-api-secret`)?.closest('.form-group');
+    if (secretWrap) {
+      secretWrap.style.display = isTradier ? 'none' : '';
+      const secretInput = document.getElementById(`${prefix}-api-secret`);
+      if (secretInput && isTradier) secretInput.value = '';
     }
 
     // Coloured banner
@@ -4282,6 +4292,10 @@ async function initApiKeys() {
         bannerText.innerHTML = isPaper
           ? 'Demo keys are separate &mdash; generate them at <strong>demo.binance.com</strong> &rarr; API Management'
           : 'Live keys &mdash; generate them at <strong>binance.com</strong> &rarr; API Management';
+      } else if (isTradier) {
+        bannerText.innerHTML = isPaper
+          ? 'Get your sandbox token at <strong>sandbox.tradier.com</strong> &rarr; API Access. No secret needed &mdash; Tradier uses a single access token.'
+          : 'Get your live token at <strong>tradier.com</strong> &rarr; API Access. No secret needed &mdash; Tradier uses a single access token.';
       } else {
         bannerText.innerHTML = isPaper
           ? 'Paper API keys start with <strong>PK</strong> &mdash; get them from alpaca.markets &rarr; Paper Trading'
@@ -4655,8 +4669,11 @@ async function initApiKeys() {
       const errEl       = document.getElementById('add-error');
       const confBtn     = document.querySelector('#modal-add-account [data-action="confirm"]');
       if (confBtn) { confBtn.disabled = false; confBtn.textContent = 'Add Account'; }
-      if (!label || !apiKey || !apiSecret) {
-        errEl.textContent = 'All fields are required.';
+      const secretRequired = broker !== 'tradier';
+      if (!label || !apiKey || (secretRequired && !apiSecret)) {
+        errEl.textContent = broker === 'tradier'
+          ? 'Label and API Token are required.'
+          : 'All fields are required.';
         errEl.classList.remove('hidden');
         throw new Error('fields required');
       }
