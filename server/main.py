@@ -29,6 +29,15 @@ log = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     crypto.init_crypto()  # must run before db.init_db() — migration calls crypto.encrypt()
     db.init_db()
+    # Fail loudly (but don't abort startup) if DB_SECRET_KEY no longer decrypts the
+    # stored broker credentials — otherwise a changed/lost key looks like an
+    # "invalid API key" error. Startup must continue so the user can log in and
+    # re-enter their keys in Settings → Broker Accounts.
+    try:
+        db.verify_secret_key_matches_credentials()
+    except db.SecretKeyMismatchError as e:
+        bar = "!" * 72
+        log.error("\n%s\nDB_SECRET_KEY MISMATCH\n%s\n%s", bar, e, bar)
     existing = {s["name"] for s in db.get_strategies()}
     for cls in strategies.REGISTRY.values():
         if cls.name not in existing:
@@ -39,7 +48,10 @@ async def lifespan(app: FastAPI):
     import threading
     threading.Thread(target=alpaca_client._load_asset_cache, daemon=True).start()
     yield
-    engine.shutdown()
+    try:
+        engine.shutdown()
+    except Exception as e:
+        log.warning("engine shutdown error (ignored): %s", e)
 
 
 app = FastAPI(title="TradeBot", lifespan=lifespan)
@@ -72,16 +84,29 @@ def _require_license():
 
 
 def _require_auth(request: Request):
-    if not auth.password_is_set():
-        # Allow through only during initial setup wizard. Once setup is marked
-        # complete the password_hash row must exist — treat absence as corruption
-        # and reject rather than silently granting unauthenticated access.
-        if auth.setup_complete():
+    # If setup is complete, always require a valid password + session —
+    # a missing password_hash row means DB corruption, not a fresh install.
+    if auth.setup_complete():
+        if not auth.password_is_set() or not auth.validate_session(_get_token(request)):
             raise HTTPException(401, "Unauthorized")
+        _require_license()
         return
-    if not auth.validate_session(_get_token(request)):
+    # Setup not done yet — only allow through if password is genuinely not set
+    # (first-run wizard). Once setup is marked complete this branch is unreachable.
+    if auth.password_is_set():
         raise HTTPException(401, "Unauthorized")
-    _require_license()
+
+
+def owner_mode_enabled() -> bool:
+    """True only on the seller's own instance (env TRADEBOT_OWNER_MODE set)."""
+    return os.environ.get("TRADEBOT_OWNER_MODE", "").strip().lower() in ("1", "true", "yes")
+
+
+def _require_owner(request: Request):
+    """Require auth AND owner mode. Buyers get 403 on seller-only endpoints."""
+    _require_auth(request)
+    if not owner_mode_enabled():
+        raise HTTPException(403, "owner only")
 
 
 def _read_env_key(name: str) -> str:
@@ -92,6 +117,17 @@ def _read_env_key(name: str) -> str:
     except FileNotFoundError:
         pass
     return ""
+
+
+def _safe_broker_error(e: Exception) -> str:
+    """Return a user-safe broker error message — never expose internal crypto details."""
+    msg = str(e)
+    if "decrypt" in msg.lower() or "fernet" in msg.lower() or "invalidtoken" in msg.lower():
+        return "Account credentials unavailable — please re-enter your API keys in Broker Accounts."
+    if "unauthorized" in msg.lower() or "403" in msg or "401" in msg:
+        return "Broker rejected the API key — check your credentials in Broker Accounts."
+    # Truncate very long messages (stack traces etc.)
+    return msg[:200] if len(msg) > 200 else msg
 
 
 def _mask_account(row: dict) -> dict:
@@ -117,11 +153,11 @@ class OrderIn(BaseModel):
     account_id: int | None = None
 
 class WebhookSignal(BaseModel):
-    symbol:     str
+    symbol:     str = Field(min_length=1, max_length=20)
     side:       Literal["buy", "sell"]
-    qty:        float | None = None
-    notional:   float | None = None
-    strategy:   str = "webhook"
+    qty:        float | None = Field(default=None, gt=0)
+    notional:   float | None = Field(default=None, gt=0)
+    strategy:   str = Field(default="webhook", max_length=64)
     account_id: int | None = None
 
 _broker_client_cache: dict[int, object] = {}
@@ -149,7 +185,11 @@ def _get_broker_client(account_id: int | None):
         paper=(acct["account_type"] == "paper"),
         account_id=account_id,
     )
-    client._account_id = account_id
+    # NOTE: do NOT set client._account_id here. The broker that needs the DB id
+    # (Binance) already receives it via the account_id constructor arg above.
+    # Tradier reuses _account_id for the *broker-side* account number (e.g.
+    # "VA6629110"), fetched lazily from /user/profile; overwriting it with the
+    # DB integer id produced URLs like /accounts/24/balances and a 401.
     _broker_client_cache[account_id] = client
     return client
 
@@ -170,14 +210,14 @@ class RiskSettingUpdate(BaseModel):
     value: str
 
 class LoginIn(BaseModel):
-    password: str
+    password: str = Field(min_length=1)
 
 class SetupCompleteIn(BaseModel):
     notional: float = 500
     max_daily_loss_pct: float = 2.0
     max_position_count: int = 5
     starter_strategy: str = "momentum"
-    password: str
+    password: str = Field(min_length=8)
 
 class NotificationSettings(BaseModel):
     email_enabled: bool = False
@@ -254,11 +294,19 @@ def login_page():
     return FileResponse(str(STATIC_DIR / "login.html"))
 
 @app.post("/api/auth/login")
-def login(body: LoginIn, response: Response):
+def login(body: LoginIn, request: Request, response: Response):
+    allowed, secs = auth.check_login_allowed()
+    if not allowed:
+        raise HTTPException(429, f"Too many failed attempts. Try again in {secs}s.")
     if not auth.check_password(body.password):
+        auth.record_login_failure()
         raise HTTPException(401, "incorrect password")
+    auth.record_login_success()
     token = auth.create_session()
-    response.set_cookie("tb_session", token, httponly=True, samesite="lax", max_age=86400)
+    # secure=True when served over HTTPS; omit for plain localhost HTTP
+    is_secure = request.url.scheme == "https"
+    response.set_cookie("tb_session", token, httponly=True, samesite="lax",
+                        max_age=86400, secure=is_secure)
     return {"ok": True}
 
 @app.post("/api/auth/logout")
@@ -320,6 +368,13 @@ def health():
     }
 
 
+@app.get("/api/app-info")
+def app_info(request: Request):
+    """Authenticated app metadata. Tells the UI whether to show owner-only tooling."""
+    _require_auth(request)
+    return {"owner_mode": owner_mode_enabled()}
+
+
 # ── Update check ──────────────────────────────────────────────────────────────
 
 _GITHUB_RELEASES_URL = "https://api.github.com/repos/oxenjo30/TradingBot/releases/latest"
@@ -360,12 +415,23 @@ class LicenseActivate(BaseModel):
     key: str
 
 @app.get("/api/license/status")
-def license_status():
+def license_status(request: Request):
+    # Allow unauthenticated only during setup (before password exists)
+    if auth.setup_complete():
+        if not auth.password_is_set() or not auth.validate_session(_get_token(request)):
+            raise HTTPException(401, "Unauthorized")
     from .license import check_stored_license
-    return check_stored_license()
+    result = check_stored_license()
+    # Never expose machine_id to clients
+    result.pop("machine_id", None)
+    return result
 
 @app.post("/api/license/activate")
-def license_activate(body: LicenseActivate):
+def license_activate(body: LicenseActivate, request: Request):
+    # Require auth if setup is done; allow unauthenticated only on fresh installs
+    if auth.setup_complete():
+        if not auth.password_is_set() or not auth.validate_session(_get_token(request)):
+            raise HTTPException(401, "Unauthorized")
     from .license import verify_key, LicenseError, invalidate_cache
     from .db import set_license_key
     try:
@@ -374,6 +440,7 @@ def license_activate(body: LicenseActivate):
         raise HTTPException(422, str(e))
     set_license_key(body.key)
     invalidate_cache()
+    result.pop("machine_id", None)
     return result
 
 @app.delete("/api/license")
@@ -409,7 +476,7 @@ async def lemon_webhook(request: Request):
 @app.get("/api/admin/licenses")
 def admin_list_licenses(request: Request, page: int = 1,
                         per_page: int = 20, search: str = ""):
-    _require_auth(request)
+    _require_owner(request)
     licenses = db.list_issued_licenses(search=search, page=page, per_page=per_page)
     total = db.count_issued_licenses(search=search)
     return {"total": total, "page": page, "per_page": per_page, "licenses": licenses}
@@ -417,7 +484,7 @@ def admin_list_licenses(request: Request, page: int = 1,
 
 @app.post("/api/admin/licenses/{license_id}/revoke")
 def admin_revoke_license(request: Request, license_id: int):
-    _require_auth(request)
+    _require_owner(request)
     row = db.get_issued_license(license_id)
     if not row:
         raise HTTPException(404, "License not found")
@@ -427,7 +494,7 @@ def admin_revoke_license(request: Request, license_id: int):
 
 @app.post("/api/admin/licenses/{license_id}/resend")
 def admin_resend_license(request: Request, license_id: int):
-    _require_auth(request)
+    _require_owner(request)
     from .lemon import build_license_email_html
     from .notifications import send_email_direct
     row = db.get_issued_license(license_id)
@@ -438,7 +505,7 @@ def admin_resend_license(request: Request, license_id: int):
     smtp_host = db.get_app_config("email_smtp", "")
     smtp_port = int(db.get_app_config("email_port", "587"))
     smtp_user = db.get_app_config("email_user", "")
-    smtp_pass = db.get_app_config("email_pass", "")
+    smtp_pass = db.get_app_config_secure("email_pass", "")
     if not smtp_host or not smtp_user or not smtp_pass:
         raise HTTPException(400, "SMTP not configured in Settings")
     send_email_direct(row["buyer_email"], smtp_host, smtp_port,
@@ -449,7 +516,7 @@ def admin_resend_license(request: Request, license_id: int):
 
 @app.get("/api/admin/licenses/export")
 def admin_export_licenses(request: Request):
-    _require_auth(request)
+    _require_owner(request)
     import csv
     import io
     rows = db.list_issued_licenses(per_page=100000)
@@ -464,6 +531,31 @@ def admin_export_licenses(request: Request):
                     headers={"Content-Disposition": "attachment; filename=licenses.csv"})
 
 
+class LemonConfigBody(BaseModel):
+    signing_secret: str = ""
+
+
+@app.get("/api/admin/lemon-config")
+def admin_get_lemon_config(request: Request):
+    """Return whether the Lemon Squeezy signing secret is set, masked. Never returns the raw value."""
+    _require_owner(request)
+    raw = db.get_app_config_secure("lemon_signing_secret", "")
+    masked = ("••••" + raw[-4:]) if len(raw) > 4 else ("•" * len(raw) if raw else "")
+    return {"signing_secret_set": bool(raw), "signing_secret_masked": masked}
+
+
+@app.patch("/api/admin/lemon-config")
+def admin_patch_lemon_config(body: LemonConfigBody, request: Request):
+    """Save the Lemon Squeezy signing secret (encrypted). Empty value preserves the existing secret."""
+    _require_owner(request)
+    if body.signing_secret is not None and body.signing_secret.strip():
+        db.set_app_config_secure("lemon_signing_secret", body.signing_secret.strip())
+        db.log_audit("license", "updated Lemon Squeezy signing secret", "")
+    raw = db.get_app_config_secure("lemon_signing_secret", "")
+    masked = ("••••" + raw[-4:]) if len(raw) > 4 else ("•" * len(raw) if raw else "")
+    return {"signing_secret_set": bool(raw), "signing_secret_masked": masked}
+
+
 # ── Account & market ───────────────────────────────────────────────────────────
 
 @app.get("/api/account")
@@ -473,7 +565,7 @@ def account(request: Request, account_id: int | None = None):
         summary = _get_broker_client(account_id).get_account_summary()
     except Exception as e:
         log.warning("account %s fetch failed: %s", account_id, e)
-        raise HTTPException(503, f"Broker connection failed: {e}")
+        raise HTTPException(503, f"Broker connection failed: {_safe_broker_error(e)}")
     # For Binance accounts, attach signals-based P&L (more accurate than cost_basis table)
     if account_id is not None:
         acct_row = db.get_broker_account(account_id)
@@ -507,7 +599,7 @@ def positions(request: Request, account_id: int | None = None):
         return _get_broker_client(account_id).get_positions()
     except Exception as e:
         log.warning("positions %s fetch failed: %s", account_id, e)
-        raise HTTPException(503, f"Broker connection failed: {e}")
+        raise HTTPException(503, f"Broker connection failed: {_safe_broker_error(e)}")
 
 @app.get("/api/orders")
 def orders(request: Request, status: str = "all", limit: int = 50, account_id: int | None = None):
@@ -516,7 +608,7 @@ def orders(request: Request, status: str = "all", limit: int = 50, account_id: i
         return _get_broker_client(account_id).get_orders(limit=limit, status=status)
     except Exception as e:
         log.warning("orders %s fetch failed: %s", account_id, e)
-        raise HTTPException(503, f"Broker connection failed: {e}")
+        raise HTTPException(503, f"Broker connection failed: {_safe_broker_error(e)}")
 
 @app.post("/api/orders")
 def submit_order(o: OrderIn, request: Request):
@@ -760,8 +852,11 @@ class BrokerCredentialsTest(BaseModel):
     broker: str = "alpaca"
 
 @app.post("/api/setup/test-credentials")
-def setup_test_credentials(body: BrokerCredentialsTest):
-    """Validate broker credentials during setup (no auth required — setup runs before login)."""
+def setup_test_credentials(body: BrokerCredentialsTest, request: Request):
+    """Validate broker credentials during setup wizard (pre-auth only)."""
+    if auth.setup_complete():
+        # After setup, use the authenticated endpoint instead
+        raise HTTPException(403, "Use /api/broker-accounts/test-credentials")
     try:
         from .broker_factory import get_account_client
         client = get_account_client(
@@ -774,7 +869,7 @@ def setup_test_credentials(body: BrokerCredentialsTest):
         return {"ok": True, "status": summary.get("status", "active"),
                 "equity": summary.get("equity", 0)}
     except Exception as e:
-        raise HTTPException(400, f"Connection failed: {e}")
+        raise HTTPException(400, _safe_broker_error(e))
 
 @app.post("/api/broker-accounts/test-credentials")
 def test_broker_credentials(body: BrokerCredentialsTest, request: Request):
@@ -792,7 +887,7 @@ def test_broker_credentials(body: BrokerCredentialsTest, request: Request):
         return {"ok": True, "status": summary.get("status", "active"),
                 "equity": summary.get("equity", 0)}
     except Exception as e:
-        raise HTTPException(400, f"Connection failed: {e}")
+        raise HTTPException(400, _safe_broker_error(e))
 
 @app.post("/api/broker-accounts", status_code=201)
 def create_broker_account(body: BrokerAccountCreate, request: Request):
@@ -988,16 +1083,19 @@ def unassign_strategy_account(name: str, account_id: int, request: Request):
 # ── Performance analytics ──────────────────────────────────────────────────────
 
 @app.get("/api/performance")
-def performance_data(request: Request):
+def performance_data(request: Request, account_id: int | None = None):
     _require_auth(request)
     strategy_stats = db.performance_by_strategy()
     top_syms       = db.top_symbols_overall(limit=10)
     daily          = db.daily_signal_counts(30)
 
-    # Enrich with live unrealized P&L from open positions
+    # Enrich with live unrealized P&L from open positions for the requested
+    # account. When account_id is omitted, fall back to the first Alpaca account.
     try:
-        alpaca_accts = [a for a in db.get_broker_accounts() if (a.get("broker") or "alpaca") == "alpaca"]
-        positions = _get_broker_client(alpaca_accts[0]["id"]).get_positions() if alpaca_accts else []
+        if account_id is None:
+            alpaca_accts = [a for a in db.get_broker_accounts() if (a.get("broker") or "alpaca") == "alpaca"]
+            account_id = alpaca_accts[0]["id"] if alpaca_accts else None
+        positions = _get_broker_client(account_id).get_positions() if account_id else []
         open_count = len(positions)
         total_upl  = sum(p["unrealized_pl"] for p in positions)
     except Exception:
@@ -1057,9 +1155,10 @@ def performance_compare(request: Request):
 # ── Signals & Engine ───────────────────────────────────────────────────────────
 
 @app.get("/api/signals")
-def signals(request: Request, limit: int = 100, since: str | None = None, until: str | None = None):
+def signals(request: Request, limit: int = 100, since: str | None = None, until: str | None = None,
+            account_id: int | None = None):
     _require_auth(request)
-    return db.recent_signals(limit=limit, since=since, until=until)
+    return db.recent_signals(limit=min(limit, 10000), since=since, until=until, account_id=account_id)
 
 @app.get("/api/engine")
 def engine_status(request: Request):
@@ -1099,7 +1198,7 @@ def ai_status(request: Request):
 @app.get("/api/ai/settings")
 def ai_settings_get(request: Request):
     _require_auth(request)
-    raw_key = db.get_app_config("ai_claude_api_key", "")
+    raw_key = db.get_app_config_secure("ai_claude_api_key", "")
     masked_key = ("sk-ant-..." + raw_key[-4:]) if len(raw_key) > 4 else ("*" * len(raw_key) if raw_key else "")
     return {
         "ollama_url":           db.get_app_config("ai_ollama_url", "http://localhost:11434"),
@@ -1132,7 +1231,7 @@ def ai_settings_patch(body: AiSettingsBody, request: Request):
     if body.tuner_provider is not None and body.tuner_provider in ("ollama", "claude"):
         db.set_app_config("ai_tuner_provider", body.tuner_provider)
     if body.claude_api_key is not None and body.claude_api_key.strip():
-        db.set_app_config("ai_claude_api_key", body.claude_api_key.strip())
+        db.set_app_config_secure("ai_claude_api_key", body.claude_api_key.strip())
     if body.claude_model is not None and body.claude_model.strip():
         db.set_app_config("ai_claude_model", body.claude_model.strip())
     if body.target_win_rate is not None and 50 <= body.target_win_rate <= 90:
@@ -1195,7 +1294,7 @@ def ai_tuning_revert(run_id: int, request: Request):
 @app.get("/api/export/trades")
 def export_trades(request: Request, limit: int = 5000):
     _require_auth(request)
-    rows = db.recent_signals(limit=limit)
+    rows = db.recent_signals(limit=min(limit, 10000))
     output = io.StringIO()
     writer = csv.DictWriter(output, fieldnames=[
         "timestamp", "strategy", "symbol", "side", "qty", "reason",
@@ -1419,23 +1518,29 @@ def get_stock_window(request: Request):
         "stock_trading_end":   db.get_app_config("stock_trading_end",   ""),
     }
 
+class StockWindowIn(BaseModel):
+    stock_trading_start: str = ""
+    stock_trading_end:   str = ""
+
+class KillSwitchIn(BaseModel):
+    on: bool
+
 @app.post("/api/risk/stock-window")
-def set_stock_window(body: dict, request: Request):
+def set_stock_window(body: StockWindowIn, request: Request):
     _require_auth(request)
-    start = (body.get("stock_trading_start") or "").strip()
-    end   = (body.get("stock_trading_end")   or "").strip()
+    start = body.stock_trading_start.strip()
+    end   = body.stock_trading_end.strip()
     db.set_app_config("stock_trading_start", start)
     db.set_app_config("stock_trading_end",   end)
     db.log_audit("risk", "set global stock trading window", f"{start or 'any'}–{end or 'any'}")
     return {"stock_trading_start": start, "stock_trading_end": end}
 
 @app.post("/api/risk/kill_switch")
-def set_kill(body: dict, request: Request):
+def set_kill(body: KillSwitchIn, request: Request):
     _require_auth(request)
-    on = bool(body.get("on", True))
-    risk.set_kill_switch(on)
-    db.log_audit("kill_switch", f"global kill switch {'ON' if on else 'OFF'}", "")
-    return {"kill_switch": on}
+    risk.set_kill_switch(body.on)
+    db.log_audit("kill_switch", f"global kill switch {'ON' if body.on else 'OFF'}", "")
+    return {"kill_switch": body.on}
 
 @app.patch("/api/risk/{key}")
 def update_risk_setting(key: str, body: RiskSettingUpdate, request: Request):
@@ -1493,7 +1598,8 @@ def get_notifications(request: Request):
 def save_notifications(body: NotificationSettings, request: Request):
     _require_auth(request)
     for key, val in body.model_dump().items():
-        db.set_app_config(key, "true" if val is True else "false" if val is False else str(val))
+        plaintext = "true" if val is True else "false" if val is False else str(val)
+        db.set_app_config_secure(key, plaintext)
     return db.get_notification_settings()
 
 @app.post("/api/notifications/test")
