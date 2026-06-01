@@ -1,5 +1,4 @@
 import os
-os.environ.setdefault("TRADEBOT_LICENSE_SECRET", "test-secret-32-chars-seller-key!!")
 
 
 def test_export_trades_returns_csv(client):

@@ -149,7 +149,7 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setattr(db_mod, "DB_PATH", tmp_path / "test.db")
     db_mod.init_db()
     monkeypatch.setenv("LEMON_SQUEEZY_SIGNING_SECRET", SIGNING_SECRET)
-    monkeypatch.setenv("TRADEBOT_LICENSE_SECRET", "test-seller-secret-32-chars-long!")
+    # License signing key is provided by the conftest test keypair (TRADEBOT_LICENSE_PRIVATE_KEY).
     monkeypatch.setenv("LICENSE_DURATION_DAYS", "36500")
     monkeypatch.setenv("LICENSE_DOWNLOAD_URL", "https://lemonsqueezy.com/dl/test")
     from server.main import app
