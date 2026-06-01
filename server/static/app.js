@@ -3670,29 +3670,56 @@ async function initBalances() {
 
   let balAccountId = null;
 
-  // Build account selector (only shown when >1 account exists)
+  // Build stock account selector (broker-chip tabs, hidden when only 1 stock account)
   try {
     const accounts = await api('/api/broker-accounts', { key: 'bal-acct-list' });
-    if (accounts && accounts.length >= 2) {
-      const wrap = document.getElementById('bal-account-wrap');
-      if (wrap) {
-        const sel = document.createElement('select');
-        sel.className = 'acct-sel';
-        const all = document.createElement('option');
-        all.value = ''; all.textContent = 'All accounts';
-        sel.appendChild(all);
-        accounts.forEach(a => {
-          const opt = document.createElement('option');
-          opt.value = a.id; opt.textContent = a.label || `Account ${a.id}`;
-          sel.appendChild(opt);
-        });
-        sel.addEventListener('change', () => {
-          balAccountId = sel.value ? parseInt(sel.value) : null;
+    const CRYPTO_IDS = new Set(['binance','binanceus','coinbase','kraken']);
+    const stockAccts = (accounts || []).filter(a => !CRYPTO_IDS.has(a.broker));
+
+    // Default to first stock account
+    if (stockAccts.length > 0) {
+      balAccountId = stockAccts[0].id;
+    }
+
+    const wrap = document.getElementById('bal-account-wrap');
+    if (wrap && stockAccts.length > 1) {
+      wrap.style.cssText = 'display:flex;align-items:center;gap:6px;';
+      stockAccts.forEach((a, i) => {
+        const bm  = getBrokerMeta(a.broker || 'alpaca');
+        const tab = document.createElement('button');
+        tab.dataset.acctId = a.id;
+        tab.style.cssText =
+          `display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:6px;` +
+          `font-size:12px;font-weight:600;border:1px solid var(--border);background:transparent;` +
+          `color:var(--muted);cursor:pointer;transition:all .15s;font-family:inherit;white-space:nowrap;`;
+        tab.innerHTML =
+          `<span style="display:inline-flex;align-items:center;justify-content:center;` +
+          `width:16px;height:16px;border-radius:4px;font-size:9px;font-weight:800;` +
+          `background:${bm.bg};color:${bm.color};">${bm.initials}</span>` +
+          escHtml(a.label);
+
+        const activate = (btn, acct, meta) => {
+          wrap.querySelectorAll('button').forEach(b => {
+            b.style.background  = 'transparent';
+            b.style.color       = 'var(--muted)';
+            b.style.borderColor = 'var(--border)';
+          });
+          btn.style.background  = meta.bg;
+          btn.style.color       = meta.color;
+          btn.style.borderColor = meta.color;
+          balAccountId = acct.id;
+        };
+
+        tab.addEventListener('click', () => {
+          activate(tab, a, bm);
           fetchAccount();
           fetchHoldings();
         });
-        wrap.appendChild(sel);
-      }
+
+        // Activate first tab by default
+        if (i === 0) activate(tab, a, bm);
+        wrap.appendChild(tab);
+      });
     }
   } catch {}
 
