@@ -444,11 +444,14 @@
     .bento .tile-hero { grid-row: span 2; display: flex; flex-direction: column; justify-content: center;
       background: radial-gradient(120% 90% at 18% 0%, rgba(139,92,246,.18), transparent 60%), var(--card);
       position: relative; overflow: hidden; }
-    /* Lottie chart accent in the hero tile — subtle, bottom-right, behind content */
-    .hero-lottie { position: absolute; right: 6px; bottom: 4px; width: 230px; height: 115px;
-      opacity: .4; pointer-events: none; z-index: 0; }
+    /* Lottie hero animation — a person analysing the markets (the work the bot automates) */
+    .hero-lottie { position: absolute; right: -18px; bottom: -10px;
+      width: 260px; height: 260px; opacity: .92; pointer-events: none; z-index: 0; }
     .hero-lottie lottie-player, .hero-lottie .lottie-fallback { width: 100%; height: 100%; display: block; }
     .tile-hero > *:not(.hero-lottie) { position: relative; z-index: 1; }
+    /* keep text readable over the animation: cap text column width on wide hero tiles */
+    .tile-hero .hero-title, .tile-hero .hero-sub { max-width: min(100%, 30ch); }
+    @media (max-width: 1100px) { .hero-lottie { opacity: .35; right: -30px; } }
     /* CSS/SVG fallback: animated drawing line, used if the Lottie player is unavailable */
     .lottie-fallback path.line { stroke-dasharray: 520; stroke-dashoffset: 520;
       animation: drawLine 3.2s ease-in-out infinite; }
@@ -529,9 +532,13 @@
       <div class="tile tile-hero">
         <div class="hero-lottie" id="hero-lottie" aria-hidden="true">
           <!-- Fallback SVG (animated via CSS); replaced by the Lottie player when available -->
-          <svg class="lottie-fallback" viewBox="0 0 220 110" fill="none" preserveAspectRatio="xMidYMid meet">
-            <path class="line" d="M8 92 L48 80 L88 84 L128 54 L168 66 L210 22" stroke="#60A5FA" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-            <circle cx="210" cy="22" r="5" fill="#8B5CF6"/>
+          <svg class="lottie-fallback" viewBox="0 0 200 200" fill="none" preserveAspectRatio="xMidYMid meet">
+            <rect x="20" y="120" width="22" height="60" rx="3" fill="rgba(59,130,246,.35)"/>
+            <rect x="52" y="96" width="22" height="84" rx="3" fill="rgba(59,130,246,.45)"/>
+            <rect x="84" y="110" width="22" height="70" rx="3" fill="rgba(139,92,246,.4)"/>
+            <rect x="116" y="74" width="22" height="106" rx="3" fill="rgba(139,92,246,.5)"/>
+            <path class="line" d="M20 130 L60 100 L100 112 L140 70 L182 40" stroke="#60A5FA" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="182" cy="40" r="5" fill="#8B5CF6"/>
           </svg>
         </div>
         <div class="hero-eyebrow">
@@ -1080,7 +1087,7 @@
     if (reduce) return;
     if (!customElements || !customElements.get('lottie-player')) return; // CDN didn't load → keep SVG
     const player = document.createElement('lottie-player');
-    player.setAttribute('src', '/static/img/chart-line.json');
+    player.setAttribute('src', '/static/img/stocks-hero.json');
     player.setAttribute('background', 'transparent');
     player.setAttribute('speed', '1');
     player.setAttribute('loop', '');
