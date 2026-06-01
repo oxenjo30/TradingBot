@@ -16,6 +16,8 @@
   <meta name="twitter:image" content="/static/img/shots/overview.png">
   <!-- Preload the above-the-fold hero screenshot (LCP element) -->
   <link rel="preload" as="image" href="/static/img/shots/overview.webp" fetchpriority="high">
+  <!-- Lottie player (animation; degrades to a CSS-animated SVG chart if it fails to load) -->
+  <script src="https://unpkg.com/@lottiefiles/lottie-player@2.0.4/dist/lottie-player.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -45,6 +47,30 @@
       line-height: 1.6;
       overflow-x: hidden;
     }
+
+    /* ── Gradient mesh background (fixed, behind everything) ──────────────── */
+    .bg-mesh {
+      position: fixed; inset: 0; z-index: -2; pointer-events: none;
+      background:
+        radial-gradient(48% 36% at 18% 8%,  rgba(59,130,246,.20) 0%, transparent 60%),
+        radial-gradient(42% 34% at 86% 6%,  rgba(139,92,246,.18) 0%, transparent 60%),
+        radial-gradient(55% 45% at 50% 0%,  rgba(37,99,235,.12)  0%, transparent 55%),
+        radial-gradient(40% 40% at 80% 70%, rgba(16,185,129,.06) 0%, transparent 60%),
+        var(--bg);
+    }
+    .bg-mesh::after {
+      content: ''; position: absolute; inset: -20%;
+      background:
+        radial-gradient(30% 30% at 25% 30%, rgba(99,102,241,.10), transparent 60%),
+        radial-gradient(28% 28% at 75% 40%, rgba(59,130,246,.10), transparent 60%);
+      animation: meshDrift 26s ease-in-out infinite alternate;
+    }
+    @keyframes meshDrift {
+      0%   { transform: translate3d(0,0,0)        scale(1);    }
+      50%  { transform: translate3d(2%, -2%, 0)   scale(1.06); }
+      100% { transform: translate3d(-2%, 1.5%, 0) scale(1.02); }
+    }
+    @media (prefers-reduced-motion: reduce) { .bg-mesh::after { animation: none; } }
 
     /* ── Utility ─────────────────────────────────────────────────────────── */
     .container { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
@@ -416,7 +442,22 @@
     .bento { display: grid; grid-template-columns: 1.25fr 1fr; gap: 14px; margin-top: 24px; }
     .bento .tile { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 26px; }
     .bento .tile-hero { grid-row: span 2; display: flex; flex-direction: column; justify-content: center;
-      background: radial-gradient(120% 90% at 18% 0%, rgba(139,92,246,.18), transparent 60%), var(--card); }
+      background: radial-gradient(120% 90% at 18% 0%, rgba(139,92,246,.18), transparent 60%), var(--card);
+      position: relative; overflow: hidden; }
+    /* Lottie chart accent in the hero tile — subtle, bottom-right, behind content */
+    .hero-lottie { position: absolute; right: 6px; bottom: 4px; width: 230px; height: 115px;
+      opacity: .4; pointer-events: none; z-index: 0; }
+    .hero-lottie lottie-player, .hero-lottie .lottie-fallback { width: 100%; height: 100%; display: block; }
+    .tile-hero > *:not(.hero-lottie) { position: relative; z-index: 1; }
+    /* CSS/SVG fallback: animated drawing line, used if the Lottie player is unavailable */
+    .lottie-fallback path.line { stroke-dasharray: 520; stroke-dashoffset: 520;
+      animation: drawLine 3.2s ease-in-out infinite; }
+    @keyframes drawLine {
+      0% { stroke-dashoffset: 520; } 55% { stroke-dashoffset: 0; }
+      85% { stroke-dashoffset: 0; opacity: 1; } 100% { stroke-dashoffset: 0; opacity: 0; }
+    }
+    @media (prefers-reduced-motion: reduce) { .lottie-fallback path.line { animation: none; stroke-dashoffset: 0; } }
+    @media (max-width: 600px) { .hero-lottie { display: none; } }
     .bento .tile-shot { grid-column: 1 / -1; padding: 0; border: none; background: none; }
     .bento .stat-tile { display: flex; flex-direction: column; }
     .bento .stat-tile .stat-top { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
@@ -459,6 +500,9 @@
 </head>
 <body>
 
+<!-- Gradient mesh background -->
+<div class="bg-mesh" aria-hidden="true"></div>
+
 <!-- ── Nav ───────────────────────────────────────────────────────────────── -->
 <nav>
   <a href="#" class="nav-logo">
@@ -483,6 +527,13 @@
   <div class="container">
     <div class="bento">
       <div class="tile tile-hero">
+        <div class="hero-lottie" id="hero-lottie" aria-hidden="true">
+          <!-- Fallback SVG (animated via CSS); replaced by the Lottie player when available -->
+          <svg class="lottie-fallback" viewBox="0 0 220 110" fill="none" preserveAspectRatio="xMidYMid meet">
+            <path class="line" d="M8 92 L48 80 L88 84 L128 54 L168 66 L210 22" stroke="#60A5FA" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="210" cy="22" r="5" fill="#8B5CF6"/>
+          </svg>
+        </div>
         <div class="hero-eyebrow">
           <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><circle cx="5" cy="5" r="5"/></svg>
           Live · 24/7 · No coding required
@@ -1016,6 +1067,26 @@
       });
     }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
     els.forEach(el => io.observe(el));
+  })();
+
+  // ── Hero Lottie ───────────────────────────────────────────────────────────
+  // Upgrade the fallback SVG to a Lottie animation only if the player loaded
+  // from CDN and the user hasn't asked for reduced motion. Otherwise the
+  // CSS-animated SVG fallback stays in place — so the hero is never blank.
+  (() => {
+    const host = document.getElementById('hero-lottie');
+    if (!host) return;
+    const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduce) return;
+    if (!customElements || !customElements.get('lottie-player')) return; // CDN didn't load → keep SVG
+    const player = document.createElement('lottie-player');
+    player.setAttribute('src', '/static/img/chart-line.json');
+    player.setAttribute('background', 'transparent');
+    player.setAttribute('speed', '1');
+    player.setAttribute('loop', '');
+    player.setAttribute('autoplay', '');
+    host.innerHTML = '';
+    host.appendChild(player);
   })();
 </script>
 </body>
