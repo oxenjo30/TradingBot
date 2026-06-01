@@ -22,7 +22,7 @@ class EMAConfluence(Strategy):
         "Requires all scored EMAs to agree -- no mixed signals. Position size scales "
         "with confluence score when enabled. Works on stocks (daily) and crypto (hourly)."
     )
-    brokers = ["alpaca", "tradier", "binance"]
+    brokers = ["stock", "crypto"]
     default_params = {
         "symbols": [],
         "use_scanner": True,

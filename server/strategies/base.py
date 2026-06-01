@@ -1,6 +1,15 @@
 from dataclasses import dataclass, field
 from typing import Literal, ClassVar, Protocol, runtime_checkable
 
+# ── Broker asset-class sets ────────────────────────────────────────────────────
+# Add any new stock broker id here and it will automatically get all stock
+# strategies without touching individual strategy files.
+STOCK_BROKERS:  frozenset[str] = frozenset({"alpaca", "tradier", "ibkr", "schwab",
+                                             "tastytrade", "robinhood", "webull",
+                                             "fidelity", "etrade", "tradestation"})
+CRYPTO_BROKERS: frozenset[str] = frozenset({"binance", "binanceus", "coinbase",
+                                             "kraken"})
+
 
 @runtime_checkable
 class BarsProvider(Protocol):
@@ -28,7 +37,9 @@ class Strategy:
     params_schema: ClassVar[list] = []
     auto_trade: ClassVar[bool] = True
     hidden: ClassVar[bool] = False  # if True, excluded from the bots UI list
-    brokers: ClassVar[list[str]] = ["alpaca", "tradier"]  # which brokers this strategy supports
+    # "stock" = any broker in STOCK_BROKERS, "crypto" = any in CRYPTO_BROKERS,
+    # or list explicit broker ids for mixed strategies.
+    brokers: ClassVar[list[str]] = ["stock"]
 
     def __init__(self, params: dict):
         merged = dict(self.default_params)

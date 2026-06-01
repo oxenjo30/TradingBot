@@ -34,7 +34,7 @@ def _rsi(closes: list[float], period: int = 14) -> float | None:
 class CryptoVolatilityBreakout(Strategy):
     name = "crypto_volatility_breakout"
     label = "Crypto Mean Reversion"
-    brokers: ClassVar[list[str]] = ["binance"]
+    brokers: ClassVar[list[str]] = ["crypto"]
     description = (
         "Buys when price touches the lower Bollinger Band AND RSI is oversold (< 35) — "
         "a mean reversion entry with momentum confirmation. "

@@ -86,7 +86,7 @@ def run_tick():
                 _us_market_open = False
         return _us_market_open
 
-    CRYPTO_BROKERS = {"binance"}
+    from server.strategies.base import CRYPTO_BROKERS
 
     # Global stock trading window (applies to all stock broker accounts)
     _stock_global_start = db.get_app_config("stock_trading_start", "") or ""

@@ -304,8 +304,8 @@ class TestEMAConfluenceMetadata:
 
     def test_strategy_brokers(self):
         from server.strategies.ema_confluence import EMAConfluence
-        assert "alpaca" in EMAConfluence.brokers
-        assert "binance" in EMAConfluence.brokers
+        assert "stock" in EMAConfluence.brokers
+        assert "crypto" in EMAConfluence.brokers
 
     def test_describe_has_required_keys(self):
         from server.strategies.ema_confluence import EMAConfluence

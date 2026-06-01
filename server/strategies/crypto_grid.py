@@ -11,7 +11,7 @@ def _sma(closes: list[float], period: int) -> float | None:
 class CryptoGrid(Strategy):
     name = "crypto_grid"
     label = "Crypto Grid Trading"
-    brokers: ClassVar[list[str]] = ["binance"]
+    brokers: ClassVar[list[str]] = ["crypto"]
     description = (
         "Grid trading strategy that buys near band lows and sells near band highs. "
         "Adds a trend filter: only buys when price is above the long-term SMA (uptrend), "

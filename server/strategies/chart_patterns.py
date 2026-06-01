@@ -20,7 +20,7 @@ class ClassicPatterns(Strategy):
         "Only trades patterns that align with the EMA200 trend. Position size scales with "
         "pattern confidence. Works on stocks (daily) and crypto (hourly)."
     )
-    brokers = ["alpaca", "tradier", "binance"]
+    brokers = ["stock", "crypto"]
     default_params = {
         "symbols": [],
         "use_scanner": True,

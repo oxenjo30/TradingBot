@@ -650,8 +650,8 @@ class TestClassicPatternsStrategy:
     def test_strategy_metadata(self):
         from server.strategies.chart_patterns import ClassicPatterns
         assert ClassicPatterns.name == "classic_patterns"
-        assert "alpaca" in ClassicPatterns.brokers
-        assert "binance" in ClassicPatterns.brokers
+        assert "stock" in ClassicPatterns.brokers
+        assert "crypto" in ClassicPatterns.brokers
 
     def test_registered_in_registry(self):
         from server.strategies import REGISTRY

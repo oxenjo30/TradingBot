@@ -892,8 +892,20 @@ def broker_account_strategy_view(account_id: int, request: Request):
             "params_schema": cls.params_schema,
         }
         for name, cls in strategies.REGISTRY.items()
-        if not cls.hidden and broker in cls.brokers
+        if not cls.hidden and _broker_matches(broker, cls.brokers)
     ]
+
+
+def _broker_matches(broker: str, brokers: list[str]) -> bool:
+    """Return True if `broker` is compatible with the strategy's broker list.
+    Supports asset-class tokens: "stock" and "crypto".
+    """
+    from server.strategies.base import STOCK_BROKERS, CRYPTO_BROKERS
+    for b in brokers:
+        if b == "stock"  and broker in STOCK_BROKERS:  return True
+        if b == "crypto" and broker in CRYPTO_BROKERS: return True
+        if b == broker:                                 return True
+    return False
 
 
 @app.delete("/api/broker-accounts/{account_id}")
