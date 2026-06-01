@@ -1549,10 +1549,16 @@ async function initBots() {
       dot.className = 'acct-dot';
       dot.style.background = acct.account_type === 'live' ? '#f59e0b' : '#3b82f6';
 
+      const brokerMeta = getBrokerMeta(acct.broker || 'alpaca');
       const lbl = document.createElement('div');
       lbl.className = 'acct-item-label';
       lbl.innerHTML = `<div class="acct-item-name">${escHtml(acct.label)}</div>` +
-        `<div class="acct-item-type">${acct.account_type === 'live' ? 'Live trading' : 'Paper trading'}</div>`;
+        `<div class="acct-item-type" style="display:flex;align-items:center;gap:5px;">` +
+          `<span style="display:inline-flex;align-items:center;justify-content:center;` +
+               `width:16px;height:16px;border-radius:4px;font-size:9px;font-weight:800;` +
+               `background:${brokerMeta.bg};color:${brokerMeta.color};flex-shrink:0;">${brokerMeta.initials}</span>` +
+          `<span>${brokerMeta.name} · ${acct.account_type === 'live' ? 'Live' : 'Paper'}</span>` +
+        `</div>`;
 
       const badge = document.createElement('span');
       badge.className = 'badge ' + (acct.account_type === 'live' ? 'b-live' : 'b-paper');
@@ -1570,16 +1576,27 @@ async function initBots() {
       el.classList.toggle('active', el.dataset.acctId == acct.id);
     });
 
+    const _bm = getBrokerMeta(acct.broker || 'alpaca');
     document.getElementById('panel-title').textContent =
-      `${acct.label} — ${acct.account_type === 'live' ? 'Live' : 'Paper'}`;
-    document.getElementById('panel-meta').textContent = 'Loading…';
+      `${acct.label}`;
+    const _panelMeta = document.getElementById('panel-meta');
+    _panelMeta.innerHTML =
+      `<span style="display:inline-flex;align-items:center;gap:5px;font-size:12px;">` +
+        `<span style="display:inline-flex;align-items:center;justify-content:center;` +
+             `width:18px;height:18px;border-radius:4px;font-size:9px;font-weight:800;` +
+             `background:${_bm.bg};color:${_bm.color};">${_bm.initials}</span>` +
+        `<strong style="color:${_bm.color};">${_bm.name}</strong>` +
+        `<span style="color:var(--muted);">·</span>` +
+        `<span style="color:var(--muted);">${acct.account_type === 'live' ? 'Live trading' : 'Paper trading'}</span>` +
+      `</span> <span id="panel-meta-status" style="color:var(--muted);"></span>`;
 
     let acctStrats;
     try {
       acctStrats = await api(`/api/broker-accounts/${acct.id}/strategies`,
         { key: `bots-acct-strats-${acct.id}` });
     } catch {
-      document.getElementById('panel-meta').textContent = 'Failed to load';
+      const st = document.getElementById('panel-meta-status');
+      if (st) st.textContent = '· Failed to load'; else document.getElementById('panel-meta').textContent = 'Failed to load';
       return;
     }
     renderStratPanel(acct, acctStrats);
@@ -1587,8 +1604,9 @@ async function initBots() {
 
   function renderStratPanel(acct, acctStrats) {
     const enabledCount = acctStrats.filter(s => s.enabled).length;
-    document.getElementById('panel-meta').textContent =
-      `${enabledCount} of ${acctStrats.length} strategies enabled`;
+    const st = document.getElementById('panel-meta-status');
+    const statusText = `· ${enabledCount} of ${acctStrats.length} strategies enabled`;
+    if (st) st.textContent = statusText; else document.getElementById('panel-meta').textContent = statusText;
 
     const aList = document.getElementById('assigned-list');
     aList.innerHTML = '';
@@ -1931,7 +1949,7 @@ async function initPositions() {
           sel.className = 'acct-sel';
           const all = document.createElement('option'); all.value = ''; all.textContent = 'All accounts';
           sel.appendChild(all);
-          accounts.forEach(a => { const o = document.createElement('option'); o.value = a.id; o.textContent = a.label || `Account ${a.id}`; sel.appendChild(o); });
+          accounts.forEach(a => { const o = document.createElement('option'); o.value = a.id; const bm = getBrokerMeta(a.broker || 'alpaca'); o.textContent = `[${bm.name}] ${a.label || `Account ${a.id}`} (${a.account_type})`; sel.appendChild(o); });
           sel.addEventListener('change', () => { posAccountId = sel.value ? parseInt(sel.value) : null; fetchPositions(); fetchOrders(); });
           wrap.appendChild(sel);
         }

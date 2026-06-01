@@ -28,7 +28,7 @@ class Strategy:
     params_schema: ClassVar[list] = []
     auto_trade: ClassVar[bool] = True
     hidden: ClassVar[bool] = False  # if True, excluded from the bots UI list
-    brokers: ClassVar[list[str]] = ["alpaca"]  # which brokers this strategy supports
+    brokers: ClassVar[list[str]] = ["alpaca", "tradier"]  # which brokers this strategy supports
 
     def __init__(self, params: dict):
         merged = dict(self.default_params)
