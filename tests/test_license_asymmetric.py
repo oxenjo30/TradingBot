@@ -25,6 +25,9 @@ def _make_keypair():
 def keypair(monkeypatch):
     priv_b64, pub_b64 = _make_keypair()
     monkeypatch.setenv("TRADEBOT_LICENSE_PRIVATE_KEY", priv_b64)
+    # Patch the baked-in constant and clear the env override so verification
+    # uses exactly this keypair regardless of the ambient environment.
+    monkeypatch.delenv("TRADEBOT_LICENSE_PUBLIC_KEY", raising=False)
     import server.license as lic
     monkeypatch.setattr(lic, "LICENSE_PUBLIC_KEY", pub_b64)
     return priv_b64, pub_b64
