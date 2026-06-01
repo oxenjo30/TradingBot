@@ -160,10 +160,11 @@ def run_tick():
 
             if acct_id not in client_cache:
                 try:
+                    _raw_sec = acct.get("api_secret") or ""
                     acct_client = get_account_client(
                         broker=acct.get("broker", "alpaca"),
                         api_key=crypto.decrypt(acct["api_key"]),
-                        api_secret=crypto.decrypt(acct["api_secret"]),
+                        api_secret=crypto.decrypt(_raw_sec) if _raw_sec else "",
                         paper=(acct["account_type"] == "paper"),
                         account_id=acct_id,
                     )

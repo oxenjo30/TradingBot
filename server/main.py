@@ -141,10 +141,11 @@ def _get_broker_client(account_id: int | None):
     if not acct:
         raise HTTPException(404, f"Account {account_id} not found")
     from .broker_factory import get_account_client
+    raw_secret = acct.get("api_secret") or ""
     client = get_account_client(
         broker=acct.get("broker", "alpaca"),
         api_key=crypto.decrypt(acct["api_key"]),
-        api_secret=crypto.decrypt(acct["api_secret"]),
+        api_secret=crypto.decrypt(raw_secret) if raw_secret else "",
         paper=(acct["account_type"] == "paper"),
         account_id=account_id,
     )
@@ -844,10 +845,11 @@ def broker_account_status(account_id: int, request: Request):
     try:
         from .broker_factory import get_account_client
         creds  = db.get_broker_account_credentials(account_id)
+        _sec = creds.get("api_secret") or ""
         client = get_account_client(
             broker=row.get("broker", "alpaca"),
             api_key=crypto.decrypt(creds["api_key"]),
-            api_secret=crypto.decrypt(creds["api_secret"]),
+            api_secret=crypto.decrypt(_sec) if _sec else "",
             paper=(row["account_type"] == "paper"),
         )
         return client.get_account_summary()
@@ -1031,10 +1033,11 @@ def performance_compare(request: Request):
             try:
                 creds = db.get_broker_account_credentials(acct["id"])
                 from .broker_factory import get_account_client
+                _sec2 = creds.get("api_secret") or ""
                 client = get_account_client(
                     broker=acct.get("broker", "alpaca"),
                     api_key=crypto.decrypt(creds["api_key"]),
-                    api_secret=crypto.decrypt(creds["api_secret"]),
+                    api_secret=crypto.decrypt(_sec2) if _sec2 else "",
                     paper=(account_type == "paper"),
                 )
                 summary = client.get_account_summary()
