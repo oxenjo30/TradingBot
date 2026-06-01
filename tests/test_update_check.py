@@ -1,10 +1,7 @@
 """Tests for GET /api/update/check endpoint."""
-import os
 import pytest
 from unittest.mock import patch, MagicMock
 from fastapi.testclient import TestClient
-
-os.environ.setdefault("TRADEBOT_LICENSE_SECRET", "test-secret-32-chars-seller-key!!")
 
 
 @pytest.fixture

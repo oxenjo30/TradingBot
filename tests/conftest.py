@@ -1,11 +1,38 @@
+import base64
 import os
 import pytest
 from cryptography.fernet import Fernet
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from unittest.mock import patch
 from fastapi.testclient import TestClient
 
-# Ensure license secret is set before any server module imports it
-os.environ.setdefault("TRADEBOT_LICENSE_SECRET", "test-secret-32-chars-seller-key!!")
+# ── Test license keypair ──────────────────────────────────────────────────────
+# Generate a throwaway Ed25519 keypair ONCE at import time (conftest is imported
+# before any test module). The private key signs test keys via mint_test_key();
+# the public key is injected into server.license so verification succeeds.
+_test_priv = Ed25519PrivateKey.generate()
+_TEST_PRIVATE_B64 = base64.b64encode(
+    _test_priv.private_bytes(
+        encoding=serialization.Encoding.Raw,
+        format=serialization.PrivateFormat.Raw,
+        encryption_algorithm=serialization.NoEncryption(),
+    )
+).decode()
+_TEST_PUBLIC_B64 = base64.b64encode(
+    _test_priv.public_key().public_bytes(
+        encoding=serialization.Encoding.Raw,
+        format=serialization.PublicFormat.Raw,
+    )
+).decode()
+os.environ["TRADEBOT_LICENSE_PRIVATE_KEY"] = _TEST_PRIVATE_B64
+os.environ["TRADEBOT_LICENSE_PUBLIC_KEY"] = _TEST_PUBLIC_B64
+
+
+def mint_test_key(machine_id: str = "ANY", days: int = 365) -> str:
+    """Mint a license key signed by the test keypair. Importable by any test module."""
+    import server.license as lic
+    return lic.mint_key(machine_id=machine_id, days=days)
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -30,9 +57,5 @@ def client(tmp_path, monkeypatch):
         from server.main import app
         with TestClient(app, raise_server_exceptions=True) as tc:
             # Store a valid license key so _require_auth license check passes
-            import server.license as lic_mod
-            key = lic_mod.mint_key(
-                os.environ["TRADEBOT_LICENSE_SECRET"], "ANY", 365
-            )
-            db_mod.set_license_key(key)
+            db_mod.set_license_key(mint_test_key())
             yield tc

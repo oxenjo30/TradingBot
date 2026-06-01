@@ -1,6 +1,6 @@
 # tests/test_license_api.py
 import os
-os.environ.setdefault("TRADEBOT_LICENSE_SECRET", "test-secret-32-chars-seller-key!!")
+from tests.conftest import mint_test_key
 
 import pytest
 from unittest.mock import patch
@@ -35,8 +35,7 @@ def test_activate_license_bad_key(client):
 
 
 def test_license_status_after_valid_key(client):
-    import server.license as lic_mod
-    key = lic_mod.mint_key("test-secret-32-chars-seller-key!!", "ANY", 30)
+    key = mint_test_key(machine_id="ANY", days=30)
     r = client.post("/api/license/activate", json={"key": key})
     assert r.status_code == 200
     assert r.json()["valid"] is True
@@ -66,9 +65,7 @@ def test_delete_license_deactivates(tmp_path, monkeypatch):
     import server.auth as auth_mod
     monkeypatch.setattr(auth_mod, "password_is_set", lambda: False)
     monkeypatch.setattr(auth_mod, "setup_complete", lambda: False)
-    import server.license as lic_mod
-    key = lic_mod.mint_key("test-secret-32-chars-seller-key!!", "ANY", 30)
-    db_mod.set_license_key(key)
+    db_mod.set_license_key(mint_test_key(machine_id="ANY", days=30))
     from fastapi.testclient import TestClient
     from server.main import app as _app
     c = TestClient(_app)

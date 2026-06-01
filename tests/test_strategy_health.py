@@ -3,8 +3,6 @@ import pytest
 from cryptography.fernet import Fernet
 from unittest.mock import patch
 
-os.environ.setdefault("TRADEBOT_LICENSE_SECRET", "test-secret-32-chars-seller-key!!")
-
 
 @pytest.fixture
 def db(tmp_path, monkeypatch):

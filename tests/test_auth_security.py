@@ -2,13 +2,9 @@
 - Auth bypass when password_is_set=False but setup is complete
 - Setup endpoint replay (POST /api/setup/complete twice → 409)
 """
-import os
 import pytest
 from unittest.mock import patch
 from fastapi.testclient import TestClient
-
-
-os.environ.setdefault("TRADEBOT_LICENSE_SECRET", "test-secret-32-chars-seller-key!!")
 
 
 # ── Auth bypass regression ─────────────────────────────────────────────────────
@@ -73,7 +69,7 @@ def test_setup_complete_replay_returns_409(tmp_path, monkeypatch):
         "api_secret": "TESTSECRET1234567890123456789012",
         "account_type": "paper",
         "starter_strategy": "SMA Cross",
-        "password": "hunter2",
+        "password": "hunter22",  # >= 8 chars (password minimum)
     }
 
     # The 409 guard in the endpoint calls auth.setup_complete() which reads from DB.
