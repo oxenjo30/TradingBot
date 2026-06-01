@@ -799,7 +799,8 @@ async function initDashboard() {
   // ── Fetch performance ──
   async function fetchPerformance() {
     try {
-      const p = await api('/api/performance', { key: 'idx-perf' });
+      const perfQs = selectedStockAcctId ? `?account_id=${selectedStockAcctId}` : '';
+      const p = await api(`/api/performance${perfQs}`, { key: 'idx-perf' });
 
       const upnlEl = document.getElementById('upnl-val');
       clearState(upnlEl);
@@ -837,7 +838,8 @@ async function initDashboard() {
   // ── Fetch signals → fill rate ──
   async function fetchSignals() {
     try {
-      const sigs = await api('/api/signals?limit=200', { key: 'idx-signals' });
+      const sigQs = selectedStockAcctId ? `&account_id=${selectedStockAcctId}` : '';
+      const sigs = await api(`/api/signals?limit=200${sigQs}`, { key: 'idx-signals' });
       const filled  = sigs.filter(s => s.status === 'filled').length;
       const blocked = sigs.filter(s => s.status === 'blocked').length;
       const error   = sigs.filter(s => s.status === 'error').length;
@@ -864,7 +866,11 @@ async function initDashboard() {
       // Render stock account selector when >1 stock account exists
       const stockBar  = document.getElementById('stock-account-bar');
       const stockTabs = document.getElementById('stock-account-tabs');
-      selectedStockAcctId = stockAccounts[0]?.id ?? null;
+      // Preserve the user's current selection across the 30s poller re-render.
+      // Only fall back to the first account on first load, or if the previously
+      // selected account no longer exists.
+      const selStillValid = stockAccounts.some(a => a.id === selectedStockAcctId);
+      if (!selStillValid) selectedStockAcctId = stockAccounts[0]?.id ?? null;
 
       if (stockAccounts.length > 1 && stockBar && stockTabs) {
         stockTabs.innerHTML = '';
@@ -891,7 +897,11 @@ async function initDashboard() {
             tab.style.background  = bm.bg;
             tab.style.color       = bm.color;
             tab.style.borderColor = bm.color;
-            await fetchAccount();
+            // Refresh every account-scoped card: equity/day-P&L (fetchAccount),
+            // Unrealized P&L + Open Positions (fetchPerformance), heat map (fetchPositions),
+            // Fill Rate (fetchSignals), Active Bots + bot panel (fetchStrategies).
+            await Promise.all([fetchAccount(), fetchPerformance(), fetchPositions(),
+                               fetchSignals(), fetchStrategies()]);
           });
           if (a.id === selectedStockAcctId) {
             tab.style.background  = bm.bg;
@@ -905,12 +915,15 @@ async function initDashboard() {
       }
 
       const alpacaAcct = stockAccounts[0] ?? null;
+      // The currently selected stock account (chip), used for the Active Bots count.
+      const selStockAcct = stockAccounts.find(a => a.id === selectedStockAcctId) ?? alpacaAcct;
 
-      const [strats, engine, binanceStrats, alpacaStrats] = await Promise.all([
+      const [strats, engine, binanceStrats, alpacaStrats, selStockStrats] = await Promise.all([
         api('/api/strategies', { key: 'idx-strategies' }),
         api('/api/engine',     { key: 'idx-engine' }),
         binanceAcct ? api(`/api/broker-accounts/${binanceAcct.id}/strategies`, { key: 'idx-bots-binance' }).catch(() => []) : Promise.resolve([]),
         alpacaAcct  ? api(`/api/broker-accounts/${alpacaAcct.id}/strategies`,  { key: 'idx-bots-alpaca'  }).catch(() => []) : Promise.resolve([]),
+        selStockAcct ? api(`/api/broker-accounts/${selStockAcct.id}/strategies`, { key: 'idx-bots-selstock' }).catch(() => []) : Promise.resolve([]),
       ]);
 
       // Build sets of strategy names enabled per broker account
@@ -918,7 +931,8 @@ async function initDashboard() {
       const alpacaEnabled  = new Set((alpacaStrats  || []).filter(s => s.enabled).map(s => s.name));
       const botsEl = document.getElementById('bots-val');
       clearState(botsEl);
-      botsEl.textContent = strats.filter(s => s.enabled).length;
+      // Active Bots = strategies enabled on the SELECTED stock account.
+      botsEl.textContent = (selStockStrats || []).filter(s => s.enabled).length;
 
       const ranMap = {};
       (engine.ran || []).forEach(r => { ranMap[r.strategy] = r; });
@@ -4827,6 +4841,18 @@ async function initSettings() {
         await fetch('/api/license', { method: 'DELETE' });
         location.href = '/static/license.html';
       };
+    }
+  } catch {}
+
+  // ── Owner-only tooling ──
+  // The License Management panel is hidden by default (see settings.html). Reveal
+  // it only on the seller's instance, where /api/app-info reports owner_mode.
+  // Buyers also get 403 from /api/admin/* server-side, so this is UI hygiene.
+  try {
+    const info = await api('/api/app-info');
+    if (info && info.owner_mode) {
+      const sec = document.getElementById('license-mgmt-section');
+      if (sec) sec.style.display = '';
     }
   } catch {}
 

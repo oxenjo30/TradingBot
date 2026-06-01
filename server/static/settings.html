@@ -395,8 +395,8 @@
       <div id="update-error" class="field-msg err" style="display:none;margin-top:.75rem;"></div>
     </div>
 
-    <!-- ── License Management ─────────────────────────────────────────────── -->
-    <div class="card" id="license-mgmt-section">
+    <!-- ── License Management (owner-only; revealed by initSettings via /api/app-info) ── -->
+    <div class="card" id="license-mgmt-section" style="display:none;">
       <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;"
            onclick="toggleLicenseMgmt()">
         <div>
@@ -411,6 +411,23 @@
       </div>
 
       <div id="license-mgmt-body" style="display:none;margin-top:1rem;">
+
+        <!-- Lemon Squeezy signing secret -->
+        <div style="margin-bottom:1.25rem;padding-bottom:1.25rem;border-bottom:1px solid var(--border);">
+          <div class="field-label">Lemon Squeezy Signing Secret</div>
+          <div style="display:flex;gap:.5rem;align-items:center;">
+            <input id="lemon-signing-secret" type="password" class="input-field"
+                   style="font-family:monospace;font-size:12px;flex:1;" autocomplete="off"
+                   placeholder="Enter signing secret">
+            <button class="btn btn-sm" id="save-lemon-secret">Save</button>
+          </div>
+          <div class="field-hint" id="lemon-secret-status" style="margin-top:.4rem;">Not configured.</div>
+          <div style="margin-top:.6rem;background:#0D1117;border:1px solid #1E2D45;border-radius:8px;padding:.75rem;font-size:11px;color:#94A3B8;line-height:1.7;">
+            Set this to the <b style="color:#E6EBF5;">Signing secret</b> from your Lemon Squeezy webhook.
+            Point the webhook at:<br>
+            <code style="color:#10B981;" id="lemon-webhook-url">…/api/lemon/webhook</code>
+          </div>
+        </div>
 
         <!-- Stats row -->
         <div style="display:flex;gap:1rem;margin-bottom:1rem;flex-wrap:wrap;align-items:center;">
@@ -562,8 +579,51 @@ function toggleLicenseMgmt() {
   const chevron = document.getElementById('license-mgmt-chevron');
   body.style.display    = lmOpen ? 'block' : 'none';
   chevron.style.transform = lmOpen ? 'rotate(180deg)' : '';
-  if (lmOpen) loadLicenses(1);
+  if (lmOpen) { loadLicenses(1); loadLemonConfig(); }
 }
+
+// ── Lemon Squeezy signing secret ──
+async function loadLemonConfig() {
+  // Show the webhook URL based on this server's origin
+  const urlEl = document.getElementById('lemon-webhook-url');
+  if (urlEl) urlEl.textContent = `${location.origin}/api/lemon/webhook`;
+  const statusEl = document.getElementById('lemon-secret-status');
+  const inputEl  = document.getElementById('lemon-signing-secret');
+  try {
+    const cfg = await api('/api/admin/lemon-config');
+    if (cfg.signing_secret_set) {
+      if (statusEl) { statusEl.textContent = `Configured (${cfg.signing_secret_masked})`; statusEl.style.color = 'var(--green)'; }
+      if (inputEl) inputEl.placeholder = cfg.signing_secret_masked || '••••••••';
+    } else {
+      if (statusEl) { statusEl.textContent = 'Not configured.'; statusEl.style.color = ''; }
+      if (inputEl) inputEl.placeholder = 'Enter signing secret';
+    }
+  } catch (e) {
+    if (statusEl) { statusEl.textContent = `Failed to load: ${_esc(e.message)}`; statusEl.style.color = 'var(--red)'; }
+  }
+}
+
+document.getElementById('save-lemon-secret')?.addEventListener('click', async () => {
+  const inputEl  = document.getElementById('lemon-signing-secret');
+  const statusEl = document.getElementById('lemon-secret-status');
+  const val = (inputEl?.value || '').trim();
+  if (!val) {
+    if (statusEl) { statusEl.textContent = 'Enter a secret to save.'; statusEl.style.color = 'var(--red)'; }
+    return;
+  }
+  try {
+    const cfg = await api('/api/admin/lemon-config', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ signing_secret: val }),
+    });
+    if (inputEl) inputEl.value = '';   // clear the field; never echo the secret back
+    if (statusEl) { statusEl.textContent = `Saved (${cfg.signing_secret_masked})`; statusEl.style.color = 'var(--green)'; }
+    if (inputEl) inputEl.placeholder = cfg.signing_secret_masked || '••••••••';
+  } catch (e) {
+    if (statusEl) { statusEl.textContent = `Save failed: ${_esc(e.message)}`; statusEl.style.color = 'var(--red)'; }
+  }
+});
 
 async function loadLicenses(page) {
   page = Math.max(1, page || 1);
