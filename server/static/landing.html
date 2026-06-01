@@ -7,6 +7,15 @@
   <meta name="description" content="PrimusTrader runs 14 algorithmic trading strategies on stocks and crypto 24/7. AI-powered, risk-controlled, no coding required.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <!-- Open Graph / Twitter -->
+  <meta property="og:title" content="PrimusTrader — Automated Trading Bot for Stocks & Crypto">
+  <meta property="og:description" content="14 algorithmic strategies on stocks and crypto, risk-managed automatically. Test risk-free on paper, then go live.">
+  <meta property="og:type" content="website">
+  <meta property="og:image" content="/static/img/shots/overview.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="/static/img/shots/overview.png">
+  <!-- Preload the above-the-fold hero screenshot (LCP element) -->
+  <link rel="preload" as="image" href="/static/img/shots/overview.webp" fetchpriority="high">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -421,6 +430,51 @@
     }
     .ticker-up   { color: var(--green); }
     .ticker-down { color: var(--red); }
+
+    /* ── Browser-chrome frame for screenshots ────────────────────────────── */
+    .shot-frame { border: 1px solid var(--border); border-radius: 12px; overflow: hidden;
+      background: var(--card); box-shadow: 0 30px 80px rgba(0,0,0,.55); position: relative; }
+    .shot-frame .chrome { display: flex; align-items: center; gap: 6px; padding: 9px 12px;
+      background: var(--bg2); border-bottom: 1px solid var(--border); }
+    .shot-frame .chrome i { width: 10px; height: 10px; border-radius: 50%; background: #2a3b55; }
+    .shot-frame .chrome .url { margin-left: 10px; font-size: 11px; color: var(--muted2);
+      background: var(--card); border-radius: 6px; padding: 3px 12px; flex: 1; max-width: 260px; }
+    .shot-frame img { display: block; width: 100%; height: auto; }
+    .paper-chip { position: absolute; top: 52px; right: 14px; z-index: 2;
+      font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+      color: var(--blue); background: rgba(59,130,246,.14); border: 1px solid rgba(59,130,246,.34);
+      padding: 4px 10px; border-radius: 20px; backdrop-filter: blur(4px); }
+
+    /* ── Bento hero ──────────────────────────────────────────────────────── */
+    .bento { display: grid; grid-template-columns: 1.25fr 1fr; gap: 14px; margin-top: 24px; }
+    .bento .tile { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 26px; }
+    .bento .tile-hero { grid-row: span 2; display: flex; flex-direction: column; justify-content: center;
+      background: radial-gradient(120% 90% at 18% 0%, rgba(139,92,246,.18), transparent 60%), var(--card); }
+    .bento .tile-shot { grid-column: 1 / -1; padding: 0; border: none; background: none; }
+    .bento .stat-tile .stat-num { font-size: 38px; }
+    @media (max-width: 860px) {
+      .bento { grid-template-columns: 1fr; }
+      .bento .tile-hero { order: 1; } .bento .tile-shot { order: 2; } .bento .stat-tile { order: 3; }
+    }
+
+    /* ── Scroll reveal ───────────────────────────────────────────────────── */
+    .reveal { opacity: 0; transform: translateY(24px); transition: opacity .6s ease, transform .6s ease; }
+    .reveal.in { opacity: 1; transform: none; }
+    @media (prefers-reduced-motion: reduce) {
+      .reveal { opacity: 1; transform: none; transition: none; }
+      .ticker-track { animation: none; }
+    }
+
+    /* ── Screenshot showcase ─────────────────────────────────────────────── */
+    #showcase .show-row { display: grid; grid-template-columns: 1fr 1fr; gap: 44px; align-items: center; margin-top: 64px; }
+    #showcase .show-row:nth-child(even) .show-text { order: 2; }
+    #showcase .show-eyebrow { font-size: 11px; font-weight: 700; color: var(--blue); text-transform: uppercase; letter-spacing: .12em; margin-bottom: 12px; }
+    #showcase .show-title { font-size: clamp(22px, 3vw, 32px); font-weight: 800; letter-spacing: -.02em; line-height: 1.18; margin-bottom: 12px; }
+    #showcase .show-desc { font-size: 15px; color: var(--muted); line-height: 1.65; }
+    @media (max-width: 760px) {
+      #showcase .show-row { grid-template-columns: 1fr; gap: 22px; }
+      #showcase .show-row .show-text { order: 1 !important; }
+    }
   </style>
 </head>
 <body>
@@ -444,8 +498,44 @@
   </div>
 </nav>
 
+<!-- ── Hero (bento) ───────────────────────────────────────────────────────── -->
+<section class="hero-bento" style="padding-top:84px;">
+  <div class="container">
+    <div class="bento">
+      <div class="tile tile-hero">
+        <div class="hero-eyebrow">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><circle cx="5" cy="5" r="5"/></svg>
+          Live · 24/7 · No coding required
+        </div>
+        <h1 class="hero-title" style="font-size:clamp(32px,4.5vw,52px);">
+          Automated trading,<br><span class="grad">on autopilot</span>
+        </h1>
+        <p class="hero-sub" style="margin:18px 0 26px;">
+          PrimusTrader runs 14 strategies on stocks and crypto, manages risk for you,
+          and lets you test everything risk-free on paper before going live.
+        </p>
+        <div class="hero-actions" style="justify-content:flex-start;">
+          <a href="BUY_URL_PLACEHOLDER" class="btn-primary" id="hero-buy-btn">Get PrimusTrader — $249</a>
+          <a href="#showcase" class="btn-ghost">See it in action</a>
+        </div>
+        <p class="hero-note" style="text-align:left;">Test on paper first · Lifetime license · Windows &amp; Linux</p>
+      </div>
+      <div class="tile stat-tile"><div class="stat-num">14</div><div class="stat-label">Built-in strategies</div></div>
+      <div class="tile stat-tile"><div class="stat-num">9</div><div class="stat-label">Risk guards</div></div>
+      <div class="tile-shot">
+        <div class="shot-frame">
+          <div class="chrome"><i></i><i></i><i></i><span class="url">localhost:8000 — Dashboard</span></div>
+          <span class="paper-chip">Paper Trading</span>
+          <img src="/static/img/shots/overview.webp" width="1440" height="900" fetchpriority="high" decoding="async"
+               alt="PrimusTrader dashboard showing total balance, daily P&amp;L, KPI cards and a performance chart">
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- ── Ticker ─────────────────────────────────────────────────────────────── -->
-<div class="ticker-wrap" style="margin-top:60px;">
+<div class="ticker-wrap">
   <div class="ticker-track" id="ticker">
     <span class="ticker-item"><span>BTC/USDT</span><span class="ticker-up">+2.41%</span></span>
     <span class="ticker-item"><span>ETH/USDT</span><span class="ticker-up">+1.87%</span></span>
@@ -471,56 +561,79 @@
   </div>
 </div>
 
-<!-- ── Hero ───────────────────────────────────────────────────────────────── -->
-<section class="hero">
+<!-- ── Showcase ───────────────────────────────────────────────────────────── -->
+<section id="showcase">
   <div class="container">
-    <div class="hero-eyebrow">
-      <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><circle cx="5" cy="5" r="5"/></svg>
-      Live trading · 24/7 · No coding required
+    <div class="section-eyebrow text-center">See it in action</div>
+    <h2 class="section-title text-center">The whole product, before you buy</h2>
+    <p class="section-sub text-center" style="margin:0 auto;">Real screenshots from the dashboard, running in paper-trading mode.</p>
+
+    <div class="show-row reveal">
+      <div class="show-text">
+        <div class="show-eyebrow">Performance</div>
+        <h3 class="show-title">Know exactly what's working</h3>
+        <p class="show-desc">Per-strategy statistics, top symbols, and signal counts — see which of your strategies are pulling their weight at a glance.</p>
+      </div>
+      <div class="shot-frame">
+        <div class="chrome"><i></i><i></i><i></i><span class="url">localhost:8000 — Performance</span></div>
+        <span class="paper-chip">Paper Trading</span>
+        <img src="/static/img/shots/performance.webp" width="1440" height="900" loading="lazy" decoding="async" alt="Performance page with strategy statistics table and top traded symbols">
+      </div>
     </div>
-    <h1 class="hero-title">
-      The Trading Bot That<br>
-      <span class="grad">Works While You Sleep</span>
-    </h1>
-    <p class="hero-sub">
-      PrimusTrader connects to your broker account, runs 14 algorithmic strategies
-      on stocks and crypto, and manages risk automatically — all from a clean web dashboard.
-    </p>
-    <div class="hero-actions">
-      <a href="BUY_URL_PLACEHOLDER" class="btn-primary" id="hero-buy-btn">
-        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="13 17 18 12 13 7"/><polyline points="6 17 11 12 6 7"/></svg>
-        Get PrimusTrader — $249
-      </a>
-      <a href="#features" class="btn-ghost">
-        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 8 12 12 14 14"/></svg>
-        See how it works
-      </a>
+
+    <div class="show-row reveal">
+      <div class="show-text">
+        <div class="show-eyebrow">Positions &amp; orders</div>
+        <h3 class="show-title">Every position, every order, one view</h3>
+        <p class="show-desc">Open positions with live P&amp;L, full order history, and a manual order ticket — all on a single screen.</p>
+      </div>
+      <div class="shot-frame">
+        <div class="chrome"><i></i><i></i><i></i><span class="url">localhost:8000 — Positions</span></div>
+        <span class="paper-chip">Paper Trading</span>
+        <img src="/static/img/shots/positions.webp" width="1440" height="900" loading="lazy" decoding="async" alt="Positions and orders page showing open positions and order history">
+      </div>
     </div>
-    <p class="hero-note">One-time payment · Lifetime license · Windows &amp; Linux</p>
+
+    <div class="show-row reveal">
+      <div class="show-text">
+        <div class="show-eyebrow">Risk management</div>
+        <h3 class="show-title">9 guards between you and a bad trade</h3>
+        <p class="show-desc">Kill switch, daily loss limits, PDT protection, take-profit and more. Every signal passes all guards before an order is placed.</p>
+      </div>
+      <div class="shot-frame">
+        <div class="chrome"><i></i><i></i><i></i><span class="url">localhost:8000 — Risk</span></div>
+        <span class="paper-chip">Paper Trading</span>
+        <img src="/static/img/shots/risk.webp" width="1440" height="900" loading="lazy" decoding="async" alt="Risk management page showing kill switch, loss limits and trading guards">
+      </div>
+    </div>
+
+    <div class="show-row reveal">
+      <div class="show-text">
+        <div class="show-eyebrow">Backtesting</div>
+        <h3 class="show-title">Test before you risk a dollar</h3>
+        <p class="show-desc">Run any strategy against historical data with slippage and commissions. Save runs and compare returns against a benchmark.</p>
+      </div>
+      <div class="shot-frame">
+        <div class="chrome"><i></i><i></i><i></i><span class="url">localhost:8000 — Backtesting</span></div>
+        <span class="paper-chip">Paper Trading</span>
+        <img src="/static/img/shots/backtesting.webp" width="1440" height="900" loading="lazy" decoding="async" alt="Backtesting studio with configuration panel and saved run results">
+      </div>
+    </div>
+
+    <div class="show-row reveal">
+      <div class="show-text">
+        <div class="show-eyebrow">Balances</div>
+        <h3 class="show-title">Stocks and crypto, side by side</h3>
+        <p class="show-desc">Equity, cash and buying power up top; stock and crypto holdings below — across every connected broker.</p>
+      </div>
+      <div class="shot-frame">
+        <div class="chrome"><i></i><i></i><i></i><span class="url">localhost:8000 — Balances</span></div>
+        <span class="paper-chip">Paper Trading</span>
+        <img src="/static/img/shots/balances.webp" width="1440" height="900" loading="lazy" decoding="async" alt="Balances page showing equity KPIs with stock and crypto holdings">
+      </div>
+    </div>
   </div>
 </section>
-
-<!-- ── Stats bar ──────────────────────────────────────────────────────────── -->
-<div class="container">
-  <div class="stats-bar">
-    <div class="stat-item">
-      <div class="stat-num">14</div>
-      <div class="stat-label">Built-in strategies</div>
-    </div>
-    <div class="stat-item">
-      <div class="stat-num">10</div>
-      <div class="stat-label">Risk guard layers</div>
-    </div>
-    <div class="stat-item">
-      <div class="stat-num">24/7</div>
-      <div class="stat-label">Crypto trading</div>
-    </div>
-    <div class="stat-item">
-      <div class="stat-num">60s</div>
-      <div class="stat-label">Engine tick speed</div>
-    </div>
-  </div>
-</div>
 
 <!-- ── Features ───────────────────────────────────────────────────────────── -->
 <section id="features">
@@ -531,7 +644,7 @@
 
     <div class="features-grid">
 
-      <div class="feat-card">
+      <div class="feat-card reveal">
         <div class="feat-icon" style="background:rgba(59,130,246,.12);">
           <svg width="20" height="20" fill="none" stroke="#60A5FA" stroke-width="2" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="2" height="2"/><rect x="13" y="9" width="2" height="2"/><path d="M9 13a3 3 0 0 0 6 0"/></svg>
         </div>
@@ -539,15 +652,15 @@
         <div class="feat-desc">9 stock strategies (Momentum, RSI, MACD, Bollinger, EMA Confluence, and more) + 4 crypto strategies + Classic Chart Patterns.</div>
       </div>
 
-      <div class="feat-card">
+      <div class="feat-card reveal">
         <div class="feat-icon" style="background:rgba(16,185,129,.12);">
           <svg width="20" height="20" fill="none" stroke="#34D399" stroke-width="2" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
         </div>
-        <div class="feat-title">10-Layer Risk Engine</div>
+        <div class="feat-title">9-Layer Risk Engine</div>
         <div class="feat-desc">Kill switch, daily/weekly loss limits, PDT protection, max positions, symbol exposure, consecutive loss guard, and per-account controls.</div>
       </div>
 
-      <div class="feat-card">
+      <div class="feat-card reveal">
         <div class="feat-icon" style="background:rgba(240,185,11,.12);">
           <svg width="20" height="20" fill="none" stroke="#F0B90B" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9 8h4a2 2 0 0 1 0 4H9v4"/><line x1="9" y1="12" x2="14" y2="12"/></svg>
         </div>
@@ -555,7 +668,7 @@
         <div class="feat-desc">Alpaca and Tradier for US equities. Binance (paper &amp; live) for 24/7 crypto spot trading with USDT pairs.</div>
       </div>
 
-      <div class="feat-card">
+      <div class="feat-card reveal">
         <div class="feat-icon" style="background:rgba(139,92,246,.12);">
           <svg width="20" height="20" fill="none" stroke="#A78BFA" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>
         </div>
@@ -563,7 +676,7 @@
         <div class="feat-desc">Every trade explained in plain English via Claude or Ollama. Weekly auto-tuner adjusts strategy parameters based on live performance.</div>
       </div>
 
-      <div class="feat-card">
+      <div class="feat-card reveal">
         <div class="feat-icon" style="background:rgba(245,158,11,.12);">
           <svg width="20" height="20" fill="none" stroke="#FBBF24" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
         </div>
@@ -571,7 +684,7 @@
         <div class="feat-desc">Test any strategy against historical data with slippage, commission, and capital controls. Save and compare runs. Drift monitoring vs. live results.</div>
       </div>
 
-      <div class="feat-card">
+      <div class="feat-card reveal">
         <div class="feat-icon" style="background:rgba(59,130,246,.12);">
           <svg width="20" height="20" fill="none" stroke="#60A5FA" stroke-width="2" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
         </div>
@@ -662,8 +775,8 @@
 <section>
   <div class="container">
     <div class="section-eyebrow">Risk management</div>
-    <h2 class="section-title">10 guards between you<br>and a bad trade</h2>
-    <p class="section-sub">Every signal — from strategies or webhooks — passes through all 10 guards before an order is placed.</p>
+    <h2 class="section-title">9 guards between you<br>and a bad trade</h2>
+    <p class="section-sub">Every signal — from strategies or webhooks — passes through all 9 guards before an order is placed.</p>
 
     <div class="risk-grid">
       <div class="risk-item">
@@ -713,13 +826,13 @@
       <div class="pricing-card">
         <div class="pricing-badge">Lifetime License</div>
         <div class="pricing-name">PrimusTrader</div>
-        <div class="pricing-price"><sup>$</sup>97</div>
+        <div class="pricing-price"><sup>$</sup>249</div>
         <div class="pricing-cycle">one-time payment · no subscription</div>
 
         <ul class="pricing-features">
           <li><svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> 14 built-in trading strategies</li>
           <li><svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> Stocks (Alpaca, Tradier) + Crypto (Binance)</li>
-          <li><svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> 10-layer risk engine</li>
+          <li><svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> 9-layer risk engine</li>
           <li><svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> AI trade explanations + weekly auto-tuner</li>
           <li><svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> Backtesting studio with drift monitoring</li>
           <li><svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> TradingView webhook signals</li>
@@ -875,6 +988,21 @@
       }
     });
   });
+
+  // ── Scroll reveal ─────────────────────────────────────────────────────────
+  (() => {
+    const els = document.querySelectorAll('.reveal');
+    if (!('IntersectionObserver' in window) || !els.length) {
+      els.forEach(el => el.classList.add('in'));
+      return;
+    }
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach(e => {
+        if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
+      });
+    }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+    els.forEach(el => io.observe(el));
+  })();
 </script>
 </body>
 </html>
