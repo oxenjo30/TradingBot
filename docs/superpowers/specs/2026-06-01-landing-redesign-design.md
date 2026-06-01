@@ -29,7 +29,11 @@ centered hero with a bento grid, (b) injects real screenshot showcase rows, and
 ## Assets
 
 Real screenshots captured from the running dashboard (read-only), stored in
-`server/static/img/shots/`:
+`server/static/img/shots/`. **Source PNGs are kept; a WebP variant of each is generated
+and referenced first** (PNGs total ~2.4MB which is too heavy — WebP cuts UI screenshots
+60–80% at visually identical quality). Use `<img src="...webp">` directly (this is a
+modern dark-SaaS page; no need for a `<picture>` PNG fallback, but the PNGs remain on disk
+as the capture source of truth).
 
 - `overview.png` — dashboard: balance $98K, daily P&L, KPI cards w/ sparklines, perf chart
 - `performance.png` — strategy statistics table, top symbols, 256 signals
@@ -50,11 +54,25 @@ No API keys, account numbers, or passwords are visible in any shot (verified).
    - Large headline tile (radial glow): eyebrow "● Live · 24/7 · No code", headline
      *"Automated trading, on autopilot"*, subtext, primary CTA (`Get PrimusTrader — $249`)
      + ghost CTA (`See how it works`), paper-trading trust line.
-   - Stat tiles: `14 Strategies`, `10 Risk guards`, `24/7 Crypto`, `60s Tick` w/ sparklines.
-   - Large framed screenshot tile: `overview.png` in browser-chrome frame, "Paper Trading"
-     badge, glow/shadow, float-on-scroll.
+   - Stat tiles: `14 Strategies`, `N Risk guards`, `24/7 Crypto`, `60s Tick` w/ sparklines
+     (sparklines are decorative/static SVG, not real data). `N` must equal the actual number
+     of guards shown in the risk checklist (see §8 — reconcile to a single honest number).
+   - Large framed screenshot tile: overview shot in browser-chrome frame, "Paper Trading"
+     badge, glow/shadow, float-on-scroll. **This is the above-the-fold LCP image** — load it
+     **eager** with `fetchpriority="high"`, explicit `width`/`height` (prevent layout shift),
+     and a `<link rel="preload" as="image">` in `<head>`. Do NOT lazy-load it.
    - Layout: balanced mosaic (headline shares row with tall screenshot; stat tiles fill
-     the middle; wide screenshot anchors the bottom). Collapses to single column on mobile.
+     the middle; wide screenshot anchors the bottom).
+   - **Fixed-nav offset:** the nav is `position:fixed; height:60px`. The current first
+     element (ticker) compensates with `margin-top:60px`. Whatever becomes the new first
+     below-nav element (the bento hero) MUST reintroduce that 60px top offset or it renders
+     under the nav.
+   - **Mobile:** collapses to a single column with source order **headline → CTA → hero
+     screenshot → stat tiles**, so the primary CTA stays above the fold on a ~667px-tall
+     phone viewport. Faux browser-chrome frame must stay legible at 360px width; stat-tile
+     sparklines are decorative and may simplify/hide on narrow screens.
+   - **Above-fold motion budget:** hero float + ticker + scroll-fade all compete in the
+     first viewport — keep simultaneous motion restrained so it reads premium, not busy.
 3. **Ticker strip** — keep existing animated price ticker, placed under the hero.
 4. **"See it in action" — screenshot showcase** (NEW): alternating left/right rows, each a
    real screenshot in a browser frame + a short benefit headline & blurb:
@@ -68,6 +86,9 @@ No API keys, account numbers, or passwords are visible in any shot (verified).
 6. **Strategies** — keep two-column strategy list, lightly restyled.
 7. **How it works** — keep the 4-step row.
 8. **Risk** — risk shot lives in the showcase (#4); keep the checklist grid here.
+   **Fix the count discrepancy:** copy claims "10 guards" but the checklist renders only 9
+   items. Reconcile on this page — either add the missing guard(s) to reach 10, or change the
+   headline/stat to match what's shown. Don't carry the credibility gap forward silently.
 9. **Pricing** — keep single pricing card, elevate (stronger glow, animated gradient border).
 10. **FAQ → CTA banner → Footer → Disclaimer** — keep, restyle to match.
 
@@ -85,9 +106,17 @@ No API keys, account numbers, or passwords are visible in any shot (verified).
   `landing.old.html` first.
 - Accessibility: real `alt` text on every screenshot; sufficient contrast; keyboard-operable
   FAQ; `prefers-reduced-motion` disables non-essential animation.
-- Performance: PNG screenshots are 350–500KB each (retina @2x). Add `loading="lazy"` to all
-  below-the-fold images so they don't block first paint.
-- Typography: apply correct quotes/dashes/spacing throughout (handled during build).
+- Performance:
+  - Screenshots served as **WebP** (PNG sources retained on disk). Add `loading="lazy"` to
+    all **below-the-fold** images (the 5 showcase shots) so they don't block first paint.
+  - The **above-the-fold hero shot is the exception**: eager + `fetchpriority="high"` +
+    explicit dimensions + `<link rel="preload">` so it becomes a fast LCP, not a slow one.
+  - Target LCP under ~2.5s on a typical broadband cold load.
+- Typography: apply correct quotes/dashes/spacing throughout **by hand during implementation**
+  (there is no build step).
+- `<head>`: add Open Graph + Twitter card meta (`og:title`, `og:description`, `og:image`
+  using the overview screenshot, `twitter:card=summary_large_image`). The page now has real
+  product imagery worth previewing when shared — cheap win.
 
 ## Out of scope
 
