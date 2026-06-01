@@ -148,7 +148,9 @@ def client(tmp_path, monkeypatch):
     import server.db as db_mod
     monkeypatch.setattr(db_mod, "DB_PATH", tmp_path / "test.db")
     db_mod.init_db()
-    monkeypatch.setenv("LEMON_SQUEEZY_SIGNING_SECRET", SIGNING_SECRET)
+    # The webhook reads the signing secret from encrypted DB config
+    # (Settings -> License Management), not from the env var.
+    db_mod.set_app_config_secure("lemon_signing_secret", SIGNING_SECRET)
     # License signing key is provided by the conftest test keypair (TRADEBOT_LICENSE_PRIVATE_KEY).
     monkeypatch.setenv("LICENSE_DURATION_DAYS", "36500")
     monkeypatch.setenv("LICENSE_DOWNLOAD_URL", "https://lemonsqueezy.com/dl/test")
