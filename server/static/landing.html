@@ -418,7 +418,13 @@
     .bento .tile-hero { grid-row: span 2; display: flex; flex-direction: column; justify-content: center;
       background: radial-gradient(120% 90% at 18% 0%, rgba(139,92,246,.18), transparent 60%), var(--card); }
     .bento .tile-shot { grid-column: 1 / -1; padding: 0; border: none; background: none; }
+    .bento .stat-tile { display: flex; flex-direction: column; }
     .bento .stat-tile .stat-num { font-size: 38px; }
+    .bento .stat-tile .stat-spark { margin-top: auto; }
+    .bento .stat-tile .stat-spark svg { display: block; width: 100%; height: 44px; }
+    .bento .stat-tile .stat-signal { font-size: 11px; font-weight: 600; color: var(--muted2);
+      margin-top: 10px; display: inline-flex; align-items: center; gap: 6px; }
+    .bento .stat-tile .stat-signal .dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
     @media (max-width: 860px) {
       .bento { grid-template-columns: 1fr; }
       .bento .tile-hero { order: 1; } .bento .tile-shot { order: 2; } .bento .stat-tile { order: 3; }
@@ -487,8 +493,28 @@
         </div>
         <p class="hero-note" style="text-align:left;">Test on paper first · Lifetime license · Windows &amp; Linux</p>
       </div>
-      <div class="tile stat-tile"><div class="stat-num">14</div><div class="stat-label">Built-in strategies</div></div>
-      <div class="tile stat-tile"><div class="stat-num">9</div><div class="stat-label">Risk guards</div></div>
+      <div class="tile stat-tile">
+        <div class="stat-num">14</div><div class="stat-label">Built-in strategies</div>
+        <div class="stat-spark">
+          <svg viewBox="0 0 200 44" preserveAspectRatio="none" aria-hidden="true">
+            <defs><linearGradient id="spk-a" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3B82F6" stop-opacity=".35"/><stop offset="1" stop-color="#3B82F6" stop-opacity="0"/></linearGradient></defs>
+            <path d="M0 36 L25 31 L50 33 L75 23 L100 27 L125 15 L150 19 L175 9 L200 13 L200 44 L0 44 Z" fill="url(#spk-a)"/>
+            <path d="M0 36 L25 31 L50 33 L75 23 L100 27 L125 15 L150 19 L175 9 L200 13" fill="none" stroke="#60A5FA" stroke-width="2"/>
+          </svg>
+          <span class="stat-signal"><span class="dot" style="background:var(--blue)"></span>Signal activity, last 30 days</span>
+        </div>
+      </div>
+      <div class="tile stat-tile">
+        <div class="stat-num">9</div><div class="stat-label">Risk guards</div>
+        <div class="stat-spark">
+          <svg viewBox="0 0 200 44" preserveAspectRatio="none" aria-hidden="true">
+            <defs><linearGradient id="spk-b" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#10B981" stop-opacity=".35"/><stop offset="1" stop-color="#10B981" stop-opacity="0"/></linearGradient></defs>
+            <path d="M0 22 L25 24 L50 19 L75 21 L100 16 L125 20 L150 14 L175 17 L200 12 L200 44 L0 44 Z" fill="url(#spk-b)"/>
+            <path d="M0 22 L25 24 L50 19 L75 21 L100 16 L125 20 L150 14 L175 17 L200 12" fill="none" stroke="#34D399" stroke-width="2"/>
+          </svg>
+          <span class="stat-signal"><span class="dot" style="background:var(--green)"></span>Every order checked before it fills</span>
+        </div>
+      </div>
       <div class="tile-shot">
         <div class="shot-frame">
           <div class="chrome"><i></i><i></i><i></i><span class="url">localhost:8000 — Dashboard</span></div>
