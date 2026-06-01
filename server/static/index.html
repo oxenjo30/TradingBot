@@ -127,6 +127,13 @@
   <!-- Content -->
   <main class="content flex flex-col gap-4">
 
+    <!-- Stock account selector (hidden when only 1 stock account) -->
+    <div id="stock-account-bar" class="hidden" style="display:none;align-items:center;gap:10px;padding:6px 12px;background:var(--card);border:1px solid var(--border);border-radius:10px;font-size:13px;">
+      <svg width="14" height="14" fill="none" stroke="var(--muted)" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+      <span style="color:var(--muted);font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;">Stock Account</span>
+      <div id="stock-account-tabs" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+    </div>
+
     <!-- Row 1: 6 Metric Cards -->
     <div class="metric-grid">
 

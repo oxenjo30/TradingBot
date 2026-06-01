@@ -740,11 +740,15 @@ async function initDashboard() {
   let radialChart = null;
   const sparkCharts = {};
 
+  // Selected stock account — set by the account selector tabs, used by fetchAccount
+  let selectedStockAcctId = null;
+
   // ── Fetch account ──
   async function fetchAccount() {
     const t0 = Date.now();
     try {
-      const a = await api('/api/account', { key: 'idx-account' });
+      const acctQs = selectedStockAcctId ? `?account_id=${selectedStockAcctId}` : '';
+      const a = await api(`/api/account${acctQs}`, { key: 'idx-account' });
       const latency = Date.now() - t0;
 
       const balEl = document.getElementById('balance-val');
@@ -853,7 +857,54 @@ async function initDashboard() {
     try {
       const accounts = await api('/api/broker-accounts', { key: 'idx-all-accts' }).catch(() => []);
       const binanceAcct = (accounts || []).find(a => a.broker === 'binance');
-      const alpacaAcct  = (accounts || []).find(a => a.broker === 'alpaca');
+      // All non-crypto accounts — Alpaca, Tradier, or any future stock broker
+      const CRYPTO_BROKER_IDS = new Set(['binance', 'binanceus', 'coinbase', 'kraken']);
+      const stockAccounts = (accounts || []).filter(a => !CRYPTO_BROKER_IDS.has(a.broker));
+
+      // Render stock account selector when >1 stock account exists
+      const stockBar  = document.getElementById('stock-account-bar');
+      const stockTabs = document.getElementById('stock-account-tabs');
+      selectedStockAcctId = stockAccounts[0]?.id ?? null;
+
+      if (stockAccounts.length > 1 && stockBar && stockTabs) {
+        stockTabs.innerHTML = '';
+        stockAccounts.forEach(a => {
+          const bm  = getBrokerMeta(a.broker || 'alpaca');
+          const tab = document.createElement('button');
+          tab.dataset.acctId = a.id;
+          tab.style.cssText =
+            `display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:6px;` +
+            `font-size:12px;font-weight:600;border:1px solid var(--border);background:transparent;` +
+            `color:var(--muted);cursor:pointer;transition:all .15s;font-family:inherit;`;
+          tab.innerHTML =
+            `<span style="display:inline-flex;align-items:center;justify-content:center;` +
+            `width:16px;height:16px;border-radius:4px;font-size:9px;font-weight:800;` +
+            `background:${bm.bg};color:${bm.color};">${bm.initials}</span>` +
+            `${escHtml(a.label)} <span style="opacity:.6;font-weight:400;">(${a.account_type})</span>`;
+          tab.addEventListener('click', async () => {
+            selectedStockAcctId = a.id;
+            stockTabs.querySelectorAll('button').forEach(b => {
+              b.style.background    = 'transparent';
+              b.style.color         = 'var(--muted)';
+              b.style.borderColor   = 'var(--border)';
+            });
+            tab.style.background  = bm.bg;
+            tab.style.color       = bm.color;
+            tab.style.borderColor = bm.color;
+            await fetchAccount();
+          });
+          if (a.id === selectedStockAcctId) {
+            tab.style.background  = bm.bg;
+            tab.style.color       = bm.color;
+            tab.style.borderColor = bm.color;
+          }
+          stockTabs.appendChild(tab);
+        });
+        stockBar.style.display = 'flex';
+        stockBar.classList.remove('hidden');
+      }
+
+      const alpacaAcct = stockAccounts[0] ?? null;
 
       const [strats, engine, binanceStrats, alpacaStrats] = await Promise.all([
         api('/api/strategies', { key: 'idx-strategies' }),
@@ -960,7 +1011,8 @@ async function initDashboard() {
   // ── Fetch positions → portfolio heat map ──
   async function fetchPositions() {
     try {
-      const positions = await api('/api/positions', { key: 'idx-positions' });
+      const posQs = selectedStockAcctId ? `?account_id=${selectedStockAcctId}` : '';
+      const positions = await api(`/api/positions${posQs}`, { key: 'idx-positions' });
       const gridEl  = document.getElementById('heatmap-grid');
       const emptyEl = document.getElementById('heatmap-empty');
 
