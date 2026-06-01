@@ -6,7 +6,7 @@ import logging
 import os
 import threading
 
-# Load .env before any module reads os.environ (e.g. DB_SECRET_KEY, TRADEBOT_LICENSE_SECRET)
+# Load .env before any module reads os.environ (e.g. DB_SECRET_KEY, TRADEBOT_LICENSE_PRIVATE_KEY)
 from dotenv import load_dotenv as _load_dotenv
 _load_dotenv()
 from contextlib import asynccontextmanager
@@ -366,10 +366,10 @@ def license_status():
 
 @app.post("/api/license/activate")
 def license_activate(body: LicenseActivate):
-    from .license import verify_key, _get_seller_secret, LicenseError, invalidate_cache
+    from .license import verify_key, LicenseError, invalidate_cache
     from .db import set_license_key
     try:
-        result = verify_key(body.key, _get_seller_secret())
+        result = verify_key(body.key)
     except LicenseError as e:
         raise HTTPException(422, str(e))
     set_license_key(body.key)
