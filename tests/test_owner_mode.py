@@ -64,9 +64,27 @@ def test_admin_export_403_when_not_owner(client, monkeypatch):
     assert r.status_code == 403
 
 
-def test_lemon_config_403_when_not_owner(client, monkeypatch):
+def test_admin_resend_403_when_not_owner(client, monkeypatch):
+    monkeypatch.delenv("TRADEBOT_OWNER_MODE", raising=False)
+    r = client.post("/api/admin/licenses/1/resend")
+    assert r.status_code == 403
+
+
+def test_admin_revoke_403_when_not_owner(client, monkeypatch):
+    monkeypatch.delenv("TRADEBOT_OWNER_MODE", raising=False)
+    r = client.post("/api/admin/licenses/1/revoke")
+    assert r.status_code == 403
+
+
+def test_lemon_config_get_403_when_not_owner(client, monkeypatch):
     monkeypatch.delenv("TRADEBOT_OWNER_MODE", raising=False)
     r = client.get("/api/admin/lemon-config")
+    assert r.status_code == 403
+
+
+def test_lemon_config_patch_403_when_not_owner(client, monkeypatch):
+    monkeypatch.delenv("TRADEBOT_OWNER_MODE", raising=False)
+    r = client.patch("/api/admin/lemon-config", json={"signing_secret": "x"})
     assert r.status_code == 403
 
 
@@ -80,3 +98,16 @@ def test_app_info_reports_owner_mode(client, monkeypatch):
     r = client.get("/api/app-info")
     assert r.status_code == 200
     assert r.json()["owner_mode"] is False
+
+
+def test_app_info_401_when_unauthenticated(tmp_path, monkeypatch):
+    """/api/app-info requires auth: unauthenticated callers get 401."""
+    import server.db as db_mod
+    monkeypatch.setattr(db_mod, "DB_PATH", tmp_path / "appinfo_401.db")
+    with patch("server.auth.password_is_set", return_value=False), \
+         patch("server.auth.setup_complete", return_value=True):
+        with patch("server.engine.start"), patch("server.engine.shutdown"):
+            from server.main import app
+            with TestClient(app, raise_server_exceptions=True) as tc:
+                r = tc.get("/api/app-info")
+    assert r.status_code == 401
