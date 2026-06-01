@@ -73,7 +73,7 @@ def test_setup_complete_replay_returns_409(tmp_path, monkeypatch):
         "api_secret": "TESTSECRET1234567890123456789012",
         "account_type": "paper",
         "starter_strategy": "SMA Cross",
-        "password": "hunter2",
+        "password": "hunter22",  # >= 8 chars (password minimum)
     }
 
     # The 409 guard in the endpoint calls auth.setup_complete() which reads from DB.
