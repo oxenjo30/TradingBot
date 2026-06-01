@@ -16,8 +16,6 @@
   <meta name="twitter:image" content="/static/img/shots/overview.png">
   <!-- Preload the above-the-fold hero screenshot (LCP element) -->
   <link rel="preload" as="image" href="/static/img/shots/overview.webp" fetchpriority="high">
-  <!-- Lottie player (animation; degrades to a CSS-animated SVG chart if it fails to load) -->
-  <script src="https://unpkg.com/@lottiefiles/lottie-player@2.0.4/dist/lottie-player.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -442,25 +440,7 @@
     .bento { display: grid; grid-template-columns: 1.25fr 1fr; gap: 14px; margin-top: 24px; }
     .bento .tile { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 26px; }
     .bento .tile-hero { grid-row: span 2; display: flex; flex-direction: column; justify-content: center;
-      background: radial-gradient(120% 90% at 18% 0%, rgba(139,92,246,.18), transparent 60%), var(--card);
-      position: relative; overflow: hidden; }
-    /* Lottie hero animation — a person analysing the markets (the work the bot automates) */
-    .hero-lottie { position: absolute; right: -18px; bottom: -10px;
-      width: 260px; height: 260px; opacity: .92; pointer-events: none; z-index: 0; }
-    .hero-lottie lottie-player, .hero-lottie .lottie-fallback { width: 100%; height: 100%; display: block; }
-    .tile-hero > *:not(.hero-lottie) { position: relative; z-index: 1; }
-    /* keep text readable over the animation: cap text column width on wide hero tiles */
-    .tile-hero .hero-title, .tile-hero .hero-sub { max-width: min(100%, 30ch); }
-    @media (max-width: 1100px) { .hero-lottie { opacity: .35; right: -30px; } }
-    /* CSS/SVG fallback: animated drawing line, used if the Lottie player is unavailable */
-    .lottie-fallback path.line { stroke-dasharray: 520; stroke-dashoffset: 520;
-      animation: drawLine 3.2s ease-in-out infinite; }
-    @keyframes drawLine {
-      0% { stroke-dashoffset: 520; } 55% { stroke-dashoffset: 0; }
-      85% { stroke-dashoffset: 0; opacity: 1; } 100% { stroke-dashoffset: 0; opacity: 0; }
-    }
-    @media (prefers-reduced-motion: reduce) { .lottie-fallback path.line { animation: none; stroke-dashoffset: 0; } }
-    @media (max-width: 600px) { .hero-lottie { display: none; } }
+      background: radial-gradient(120% 90% at 18% 0%, rgba(139,92,246,.18), transparent 60%), var(--card); }
     .bento .tile-shot { grid-column: 1 / -1; padding: 0; border: none; background: none; }
     .bento .stat-tile { display: flex; flex-direction: column; }
     .bento .stat-tile .stat-top { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
@@ -530,17 +510,6 @@
   <div class="container">
     <div class="bento">
       <div class="tile tile-hero">
-        <div class="hero-lottie" id="hero-lottie" aria-hidden="true">
-          <!-- Fallback SVG (animated via CSS); replaced by the Lottie player when available -->
-          <svg class="lottie-fallback" viewBox="0 0 200 200" fill="none" preserveAspectRatio="xMidYMid meet">
-            <rect x="20" y="120" width="22" height="60" rx="3" fill="rgba(59,130,246,.35)"/>
-            <rect x="52" y="96" width="22" height="84" rx="3" fill="rgba(59,130,246,.45)"/>
-            <rect x="84" y="110" width="22" height="70" rx="3" fill="rgba(139,92,246,.4)"/>
-            <rect x="116" y="74" width="22" height="106" rx="3" fill="rgba(139,92,246,.5)"/>
-            <path class="line" d="M20 130 L60 100 L100 112 L140 70 L182 40" stroke="#60A5FA" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-            <circle cx="182" cy="40" r="5" fill="#8B5CF6"/>
-          </svg>
-        </div>
         <div class="hero-eyebrow">
           <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><circle cx="5" cy="5" r="5"/></svg>
           Live · 24/7 · No coding required
@@ -1074,26 +1043,6 @@
       });
     }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
     els.forEach(el => io.observe(el));
-  })();
-
-  // ── Hero Lottie ───────────────────────────────────────────────────────────
-  // Upgrade the fallback SVG to a Lottie animation only if the player loaded
-  // from CDN and the user hasn't asked for reduced motion. Otherwise the
-  // CSS-animated SVG fallback stays in place — so the hero is never blank.
-  (() => {
-    const host = document.getElementById('hero-lottie');
-    if (!host) return;
-    const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (reduce) return;
-    if (!customElements || !customElements.get('lottie-player')) return; // CDN didn't load → keep SVG
-    const player = document.createElement('lottie-player');
-    player.setAttribute('src', '/static/img/stocks-hero.json');
-    player.setAttribute('background', 'transparent');
-    player.setAttribute('speed', '1');
-    player.setAttribute('loop', '');
-    player.setAttribute('autoplay', '');
-    host.innerHTML = '';
-    host.appendChild(player);
   })();
 </script>
 </body>
