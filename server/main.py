@@ -1517,13 +1517,36 @@ app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 @app.get("/")
 def index(request: Request):
-    # redirect to setup if not configured
-    if not auth.setup_complete():
-        return RedirectResponse("/setup")
-    # redirect to login if password set and not authenticated
-    if auth.password_is_set() and not auth.validate_session(_get_token(request)):
-        return RedirectResponse("/login")
+    # If the landing page exists and the visitor is not authenticated,
+    # show the public sales page instead of the login screen.
+    landing = STATIC_DIR / "landing.html"
+    if landing.exists():
+        if not auth.setup_complete():
+            return RedirectResponse("/setup")
+        if auth.password_is_set() and not auth.validate_session(_get_token(request)):
+            return FileResponse(str(landing))
+    else:
+        if not auth.setup_complete():
+            return RedirectResponse("/setup")
+        if auth.password_is_set() and not auth.validate_session(_get_token(request)):
+            return RedirectResponse("/login")
     return FileResponse(str(STATIC_DIR / "index.html"))
+
+
+@app.get("/landing")
+def landing_page():
+    """Public sales/landing page — always accessible."""
+    landing = STATIC_DIR / "landing.html"
+    if not landing.exists():
+        raise HTTPException(404, "Landing page not found")
+    return FileResponse(str(landing))
+
+
+@app.get("/api/buy-url")
+def buy_url():
+    """Return the Lemon Squeezy buy URL for the landing page."""
+    url = os.environ.get("LEMON_SQUEEZY_BUY_URL", "")
+    return {"url": url}
 
 
 # ── Backtesting ───────────────────────────────────────────────────────────────
