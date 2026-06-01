@@ -325,17 +325,27 @@ def logout(request: Request, response: Response):
 def setup_complete(body: SetupCompleteIn):
     if auth.setup_complete():
         raise HTTPException(409, "Setup already completed")
-    # 1. Ensure DB_SECRET_KEY exists in .env (generate once; preserve everything else)
+    # 1. Ensure DB_SECRET_KEY exists in .env.
+    # CRITICAL: this key encrypts every stored broker credential. If it is ever
+    # regenerated, all saved credentials become permanently undecryptable and read
+    # as "invalid". So we ONLY ever generate-and-write a key when none exists yet,
+    # and when one already exists we leave .env completely untouched — no rewrite,
+    # no re-ordering — to eliminate any path that could clobber it.
     env_path = BASE_DIR / ".env"
     existing_secret = os.environ.get("DB_SECRET_KEY") or _read_env_key("DB_SECRET_KEY")
-    db_secret = existing_secret or crypto.generate_key()
-    try:
-        lines = [l for l in env_path.read_text().splitlines() if not l.startswith("DB_SECRET_KEY=")]
-    except FileNotFoundError:
-        lines = []
-    lines.append(f"DB_SECRET_KEY={db_secret}")
-    env_path.write_text("\n".join(lines) + "\n")
-    os.environ["DB_SECRET_KEY"] = db_secret
+    if existing_secret:
+        # Key already present — never touch .env. Just make sure it's loaded.
+        os.environ["DB_SECRET_KEY"] = existing_secret
+    else:
+        # First run only: generate a key and append it, preserving every other line.
+        db_secret = crypto.generate_key()
+        try:
+            lines = env_path.read_text().splitlines()
+        except FileNotFoundError:
+            lines = []
+        lines.append(f"DB_SECRET_KEY={db_secret}")
+        env_path.write_text("\n".join(lines) + "\n")
+        os.environ["DB_SECRET_KEY"] = db_secret
     crypto.init_crypto()  # re-initialise with the (possibly new) key
 
     # 2. Risk settings

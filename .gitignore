@@ -6,6 +6,8 @@ trading.db
 
 # Environment / secrets
 .env
+.env.*
+!.env.example
 
 # Python bytecode
 __pycache__/
@@ -26,6 +28,7 @@ Thumbs.db
 
 # Claude Code local settings (may contain API keys from permission allowlists)
 .claude/settings.local.json
+.mcp.json
 
 # Internal dev / seller-only files
 docs/superpowers/
