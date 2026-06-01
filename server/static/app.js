@@ -4756,6 +4756,10 @@ async function initApiKeys() {
     });
     setTypeSelector('add-type-selector', 'add-account-type', 'paper', 'add');
     document.getElementById('add-error').classList.add('hidden');
+    // Reset the confirm button — it's left in the "Adding…"/disabled state after a
+    // successful add (the modal closes before it's reset), so clear it on every open.
+    const addConfBtn = document.querySelector('#modal-add-account [data-action="confirm"]');
+    if (addConfBtn) { addConfBtn.disabled = false; addConfBtn.textContent = 'Add Account'; }
     buildBrokerPicker();
     openModal(document.getElementById('modal-add-account'), async () => {
       const label       = document.getElementById('add-label').value.trim();
