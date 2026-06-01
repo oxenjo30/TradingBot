@@ -110,9 +110,15 @@ def process_webhook(body: bytes, signature: str) -> dict:
     from server.license import mint_key
     from server.notifications import send_email_direct
 
-    signing_secret = os.environ.get("LEMON_SQUEEZY_SIGNING_SECRET", "")
+    # Signing secret is managed in Settings (License Management) and stored
+    # encrypted in app_config. The LEMON_SQUEEZY_SIGNING_SECRET env var is no
+    # longer consulted.
+    signing_secret = db.get_app_config_secure("lemon_signing_secret", "")
     if not signing_secret:
-        raise RuntimeError("LEMON_SQUEEZY_SIGNING_SECRET is not set in .env")
+        raise RuntimeError(
+            "Lemon Squeezy signing secret is not set. "
+            "Add it in Settings → License Management."
+        )
 
     verify_signature(body, signature, signing_secret)
 
@@ -147,7 +153,7 @@ def process_webhook(body: bytes, signature: str) -> dict:
         smtp_host = db.get_app_config("email_smtp", "")
         smtp_port = int(db.get_app_config("email_port", "587"))
         smtp_user = db.get_app_config("email_user", "")
-        smtp_pass = db.get_app_config("email_pass", "")
+        smtp_pass = db.get_app_config_secure("email_pass", "")
         if smtp_host and smtp_user and smtp_pass:
             send_email_direct(
                 buyer_email, smtp_host, smtp_port, smtp_user, smtp_pass,
