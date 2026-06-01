@@ -1,4 +1,11 @@
 # tests/test_license.py
+#
+# These tests exercise the *ambient keypair* path: keys minted by the shared
+# conftest keypair (env-injected) and verified through the default verify path —
+# i.e. the integration path the running app uses. test_license_asymmetric.py
+# complements this by testing keypair *isolation* (per-test monkeypatched keys,
+# wrong-key rejection, missing-key handling). Keep both: they cover different
+# concerns despite the overlapping scenario names.
 import pytest
 from server.license import get_machine_id, verify_key, LicenseError
 from tests.conftest import mint_test_key

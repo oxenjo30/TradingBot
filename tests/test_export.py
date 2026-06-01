@@ -1,6 +1,3 @@
-import os
-
-
 def test_export_trades_returns_csv(client):
     r = client.get("/api/export/trades")
     assert r.status_code == 200
