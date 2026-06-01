@@ -107,7 +107,7 @@ def process_webhook(body: bytes, signature: str) -> dict:
     """
     import json
     from server import db
-    from server.license import mint_key, _get_seller_secret
+    from server.license import mint_key
     from server.notifications import send_email_direct
 
     signing_secret = os.environ.get("LEMON_SQUEEZY_SIGNING_SECRET", "")
@@ -134,7 +134,7 @@ def process_webhook(body: bytes, signature: str) -> dict:
 
     # Generate license key
     days = int(os.environ.get("LICENSE_DURATION_DAYS", "36500"))
-    license_key = mint_key(_get_seller_secret(), machine_id="ANY", days=days)
+    license_key = mint_key(machine_id="ANY", days=days)
 
     # Store in DB
     db.add_issued_license(order_id, buyer_email, license_key)
