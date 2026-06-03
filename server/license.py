@@ -108,8 +108,46 @@ def verify_key(key: str, machine_id: str | None = None) -> dict:
     return {"valid": True, "days_remaining": days_remaining, "machine_id": payload["m"]}
 
 
+def _fingerprint(key: str) -> str:
+    """Stable fingerprint of a license key (so we can recognise an already-accepted key)."""
+    return hashlib.sha256(key.encode()).hexdigest()
+
+
+def _is_config_error(exc: Exception) -> bool:
+    """True for TRANSIENT verifier-configuration problems (public key missing/unloadable
+    or an unexpected RuntimeError) — as opposed to genuine invalidity (expired / tampered
+    signature / wrong machine), which must always fail.
+    """
+    if isinstance(exc, RuntimeError):
+        return True
+    msg = str(exc).lower()
+    return "verifier not configured" in msg
+
+
+def activate_license(key: str) -> dict:
+    """Verify a key, store it, and durably record that it was accepted.
+
+    Once accepted, the key's fingerprint is saved so future requests are never
+    locked out by a transient verifier-config hiccup (see check_stored_license).
+    Raises LicenseError if the key is invalid/expired/tampered/wrong-machine.
+    """
+    result = verify_key(key)  # raises on genuine invalidity
+    from .db import set_license_key, set_app_config
+    set_license_key(key)
+    set_app_config("license_activated_fp", _fingerprint(key))
+    invalidate_cache()
+    result["reason"] = ""
+    return result
+
+
 def check_stored_license() -> dict:
-    """Verify the stored license key. Result is cached for 1 hour to avoid per-request overhead."""
+    """Verify the stored license key. Result is cached for 1 hour to avoid per-request overhead.
+
+    Durability: a key that was previously ACCEPTED (its fingerprint is recorded by
+    activate_license) is NOT rejected over a transient verifier-configuration error —
+    the user must never be re-asked for a key they already validated. Genuine
+    invalidity (expired / tampered / wrong machine) still fails.
+    """
     global _cache
     now = time.time()
 
@@ -127,10 +165,21 @@ def check_stored_license() -> dict:
     try:
         result = verify_key(key)
         result["reason"] = ""
-        # Cache valid result for 1 hour
+        # First successful verification durably marks this key as accepted.
+        if get_app_config("license_activated_fp", "") != _fingerprint(key):
+            from .db import set_app_config
+            set_app_config("license_activated_fp", _fingerprint(key))
         _cache = {**result, "expires_at": now + _CACHE_TTL}
         return result
     except (LicenseError, RuntimeError) as e:
+        # Grace path: if this exact key was already accepted AND the failure is a
+        # transient verifier-config problem (not real expiry/tamper), keep the user
+        # in — they validated this key before; a config hiccup must not lock them out.
+        if _is_config_error(e) and get_app_config("license_activated_fp", "") == _fingerprint(key):
+            result = {"valid": True, "days_remaining": 0, "reason": "",
+                      "grace": True, "machine_id": MACHINE_ANY}
+            _cache = {**result, "expires_at": now + _CACHE_TTL}
+            return result
         _cache = {}
         return {"valid": False, "reason": str(e), "days_remaining": 0}
 

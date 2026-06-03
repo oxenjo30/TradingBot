@@ -446,14 +446,13 @@ def license_activate(body: LicenseActivate, request: Request):
     if auth.setup_complete():
         if not auth.password_is_set() or not auth.validate_session(_get_token(request)):
             raise HTTPException(401, "Unauthorized")
-    from .license import verify_key, LicenseError, invalidate_cache
-    from .db import set_license_key
+    from .license import activate_license, LicenseError
     try:
-        result = verify_key(body.key)
+        # Verifies, stores the key, AND durably records it as accepted so the user
+        # is never re-asked for it (survives restarts + transient verifier hiccups).
+        result = activate_license(body.key)
     except LicenseError as e:
         raise HTTPException(422, str(e))
-    set_license_key(body.key)
-    invalidate_cache()
     result.pop("machine_id", None)
     return result
 
