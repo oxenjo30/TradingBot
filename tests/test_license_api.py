@@ -56,22 +56,6 @@ def test_license_status_without_key_returns_invalid(tmp_path, monkeypatch):
     assert r.status_code == 200
     assert r.json()["valid"] is False
 
-
-def test_delete_license_deactivates(tmp_path, monkeypatch):
-    """DELETE /api/license clears the stored key."""
-    import server.db as db_mod
-    monkeypatch.setenv("TRADEBOT_DB", str(tmp_path / "deact.db"))
-    db_mod.init_db()
-    import server.auth as auth_mod
-    monkeypatch.setattr(auth_mod, "password_is_set", lambda: False)
-    monkeypatch.setattr(auth_mod, "setup_complete", lambda: False)
-    db_mod.set_license_key(mint_test_key(machine_id="ANY", days=30))
-    from fastapi.testclient import TestClient
-    from server.main import app as _app
-    c = TestClient(_app)
-    # Deactivation now requires an explicit confirmation so a stray DELETE can't
-    # silently lock the user out.
-    r = c.request("DELETE", "/api/license", json={"confirm": True})
-    assert r.status_code == 200
-    assert r.json() == {"ok": True}
-    assert db_mod.get_license_key() == ""
+# NOTE: the license-deactivation endpoint (DELETE /api/license) was removed
+# entirely — it was the only path that could clear the stored key and repeatedly
+# locked the owner out. See tests/test_license_deactivate_guard.py.

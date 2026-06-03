@@ -456,23 +456,11 @@ def license_activate(body: LicenseActivate, request: Request):
     result.pop("machine_id", None)
     return result
 
-@app.delete("/api/license")
-async def license_deactivate(request: Request):
-    _require_auth(request)
-    # Clearing the license locks the user out, so it must be an explicit, deliberate
-    # action � never a stray/accidental DELETE. Require {"confirm": true} in the body.
-    try:
-        body = await request.json()
-    except Exception:
-        body = {}
-    if not (isinstance(body, dict) and body.get("confirm") is True):
-        raise HTTPException(400, "Deactivation must be confirmed: send {\"confirm\": true}.")
-    from .license import invalidate_cache
-    from .db import set_license_key
-    set_license_key("")
-    invalidate_cache()
-    db.log_audit("license", "license deactivated", "owner confirmed deactivation")
-    return {"ok": True}
+# NOTE: There is intentionally NO license-deactivation endpoint. Clearing the
+# stored license_key locks the owner out, and a deactivate route (even a guarded
+# one) was the single path that repeatedly wiped the key. It has been removed
+# entirely - the license cannot be cleared through the app. To rotate a key,
+# activate a new one via POST /api/license/activate (which overwrites in place).
 
 
 # ── Lemon Squeezy webhook + admin ─────────────────────────────────────────────

@@ -4823,29 +4823,17 @@ async function initApiKeys() {
 // initSettings — settings.html
 // ─────────────────────────────────────────
 async function initSettings() {
-  // License status
+  // License status (display only). There is intentionally NO deactivate action —
+  // the license can never be cleared through the UI, so it can't be wiped by accident.
   try {
     const lic = await fetch('/api/license/status').then(r => r.json());
     const statusEl = document.getElementById('lic-status');
     const daysEl   = document.getElementById('lic-days');
-    const deactBtn = document.getElementById('lic-deactivate-btn');
     if (statusEl) {
       statusEl.textContent = lic.valid ? 'Active' : 'Inactive';
       statusEl.style.color = lic.valid ? 'var(--green)' : 'var(--red)';
     }
     if (daysEl) daysEl.textContent = lic.valid ? lic.days_remaining + ' days' : '—';
-    if (deactBtn && lic.valid) {
-      deactBtn.style.display = 'block';
-      deactBtn.onclick = async () => {
-        if (!confirm('Deactivate license? The dashboard will become inaccessible.')) return;
-        await fetch('/api/license', {
-          method: 'DELETE',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ confirm: true }),
-        });
-        location.href = '/static/license.html';
-      };
-    }
   } catch {}
 
   // ── Owner-only tooling ──
