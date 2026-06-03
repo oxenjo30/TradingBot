@@ -442,13 +442,16 @@ def set_license_key(key: str) -> None:
     # significant, so when it happens we capture WHO did it (full stack trace) and
     # leave a durable audit row. This turns an invisible clobber into evidence.
     if not key or not key.strip():
-        import logging
+        import logging, traceback
+        stack = "".join(traceback.format_stack()[:-1])  # exclude this frame
         logging.getLogger("license").warning(
-            "license_key cleared (set to empty) - recording caller stack trace",
-            stack_info=True,
+            "license_key cleared (set to empty). Caller stack:
+%s", stack,
         )
         try:
-            log_audit("license", "license key cleared", "set_license_key called with empty value")
+            # Record the FULL stack into the audit detail so the caller is captured
+            # in the DB regardless of where process stdout/stderr goes.
+            log_audit("license", "license key cleared", stack[-1500:])
         except Exception:
             pass
     set_app_config("license_key", key)

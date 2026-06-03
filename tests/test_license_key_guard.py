@@ -30,16 +30,19 @@ def test_set_license_key_empty_logs_stacktrace_and_audits(tmp_path, monkeypatch,
     assert db.get_license_key() == ""  # deactivate still works
 
     warned = [r for r in caplog.records if "license_key cleared" in r.message.lower()]
-    assert warned, "clearing license_key must emit a WARNING with a stack trace"
-    # The warning must carry stack info so we can see WHO cleared it.
-    assert any(r.stack_info or r.exc_info for r in warned), (
-        "the clear-warning must include stack info to identify the caller"
+    assert warned, "clearing license_key must emit a WARNING with the caller stack"
+    # The warning message must contain the actual call stack (the caller frame),
+    # so we can see WHO cleared it.
+    assert any("set_license_key" in (r.getMessage()) for r in warned), (
+        "the clear-warning must include the caller stack so we can identify it"
     )
 
-    # And an audit row must exist so the user has a durable, timestamped record.
+    # And an audit row must exist with the full stack trace in its detail, so the
+    # caller is captured durably in the DB regardless of where stdout goes.
     audits = db.list_audit(limit=10)
-    assert any("clear" in a.get("action", "").lower()
-               and "license" in (a.get("category", "") + a.get("action", "")).lower()
-               for a in audits), (
-        "clearing license_key must be recorded in the audit log"
+    clear_rows = [a for a in audits if "clear" in a.get("action", "").lower()
+                  and "license" in (a.get("category", "") + a.get("action", "")).lower()]
+    assert clear_rows, "clearing license_key must be recorded in the audit log"
+    assert any("set_license_key" in a.get("detail", "") for a in clear_rows), (
+        "the audit detail must contain the stack trace identifying the caller"
     )
