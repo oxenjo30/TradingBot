@@ -437,6 +437,20 @@ def get_license_key() -> str:
 
 
 def set_license_key(key: str) -> None:
+    # Instrumentation: the stored license_key has been mysteriously emptied more
+    # than once, forcing the user to re-enter it. Clearing it is rare and always
+    # significant, so when it happens we capture WHO did it (full stack trace) and
+    # leave a durable audit row. This turns an invisible clobber into evidence.
+    if not key or not key.strip():
+        import logging
+        logging.getLogger("license").warning(
+            "license_key cleared (set to empty) - recording caller stack trace",
+            stack_info=True,
+        )
+        try:
+            log_audit("license", "license key cleared", "set_license_key called with empty value")
+        except Exception:
+            pass
     set_app_config("license_key", key)
 
 
