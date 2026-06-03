@@ -69,7 +69,9 @@ def test_delete_license_deactivates(tmp_path, monkeypatch):
     from fastapi.testclient import TestClient
     from server.main import app as _app
     c = TestClient(_app)
-    r = c.delete("/api/license")
+    # Deactivation now requires an explicit confirmation so a stray DELETE can't
+    # silently lock the user out.
+    r = c.request("DELETE", "/api/license", json={"confirm": True})
     assert r.status_code == 200
     assert r.json() == {"ok": True}
     assert db_mod.get_license_key() == ""

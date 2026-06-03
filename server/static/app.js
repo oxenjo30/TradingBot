@@ -4838,7 +4838,11 @@ async function initSettings() {
       deactBtn.style.display = 'block';
       deactBtn.onclick = async () => {
         if (!confirm('Deactivate license? The dashboard will become inaccessible.')) return;
-        await fetch('/api/license', { method: 'DELETE' });
+        await fetch('/api/license', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ confirm: true }),
+        });
         location.href = '/static/license.html';
       };
     }
