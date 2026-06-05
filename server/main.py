@@ -1,6 +1,5 @@
 import asyncio
 import csv
-import httpx
 import io
 import logging
 import os
@@ -18,7 +17,7 @@ from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from . import ai_explainer, ai_tuner, alpaca_client, auth, backtest as bt_mod, crypto, db, engine, notifications, risk, scanner, sentiment, strategies, version
+from . import ai_explainer, ai_tuner, alpaca_client, auth, backtest as bt_mod, crypto, db, engine, notifications, risk, scanner, sentiment, strategies, updater, version
 from .config import STATIC_DIR, BASE_DIR
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
@@ -391,36 +390,47 @@ def app_info(request: Request):
 
 # ── Update check ──────────────────────────────────────────────────────────────
 
-_GITHUB_RELEASES_URL = "https://api.github.com/repos/oxenjo30/TradingBot/releases/latest"
-
-
 @app.get("/api/update/check")
 def check_for_update(request: Request):
+    """Detect whether origin/master is ahead of the local checkout.
+
+    Branch-tracking, not release-tags: every commit pushed to master is
+    immediately detectable. Available to any logged-in user (detect only).
+    """
     _require_auth(request)
-    try:
-        resp = httpx.get(
-            _GITHUB_RELEASES_URL,
-            headers={"User-Agent": "TradeBot-UpdateCheck/1.0"},
-            timeout=10.0,
-        )
-        if resp.status_code != 200:
-            raise HTTPException(502, "Unable to reach GitHub")
-        data = resp.json()
-    except httpx.RequestError:
-        raise HTTPException(502, "Unable to reach GitHub")
-    installed = version.INSTALLED_VERSION
-    latest = data.get("tag_name", installed)
-    notes = (data.get("body") or "")[:1000]
-    release_url = data.get("html_url", "")
-    if not isinstance(release_url, str) or not release_url.startswith("https://github.com/"):
-        release_url = _GITHUB_RELEASES_URL
+    info = updater.check()
+    installed_label = version.INSTALLED_VERSION
+    # `installed`/`latest`/`release_notes` keep the legacy UI shape working;
+    # the new keys (behind_count, incoming, is_git, *_commit) drive the new UI.
+    latest_label = installed_label if info["up_to_date"] else f"{info['behind_count']} new commit(s)"
     return {
-        "installed": installed,
-        "latest": latest,
-        "up_to_date": installed == latest,
-        "release_notes": notes,
-        "release_url": release_url,
+        "installed": installed_label,
+        "latest": latest_label,
+        "up_to_date": info["up_to_date"],
+        "release_notes": "\n".join(info["incoming"]),
+        "is_git": info["is_git"],
+        "behind_count": info["behind_count"],
+        "installed_commit": info["installed_commit"],
+        "latest_commit": info["latest_commit"],
+        "incoming": info["incoming"],
     }
+
+
+@app.post("/api/update/apply")
+def apply_update(request: Request):
+    """Owner-only: safe git pull + dep install, then self-restart.
+
+    Returns before the process exits so the browser receives the step results;
+    on full success the service restarts (systemd respawns) into the new code.
+    """
+    _require_owner(request)
+    result = updater.apply_update()
+    if not result["ok"]:
+        # Surface the failing step so the dashboard can show why.
+        failed = next((s for s in result["steps"] if not s["ok"]), None)
+        detail = failed["detail"] if failed else "update failed"
+        raise HTTPException(409, detail)
+    return result
 
 
 # ── License ───────────────────────────────────────────────────────────────────

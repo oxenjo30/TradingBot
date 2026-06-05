@@ -5648,6 +5648,15 @@ function initUpdateCard() {
     <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
     <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
   </svg>`;
+  const downloadIcon = `<svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+  </svg>`;
+
+  // Only the owner's instance can apply updates (TRADEBOT_OWNER_MODE). The
+  // 'Update Now' button is hidden for everyone else; the apply endpoint also
+  // enforces this server-side (403).
+  let isOwner = false;
+  let lastData = null;
 
   function setState(state, data) {
     actionsEl.innerHTML = '';
@@ -5655,7 +5664,7 @@ function initUpdateCard() {
     errorEl.style.display = 'none';
 
     if (state === 'default') {
-      metaEl.textContent = 'Check GitHub for the latest TradeBot release';
+      metaEl.textContent = 'Check for the latest version of TradeBot';
       const btn = document.createElement('button');
       btn.className = 'btn btn-primary';
       btn.innerHTML = refreshIcon + ' Check for Updates';
@@ -5664,7 +5673,7 @@ function initUpdateCard() {
     }
 
     else if (state === 'checking') {
-      metaEl.textContent = 'Contacting GitHub…';
+      metaEl.textContent = 'Checking for updates…';
       const badge = document.createElement('span');
       badge.className = 'badge b-enabled';
       badge.style.cssText = 'background:rgba(59,130,246,.12);color:var(--blue);border:1px solid rgba(59,130,246,.2);';
@@ -5691,26 +5700,44 @@ function initUpdateCard() {
       const _latestStrong = document.createElement('strong');
       _latestStrong.style.color = 'var(--orange)';
       _latestStrong.textContent = data.latest;
-      metaEl.append('Latest: ', _latestStrong, ' is available');
+      metaEl.append('Update available: ', _latestStrong);
       const badge = document.createElement('span');
       badge.className = 'badge b-notrun';
       badge.innerHTML = `<span style="width:7px;height:7px;border-radius:50%;background:var(--orange);box-shadow:0 0 6px rgba(245,158,11,.5);flex-shrink:0;display:inline-block;"></span> Update available`;
       actionsEl.appendChild(badge);
+      // Owner-only: one-click apply. Hidden for buyers; also enforced server-side.
+      if (isOwner && data.is_git) {
+        const apply = document.createElement('button');
+        apply.className = 'btn btn-primary';
+        apply.innerHTML = downloadIcon + ' Update Now';
+        apply.onclick = doApply;
+        actionsEl.appendChild(apply);
+      }
       const btn = document.createElement('button');
       btn.className = 'btn btn-ghost';
       btn.innerHTML = refreshIcon + ' Check Again';
       btn.onclick = doCheck;
       actionsEl.appendChild(btn);
-      // Release notes box
-      releaseTitle.textContent = `What's new in ${data.latest}`;
+      // "What's new" box — incoming commit subjects
+      releaseTitle.textContent = "What's new";
       releaseNotes.textContent = data.release_notes;
-      releaseLink.href = data.release_url;
+      releaseLink.href = 'https://github.com/oxenjo30/TradingBot/commits/master';
       releaseBox.style.display = data.release_notes ? '' : 'none';
     }
 
+    else if (state === 'updating') {
+      metaEl.textContent = 'Updating — the bot will restart automatically…';
+      const badge = document.createElement('span');
+      badge.className = 'badge b-enabled';
+      badge.style.cssText = 'background:rgba(59,130,246,.12);color:var(--blue);border:1px solid rgba(59,130,246,.2);';
+      badge.innerHTML = `<svg style="animation:spin 1s linear infinite" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+        <path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg> Updating…`;
+      actionsEl.appendChild(badge);
+    }
+
     else if (state === 'error') {
-      metaEl.textContent = 'Check GitHub for the latest TradeBot release';
-      errorEl.textContent = 'Unable to reach GitHub. Try again later.';
+      metaEl.textContent = 'Check for the latest version of TradeBot';
+      errorEl.textContent = (data && data.message) || 'Unable to check for updates. Try again later.';
       errorEl.style.display = '';
       const btn = document.createElement('button');
       btn.className = 'btn btn-primary';
@@ -5724,6 +5751,7 @@ function initUpdateCard() {
     setState('checking');
     try {
       const data = await api('/api/update/check', { key: 'update-check' });
+      lastData = data;
       if (installedEl) installedEl.textContent = data.installed;
       setState(data.up_to_date ? 'up-to-date' : 'update-available', data);
     } catch (e) {
@@ -5731,10 +5759,58 @@ function initUpdateCard() {
     }
   }
 
-  // Render default state immediately; populate installed version on first successful check
+  async function doApply() {
+    if (!confirm('This will update TradeBot and restart the bot. Live trading will pause for about 10 seconds while the service restarts. Continue?')) {
+      return;
+    }
+    setState('updating');
+    try {
+      // The server responds with the step results, then exits ~1s later so
+      // systemd respawns it on the new code.
+      await api('/api/update/apply', { method: 'POST', key: 'update-apply' });
+    } catch (e) {
+      // A failure here means a pre-restart step failed (e.g. merge conflict);
+      // the server did NOT restart. Surface it and let the user retry.
+      setState('error', { message: e.message || 'Update failed.' });
+      return;
+    }
+    // Update accepted — the server is now restarting. Poll /check until it's
+    // back up and reports up-to-date, then show success.
+    pollUntilBack(0);
+  }
+
+  function pollUntilBack(attempt) {
+    // ~10s restart (systemd RestartSec) + headroom; poll every 3s up to ~60s.
+    if (attempt > 20) {
+      setState('error', { message: 'Restarted, but could not confirm the new version. Reload the page to check.' });
+      return;
+    }
+    setState('updating');
+    setTimeout(async () => {
+      try {
+        const data = await api('/api/update/check', { key: 'update-poll' });
+        lastData = data;
+        if (installedEl) installedEl.textContent = data.installed;
+        if (data.up_to_date) {
+          setState('up-to-date', data);   // back online, on the new code
+        } else {
+          pollUntilBack(attempt + 1);
+        }
+      } catch (_) {
+        // Server still down mid-restart — keep waiting.
+        pollUntilBack(attempt + 1);
+      }
+    }, 3000);
+  }
+
+  // Render default state immediately; populate installed version on load.
   setState('default');
-  // Pre-populate installed version label by fetching the check once silently on load
+  // Learn owner status (controls whether 'Update Now' is offered) in parallel
+  // with the silent initial check.
+  api('/api/app-info', { key: 'update-ownerinfo' })
+    .then(info => { isOwner = !!(info && info.owner_mode); })
+    .catch(() => {});
   api('/api/update/check', { key: 'update-check-prefetch' })
-    .then(data => { if (installedEl) installedEl.textContent = data.installed; })
+    .then(data => { lastData = data; if (installedEl) installedEl.textContent = data.installed; })
     .catch(() => {});
 }
