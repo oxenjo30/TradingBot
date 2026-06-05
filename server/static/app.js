@@ -4930,6 +4930,16 @@ async function initSettings() {
   notifyBlock.addEventListener('change', saveNotifications);
   notifyDaily.addEventListener('change', saveNotifications);
 
+  // Persist the text/credential fields on blur (there is no explicit Save button).
+  // Without this, typing a new SMTP host/user/pass never reaches the server.
+  [
+    'email-to', 'email-smtp', 'email-port', 'email-user', 'email-pass',
+    'telegram-token', 'telegram-chat-id', 'slack-webhook-url', 'discord-webhook-url',
+  ].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('blur', () => { saveNotifications(); showMsg(saveMsg, 'Saved', 'ok'); });
+  });
+
   // ── load current settings ──
   try {
     const data = await api('/api/notifications');
