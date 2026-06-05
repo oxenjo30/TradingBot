@@ -125,6 +125,29 @@ def _venv_pip() -> list[str]:
     return [sys.executable, "-m", "pip"]
 
 
+def _rebuild_customer_zip() -> dict:
+    """Rebuild the customer download zip from the freshly-pulled code.
+
+    Keeps buyers' download in lock-step with the deployed code. Non-fatal: a build
+    failure is reported but never blocks the update — the previous zip stays in
+    place so downloads keep working. The build script lives in the repo and writes
+    to <repo>/dist (which is TRADEBOT_ZIP_PATH's directory on the VPS).
+    """
+    builder = BASE_DIR / "scripts" / "build_customer_zip.py"
+    if not builder.exists():
+        return {"name": "build_zip", "ok": True, "detail": "no build script — skipped"}
+    try:
+        proc = subprocess.run(
+            [sys.executable, str(builder)],
+            capture_output=True, text=True, timeout=_GIT_TIMEOUT * 4,
+        )
+        ok = proc.returncode == 0
+        return {"name": "build_zip", "ok": ok,
+                "detail": (proc.stdout or proc.stderr)[-1500:]}
+    except Exception as e:  # noqa: BLE001 — never let a build quirk abort the update
+        return {"name": "build_zip", "ok": False, "detail": f"build failed: {e}"}
+
+
 def apply_update() -> dict:
     """Safe pull + optional dep install. On full success, schedule self-exit.
 
@@ -188,7 +211,10 @@ def apply_update() -> dict:
     else:
         steps.append({"name": "deps", "ok": True, "detail": "already up to date"})
 
-    # 5. Schedule self-exit; systemd Restart=always respawns on the new code.
+    # 5. Rebuild the customer download zip so buyers get the new code (non-fatal).
+    steps.append(_rebuild_customer_zip())
+
+    # 6. Schedule self-exit; systemd Restart=always respawns on the new code.
     steps.append({"name": "restart", "ok": True,
                   "detail": "restarting service to load new version"})
     schedule_restart()
