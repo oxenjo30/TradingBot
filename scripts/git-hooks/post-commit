@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+# Auto-bump server/version.py based on the just-made commit's message (semver),
+# then fold the bump into that same commit via --amend.
+#
+#   major: / feat!: / BREAKING CHANGE  -> major   v1.0.0 -> v2.0.0
+#   feat:                              -> minor   v1.0.0 -> v1.1.0
+#   fix:/docs:/refactor:/...           -> patch   v1.0.0 -> v1.0.1
+#   temp:/chore:/wip:/...              -> none    (no bump)
+#
+# Why post-commit (not prepare-commit-msg): for `git commit -m`, git snapshots the
+# tree BEFORE message hooks run, so a late `git add` misses the commit. post-commit
+# runs after, has the final message (HEAD), and amends the bump in cleanly.
+# A guard env var prevents the amend from recursing into this hook forever.
+
+set -euo pipefail
+
+# Recursion guard: the amend below re-invokes post-commit; bail on the second pass.
+if [ "${TRADEBOT_VERSION_BUMP_RUNNING:-}" = "1" ]; then
+  exit 0
+fi
+
+ROOT="$(git rev-parse --show-toplevel)"
+BUMP="$ROOT/scripts/bump_version.py"
+VERSION_FILE="$ROOT/server/version.py"
+[ -f "$BUMP" ] || exit 0
+[ -f "$VERSION_FILE" ] || exit 0
+
+# Skip while a merge/rebase/cherry-pick is in progress — don't rewrite those commits.
+GD="$(git rev-parse --git-dir)"
+if [ -d "$GD/rebase-merge" ] || [ -d "$GD/rebase-apply" ] || \
+   [ -f "$GD/MERGE_HEAD" ] || [ -f "$GD/CHERRY_PICK_HEAD" ]; then
+  exit 0
+fi
+
+# The message of the commit we just made.
+MSG="$(git log -1 --pretty=%B 2>/dev/null || true)"
+[ -n "$MSG" ] || exit 0
+
+# Pick a python that actually runs (Windows "python3" is often a dead Store stub).
+PY=""
+for cand in python3 python py; do
+  p="$(command -v "$cand" 2>/dev/null || true)"
+  [ -n "$p" ] || continue
+  if "$p" -c "import sys" >/dev/null 2>&1; then PY="$p"; break; fi
+done
+[ -n "$PY" ] || exit 0
+
+OLD="$("$PY" "$BUMP" --show 2>/dev/null || true)"
+NEW="$("$PY" "$BUMP" --from-message "$MSG" 2>/dev/null || true)"
+
+# No bump (temp/chore/wip, or message produced no change) -> leave the commit alone.
+if [ -z "$NEW" ] || [ "$NEW" = "$OLD" ]; then
+  exit 0
+fi
+
+# Fold the bumped version.py into the just-made commit, keeping its message.
+git add "$VERSION_FILE"
+TRADEBOT_VERSION_BUMP_RUNNING=1 git commit --amend --no-edit --no-verify >/dev/null
+echo "[version] bumped $OLD -> $NEW (folded into this commit)" >&2
+
+exit 0
