@@ -4948,10 +4948,14 @@ async function initSettings() {
     emailSmtp.value       = data.email_smtp       || 'smtp.gmail.com';
     emailPort.value       = data.email_port       || 587;
     emailUser.value       = data.email_user       || '';
-    emailPass.value       = data.email_pass       || '';
+    // Secret: the server returns "********" if one is saved, "" if not. Never load
+    // the secret into the field value; show "saved" as a placeholder hint instead.
+    emailPass.value       = '';
+    emailPass.placeholder = data.email_pass ? 'Saved — leave blank to keep' : 'App password';
 
     tgEnabled.checked     = !!data.telegram_enabled;
-    tgToken.value         = data.telegram_token   || '';
+    tgToken.value         = '';
+    tgToken.placeholder   = data.telegram_token ? 'Saved — leave blank to keep' : 'Bot token';
     tgChatId.value        = data.telegram_chat_id || '';
 
     notifyTrade.checked   = !!data.notify_on_trade;
@@ -4962,13 +4966,13 @@ async function initSettings() {
     const slackEn  = document.getElementById('slack-enabled');
     const slackUrl = document.getElementById('slack-webhook-url');
     if (slackEn)  slackEn.checked  = !!data.slack_enabled;
-    if (slackUrl) slackUrl.value   = data.slack_webhook_url || '';
+    if (slackUrl) { slackUrl.value = ''; slackUrl.placeholder = data.slack_webhook_url ? 'Saved — leave blank to keep' : 'https://hooks.slack.com/...'; }
 
     // Discord
     const discordEn  = document.getElementById('discord-enabled');
     const discordUrl = document.getElementById('discord-webhook-url');
     if (discordEn)  discordEn.checked  = !!data.discord_enabled;
-    if (discordUrl) discordUrl.value   = data.discord_webhook_url || '';
+    if (discordUrl) { discordUrl.value = ''; discordUrl.placeholder = data.discord_webhook_url ? 'Saved — leave blank to keep' : 'https://discord.com/api/webhooks/...'; }
 
     syncEmailFields();
     syncTgFields();

@@ -605,6 +605,11 @@ _ENCRYPTED_CONFIG_KEYS = {
     "discord_webhook_url", "ai_claude_api_key", "lemon_signing_secret",
 }
 
+# Sentinel returned to the browser in place of a stored secret. When the UI sends
+# this value back unchanged on save, the server keeps the existing secret (does not
+# re-encrypt). A real new secret never equals this string.
+SECRET_PLACEHOLDER = "********"
+
 
 def _encrypt_config(value: str) -> str:
     """Encrypt a sensitive config value. Falls back to plaintext if crypto not initialised."""
@@ -666,10 +671,14 @@ def get_notification_settings() -> dict:
         ).fetchall()
     result = dict(defaults)
     result.update({r["key"]: r["value"] for r in rows})
-    # Decrypt sensitive fields
+    # Secrets must NOT leave the server in plaintext. Replace each stored secret with
+    # a masked sentinel: "" if unset, else SECRET_PLACEHOLDER. The real value is only
+    # used server-side (send_email_direct etc. read it via get_app_config_secure).
+    # This also kills the old decrypt→reload→re-encrypt round-trip that corrupted
+    # the email password.
     for k in _ENCRYPTED_CONFIG_KEYS:
         if k in result:
-            result[k] = _decrypt_config(result[k])
+            result[k] = SECRET_PLACEHOLDER if result[k] not in (None, "") else ""
     for bk in ["email_enabled", "telegram_enabled", "slack_enabled", "discord_enabled",
                 "notify_on_trade", "notify_on_block", "notify_daily_summary"]:
         result[bk] = result.get(bk, "") == "true"

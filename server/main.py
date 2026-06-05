@@ -1777,6 +1777,11 @@ def get_notifications(request: Request):
 def save_notifications(body: NotificationSettings, request: Request):
     _require_auth(request)
     for key, val in body.model_dump().items():
+        # For secret fields, the UI sends back the masked placeholder when unchanged
+        # (the real value never leaves the server). Skip those so we don't overwrite
+        # the stored secret with the mask or re-encrypt it.
+        if key in db._ENCRYPTED_CONFIG_KEYS and (val in (None, "", db.SECRET_PLACEHOLDER)):
+            continue
         plaintext = "true" if val is True else "false" if val is False else str(val)
         db.set_app_config_secure(key, plaintext)
     return db.get_notification_settings()
@@ -1795,12 +1800,18 @@ def test_notification(body: dict, request: Request):
                 "✅ <b>TradeBot</b> — Telegram notifications are working!"
             )
         else:
+            # If the password field is empty or the masked placeholder (user didn't
+            # re-type it), fall back to the saved password so Send Test works without
+            # re-entering the secret.
+            form_pass = (body.get("email_pass", "") or "").strip()
+            if not form_pass or form_pass == db.SECRET_PLACEHOLDER:
+                form_pass = db.get_app_config_secure("email_pass", "")
             notifications.send_email_direct(
                 to       = body.get("email_to", "").strip(),
                 smtp     = body.get("email_smtp", "smtp.gmail.com").strip(),
                 port     = int(body.get("email_port") or 587),
                 user     = body.get("email_user", "").strip(),
-                password = body.get("email_pass", "").strip(),
+                password = form_pass,
                 subject  = "Test Notification",
                 body     = "<p>Your TradeBot email notifications are working correctly!</p>"
             )
