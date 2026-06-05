@@ -5219,6 +5219,7 @@ async function initSettings() {
 
   loadAiSettings();
   initUpdateCard();
+  initChangePassword();
 }
 
 // ─────────────────────────────────────────
@@ -5861,4 +5862,60 @@ function initUpdateCard() {
   api('/api/update/check', { key: 'update-check-prefetch' })
     .then(data => { lastData = data; if (installedEl) installedEl.textContent = data.installed; })
     .catch(() => {});
+}
+
+// ─────────────────────────────────────────
+// initChangePassword — Change Password card on settings.html
+// ─────────────────────────────────────────
+function initChangePassword() {
+  const card = document.getElementById('change-password-card');
+  if (!card) return;
+
+  const currentEl = document.getElementById('cp-current');
+  const newEl     = document.getElementById('cp-new');
+  const confirmEl = document.getElementById('cp-confirm');
+  const saveBtn   = document.getElementById('cp-save');
+  const msgEl     = document.getElementById('cp-msg');
+
+  function showMsg(text, ok) {
+    msgEl.textContent = text;
+    msgEl.classList.remove('hidden', 'ok', 'err');
+    msgEl.classList.add(ok ? 'ok' : 'err');
+  }
+
+  async function submit() {
+    const current = currentEl.value;
+    const next    = newEl.value;
+    const confirm = confirmEl.value;
+
+    // Client-side validation (server enforces the same rules).
+    if (!current) { showMsg('Enter your current password.', false); return; }
+    if (next.length < 8) { showMsg('New password must be at least 8 characters.', false); return; }
+    if (next !== confirm) { showMsg('New passwords do not match.', false); return; }
+    if (next === current) { showMsg('New password must be different from the current one.', false); return; }
+
+    saveBtn.disabled = true;
+    const origLabel = saveBtn.textContent;
+    saveBtn.textContent = 'Saving…';
+    try {
+      // The shared api() wrapper does not set Content-Type — send it explicitly.
+      await api('/api/account/password', {
+        method: 'POST',
+        key: 'change-password',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ current_password: current, new_password: next }),
+      });
+      currentEl.value = ''; newEl.value = ''; confirmEl.value = '';
+      showMsg('Password changed.', true);
+    } catch (e) {
+      showMsg(e.message || 'Could not change password.', false);
+    } finally {
+      saveBtn.disabled = false;
+      saveBtn.textContent = origLabel;
+    }
+  }
+
+  saveBtn.addEventListener('click', submit);
+  // Enter in the confirm field submits.
+  confirmEl.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
 }

@@ -215,6 +215,10 @@ class RiskSettingUpdate(BaseModel):
 class LoginIn(BaseModel):
     password: str = Field(min_length=1)
 
+class ChangePasswordIn(BaseModel):
+    current_password: str = Field(min_length=1)
+    new_password: str = Field(min_length=8)
+
 class SetupCompleteIn(BaseModel):
     notional: float = 500
     max_daily_loss_pct: float = 2.0
@@ -318,6 +322,35 @@ def logout(request: Request, response: Response):
     if token:
         auth.revoke_session(token)
     response.delete_cookie("tb_session")
+    return {"ok": True}
+
+@app.post("/api/account/password")
+def change_password(body: ChangePasswordIn, request: Request):
+    """Change the dashboard login password (logged-in + licensed users).
+
+    The dashboard password is a single per-installation value, so this is
+    available to the owner and every buyer on their own instance. Requires the
+    current password, and shares the login brute-force throttle so an unattended
+    session can't be used to guess the current password unthrottled.
+    """
+    _require_auth(request)
+
+    # Shared throttle: a failed current-password attempt counts against the same
+    # lockout as login (auth.check_login_allowed / record_login_failure).
+    allowed, secs = auth.check_login_allowed()
+    if not allowed:
+        raise HTTPException(429, f"Too many failed attempts. Try again in {secs}s.")
+
+    if not auth.check_password(body.current_password):
+        auth.record_login_failure()
+        raise HTTPException(400, "current password is incorrect")
+
+    if body.new_password == body.current_password:
+        # Current password was correct, so don't penalise; just reject the no-op.
+        raise HTTPException(400, "new password must be different from the current one")
+
+    auth.record_login_success()  # reset the shared counter on a verified change
+    auth.set_password(body.new_password)
     return {"ok": True}
 
 @app.post("/api/setup/complete")
