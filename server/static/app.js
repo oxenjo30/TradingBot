@@ -1416,25 +1416,52 @@ async function initDashboard() {
   const saved = localStorage.getItem('tb_theme') || 'dark';
   document.documentElement.setAttribute('data-theme', saved);
 
-  // Inject toggle button into every sidebar footer, after the logout button
-  document.addEventListener('DOMContentLoaded', () => {
-    const footer = document.querySelector('.sidebar-footer');
-    if (!footer) return;
+  // Toggle theme everywhere and keep all toggle buttons in sync.
+  function applyTheme(next) {
+    document.documentElement.setAttribute('data-theme', next);
+    localStorage.setItem('tb_theme', next);
+    document.querySelectorAll('.theme-toggle-btn').forEach(b => _updateThemeBtn(b, next));
+    document.querySelectorAll('.theme-toggle-icon').forEach(b => _updateThemeIcon(b, next));
+  }
+  function nextTheme() {
+    return (document.documentElement.getAttribute('data-theme') || 'dark') === 'dark' ? 'light' : 'dark';
+  }
 
-    const btn = document.createElement('button');
-    btn.className = 'theme-toggle-btn';
-    btn.id = 'theme-toggle';
-    _updateThemeBtn(btn, saved);
-    btn.addEventListener('click', () => {
-      const current = document.documentElement.getAttribute('data-theme') || 'dark';
-      const next = current === 'dark' ? 'light' : 'dark';
-      document.documentElement.setAttribute('data-theme', next);
-      localStorage.setItem('tb_theme', next);
-      _updateThemeBtn(btn, next);
-    });
-    footer.appendChild(btn);
+  document.addEventListener('DOMContentLoaded', () => {
+    // 1) Full-width toggle in the sidebar footer (desktop).
+    const footer = document.querySelector('.sidebar-footer');
+    if (footer) {
+      const btn = document.createElement('button');
+      btn.className = 'theme-toggle-btn';
+      btn.id = 'theme-toggle';
+      _updateThemeBtn(btn, saved);
+      btn.addEventListener('click', () => applyTheme(nextTheme()));
+      footer.appendChild(btn);
+    }
+
+    // 2) Compact icon toggle in the page header — visible on mobile, where the
+    //    sidebar (and its toggle) is hidden off-screen. CSS shows it only <=768px.
+    const header = document.querySelector('.page-header');
+    if (header) {
+      const icon = document.createElement('button');
+      icon.className = 'theme-toggle-icon';
+      icon.setAttribute('aria-label', 'Toggle theme');
+      _updateThemeIcon(icon, saved);
+      icon.addEventListener('click', () => applyTheme(nextTheme()));
+      // place it just before the avatar group if present, else append
+      const avatarGroup = header.querySelector('.avatar')?.closest('div');
+      if (avatarGroup && avatarGroup.parentElement === header) header.insertBefore(icon, avatarGroup);
+      else header.appendChild(icon);
+    }
   });
 })();
+
+function _updateThemeIcon(btn, theme) {
+  // Sun when in dark (tap → light), moon when in light (tap → dark).
+  btn.innerHTML = theme === 'light'
+    ? `<svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>`
+    : `<svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>`;
+}
 
 function _chartTheme() {
   return document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';

@@ -1671,6 +1671,23 @@ button { cursor: pointer; font-family: inherit; }
   .strat-actions { flex: 1 1 100% !important; justify-content: flex-start !important; }
 }
 
+/* Header theme toggle (mobile only). The full-width toggle lives in the sidebar
+   footer, which is hidden off-screen on mobile — so on phones/tablets we surface
+   a compact icon toggle in the page header instead. */
+.theme-toggle-icon {
+  display: none;
+  align-items: center; justify-content: center;
+  width: 36px; height: 36px; flex-shrink: 0;
+  background: transparent; border: 1px solid var(--border);
+  border-radius: 9px; color: var(--muted); cursor: pointer;
+  transition: color .15s, background .15s;
+}
+.theme-toggle-icon:hover { color: var(--text); background: rgba(255,255,255,.06); }
+[data-theme="light"] .theme-toggle-icon:hover { background: rgba(0,0,0,.05); }
+@media (max-width: 768px) {
+  .theme-toggle-icon { display: flex; }
+}
+
 /* Belt-and-suspenders: never allow horizontal scroll of the whole page. */
 @media (max-width: 1024px) {
   html, body { max-width: 100%; overflow-x: hidden; }
