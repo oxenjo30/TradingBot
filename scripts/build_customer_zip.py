@@ -37,6 +37,7 @@ INCLUDE_FILES = [
     "requirements.txt",
     "setup.bat",
     "start.bat",
+    "CHANGELOG.md",   # curated, customer-facing release notes (no secrets)
     "TradeBot_Installation_Guide.pdf",
     "TradeBot_Setup_Guide.pdf",
 ]
