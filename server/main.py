@@ -1877,9 +1877,9 @@ def buy_url():
     buttons are never broken. `url` is kept for backward-compatibility (= whop).
     """
     whop = (os.environ.get("WHOP_BUY_URL", "")
-            or "https://whop.com/primustrader/primustrader-with-ai-tuning/")
+            or "https://whop.com/checkout/plan_D7Xf02CtPDu77")
     gumroad = (os.environ.get("GUMROAD_BUY_URL", "")
-               or "https://primustrader.gumroad.com/l/oxchvv")
+               or "https://primustrader.gumroad.com/l/oxchvv?wanted=true")
     return {"whop": whop, "gumroad": gumroad, "url": whop}
 
 

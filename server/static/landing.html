@@ -1014,8 +1014,8 @@
   // Two stores: Whop and Gumroad. /api/buy-url returns both; we fall back to the
   // public checkout links so buttons are never broken.
   (async () => {
-    let whop = 'https://whop.com/primustrader/primustrader-with-ai-tuning/';
-    let gumroad = 'https://primustrader.gumroad.com/l/oxchvv';
+    let whop = 'https://whop.com/checkout/plan_D7Xf02CtPDu77';
+    let gumroad = 'https://primustrader.gumroad.com/l/oxchvv?wanted=true';
     try {
       const r = await fetch('/api/buy-url');
       if (r.ok) {
