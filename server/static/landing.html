@@ -1009,7 +1009,7 @@
   // Fetches the Lemon Squeezy checkout URL from the server (.env LEMON_SQUEEZY_BUY_URL).
   // Falls back to a placeholder so buttons are never broken.
   (async () => {
-    let url = 'https://primustrader.lemonsqueezy.com/buy/YOUR-PRODUCT-ID';
+    let url = 'https://primustrader.lemonsqueezy.com/checkout/buy/1114678';
     try {
       const r = await fetch('/api/buy-url');
       if (r.ok) {

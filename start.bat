@@ -1,4 +1,5 @@
 @echo off
+cd /d "%~dp0"
 title TradeBot
 color 0A
 cls

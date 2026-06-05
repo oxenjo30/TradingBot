@@ -378,7 +378,7 @@
       <div class="help-section" id="intro">
         <div class="help-hero">
           <div class="help-hero-title">Welcome to TradeBot</div>
-          <div class="help-hero-sub">TradeBot is an automated algorithmic trading platform that connects to your broker accounts, runs 14 built-in strategies on a 60-second engine tick, enforces multi-layer risk controls, explains every trade with AI, and supports both stocks and crypto &mdash; all from one dashboard.</div>
+          <div class="help-hero-sub">TradeBot is an automated algorithmic trading platform that connects to your broker accounts, runs 13 built-in strategies on a 60-second engine tick, enforces multi-layer risk controls, explains every trade with AI, and supports both stocks and crypto &mdash; all from one dashboard.</div>
         </div>
 
         <div class="help-grid">
@@ -386,8 +386,8 @@
             <div class="help-card-icon" style="background:rgba(59,130,246,.12);">
               <svg width="16" height="16" fill="none" stroke="#60A5FA" stroke-width="2" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="2" height="2"/><rect x="13" y="9" width="2" height="2"/><path d="M9 13a3 3 0 0 0 6 0"/></svg>
             </div>
-            <div class="help-card-title">14 Built-in Strategies</div>
-            <div class="help-card-desc">7 stock strategies + 4 crypto strategies (Grid, RSI Bounce, Trend, Volatility Breakout) + EMA Confluence, Classic Chart Patterns, and more.</div>
+            <div class="help-card-title">13 Built-in Strategies</div>
+            <div class="help-card-desc">7 stock strategies + 4 crypto strategies (Grid, RSI Bounce, Trend, Mean Reversion). Plus EMA Confluence and Classic Chart Patterns, which run on both stocks and crypto.</div>
           </div>
           <div class="help-card">
             <div class="help-card-icon" style="background:rgba(16,185,129,.12);">
@@ -460,7 +460,7 @@
             <div class="help-step-num">2</div>
             <div class="help-step-body">
               <div class="help-step-title">Create your .env file</div>
-              <div class="help-step-desc">Copy <span class="help-code">.env.example</span> to <span class="help-code">.env</span>. The app auto-generates <span class="help-code">DB_SECRET_KEY</span> on first launch. You don't need to fill it in manually.</div>
+              <div class="help-step-desc">Copy <span class="help-code">.env.example</span> to <span class="help-code">.env</span>. The app auto-generates <span class="help-code">DB_SECRET_KEY</span> on first launch &mdash; you don't fill it in manually. Once it's generated, <strong>back it up somewhere safe</strong>: it encrypts your broker keys and cannot be recovered if lost.</div>
             </div>
           </div>
           <div class="help-step">
@@ -502,7 +502,7 @@
           <thead><tr><th>Broker</th><th>Asset Class</th><th>Paper Trading</th></tr></thead>
           <tbody>
             <tr><td>Alpaca</td><td>US Stocks &amp; ETFs</td><td>Yes &mdash; separate paper API keys (start with PK)</td></tr>
-            <tr><td>Tradier</td><td>US Stocks &amp; Options</td><td>Yes &mdash; sandbox API at sandbox.tradier.com</td></tr>
+            <tr><td>Tradier</td><td>US Stocks &amp; ETFs</td><td>Yes &mdash; sandbox API at sandbox.tradier.com</td></tr>
             <tr><td>Binance</td><td>Crypto Spot (USDT pairs)</td><td>Yes &mdash; demo keys from demo.binance.com (separate from live)</td></tr>
           </tbody>
         </table>
@@ -548,7 +548,7 @@
       <!-- STRATEGIES -->
       <div class="help-section" id="strategies">
         <div class="help-h1">Strategies &amp; Bots</div>
-        <div class="help-lead">TradeBot comes with 14 automated strategies across stocks and crypto. The engine evaluates all enabled strategies every 60 seconds.</div>
+        <div class="help-lead">TradeBot comes with 13 automated strategies across stocks and crypto. The engine evaluates all enabled strategies every 60 seconds.</div>
 
         <div class="help-h2">Stock Strategies</div>
         <table class="help-table">
@@ -561,10 +561,14 @@
             <tr><td>Golden Cross</td><td>Enters when 50-day SMA crosses above 200-day SMA.</td><td>Long-term trend following</td></tr>
             <tr><td>SMA Crossover</td><td>Fast SMA crosses above slow SMA. Configurable fast/slow periods.</td><td>Short-term trend detection</td></tr>
             <tr><td>52-Week Breakout</td><td>Buys when price closes above its 52-week high on strong volume surge.</td><td>Breakout trading, momentum stocks</td></tr>
-            <tr><td>EMA Confluence</td><td>Requires multiple EMAs (8/21/50/200) to be aligned in the same direction. Scaled sizing by confluence count.</td><td>High-conviction trend entries</td></tr>
-            <tr><td>Classic Chart Patterns</td><td>Detects candlestick, reversal, and continuation patterns. EMA-200 trend filter guards entries; bear patterns trigger exits.</td><td>Pattern-based swing trading</td></tr>
+            <tr><td>EMA Confluence <span class="help-badge purple">stocks + crypto</span></td><td>Requires multiple EMAs (8/21/50/200) to be aligned in the same direction. Scaled sizing by confluence count.</td><td>High-conviction trend entries</td></tr>
+            <tr><td>Classic Chart Patterns <span class="help-badge purple">stocks + crypto</span></td><td>Detects candlestick, reversal, and continuation patterns. EMA-200 trend filter guards entries; bear patterns trigger exits.</td><td>Pattern-based swing trading</td></tr>
           </tbody>
         </table>
+        <div class="help-callout tip">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+          <div><strong>EMA Confluence</strong> and <strong>Classic Chart Patterns</strong> work on <strong>both stock and crypto accounts</strong> &mdash; they appear in the strategy list for whichever account type you select.</div>
+        </div>
 
         <div class="help-h2">Enabling a Strategy</div>
         <div class="help-steps">
@@ -608,7 +612,7 @@
           <tbody>
             <tr><td>Crypto Trend</td><td>EMA crossover (fast vs. slow). Buys on bullish crossover, sells on bearish crossover. Configurable fast/slow EMA periods.</td></tr>
             <tr><td>Crypto RSI Bounce</td><td>Buys when RSI drops below the oversold threshold. Sells when RSI rises above the overbought threshold. Good for ranging crypto markets.</td></tr>
-            <tr><td>Crypto Volatility Breakout</td><td>Mean-reversion strategy. Buys when price touches the lower Bollinger Band with oversold RSI. Exits when price reaches the SMA (middle band).</td></tr>
+            <tr><td>Crypto Mean Reversion</td><td>Buys when price touches the lower Bollinger Band with oversold RSI (&lt; 35). Exits when price returns to the SMA (middle band), or cuts the loss if price falls past the stop.</td></tr>
             <tr><td>Crypto Grid</td><td>Divides a price range into levels. Buys near band bottoms, sells near band tops. Auto-detects range from recent price history. Trend SMA filter prevents buying in downtrends.</td></tr>
           </tbody>
         </table>
@@ -891,7 +895,7 @@
       <!-- BACKTESTING -->
       <div class="help-section" id="backtesting">
         <div class="help-h1">Backtesting</div>
-        <div class="help-lead">Test any of the 14 strategies against historical price data before risking real money. Saved runs persist for comparison.</div>
+        <div class="help-lead">Test any of the 13 strategies against historical price data before risking real money. Saved runs persist for comparison.</div>
 
         <div class="help-h2">Running a backtest</div>
         <div class="help-steps">
@@ -943,7 +947,7 @@
 
         <div class="help-h2">Trade Explanations</div>
         <p class="help-p">Every time a trade executes, TradeBot queues an AI explanation job. The AI reads the signal's reason (indicator values, crossover details, pattern names) and writes a 2&ndash;3 sentence explanation in plain English. Explanations appear in the Logs page next to each signal.</p>
-        <p class="help-p">TradeBot supports two AI providers: <strong>Claude</strong> (Anthropic API &mdash; requires <span class="help-code">ANTHROPIC_API_KEY</span> in your <span class="help-code">.env</span>) and <strong>Ollama</strong> (local, free, requires Ollama running on your machine). Configure the provider in <strong>AI Tuning</strong> &rarr; Provider settings.</p>
+        <p class="help-p">TradeBot supports two AI providers: <strong>Claude</strong> (Anthropic API) and <strong>Ollama</strong> (local, free, requires Ollama running on your machine). To use Claude, go to <strong>AI Tuning</strong> &rarr; <strong>AI Provider Settings</strong>, select the <strong>Claude (Anthropic)</strong> tab, and paste your API key (from <span class="help-code">console.anthropic.com</span>) into the <strong>Anthropic API Key</strong> field. The key is encrypted and stored securely &mdash; you do <em>not</em> put it in <span class="help-code">.env</span>.</p>
 
         <div class="help-h2">Weekly Auto-Tuner</div>
         <p class="help-p">Every Sunday at 11 PM ET, the auto-tuner analyzes each strategy's live win rate and compares it to the backtest benchmark. It then proposes adjusted parameters (RSI thresholds, EMA periods, notional sizes, etc.) to improve performance. Results are logged in the AI Tuning page.</p>
@@ -1044,6 +1048,17 @@
 
         <div class="help-h2">Is my API key safe?</div>
         <p class="help-p">Yes &mdash; keys are encrypted with AES-256 (Fernet) before storage. The secret is never returned by any API endpoint. Use Alpaca's "Trading only" scope and disable Binance withdrawal permissions for added safety.</p>
+
+        <div class="help-h2">My broker keys suddenly show as "invalid" &mdash; what happened?</div>
+        <p class="help-p">Your API keys are encrypted with the <span class="help-code">DB_SECRET_KEY</span> stored in your <span class="help-code">.env</span> file. If that key changes &mdash; for example, if <span class="help-code">.env</span> is replaced, regenerated, or you re-run setup &mdash; the app can no longer decrypt your saved credentials, and they show as invalid even though the broker side is fine.</p>
+        <p class="help-p">The fix depends on whether you still have the original key:</p>
+        <p class="help-p">&bull; <strong>If you backed up the original <span class="help-code">DB_SECRET_KEY</span>:</strong> restore that exact value into <span class="help-code">.env</span> and restart. Your keys decrypt instantly &mdash; nothing to re-enter.</p>
+        <p class="help-p">&bull; <strong>If the original key is lost:</strong> go to <strong>Broker Accounts</strong> and re-enter your API key/secret for each account. They re-encrypt under the current key and work again. Your accounts, settings, and history are all preserved &mdash; only the key/secret fields need re-pasting.</p>
+
+        <div class="help-callout danger">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          <div><strong>Back up your <span class="help-code">DB_SECRET_KEY</span> the moment you finish setup</strong> (copy it somewhere safe, like a password manager). It is the one value that cannot be recovered if lost &mdash; and never re-run setup on a working install, as that can regenerate it.</div>
+        </div>
 
         <div class="help-callout good">
           <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
