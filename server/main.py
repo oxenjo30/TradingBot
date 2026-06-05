@@ -469,7 +469,7 @@ def license_activate(body: LicenseActivate, request: Request):
 # NOTE: There is intentionally NO license-deactivation endpoint. Clearing the
 # stored license_key locks the owner out, and a deactivate route (even a guarded
 # one) was the single path that repeatedly wiped the key. It has been removed
-# entirely - the license cannot be cleared through the app. To rotate a key,
+# entirely — the license cannot be cleared through the app. To rotate a key,
 # activate a new one via POST /api/license/activate (which overwrites in place).
 
 
@@ -574,6 +574,84 @@ def admin_patch_lemon_config(body: LemonConfigBody, request: Request):
     raw = db.get_app_config_secure("lemon_signing_secret", "")
     masked = ("••••" + raw[-4:]) if len(raw) > 4 else ("•" * len(raw) if raw else "")
     return {"signing_secret_set": bool(raw), "signing_secret_masked": masked}
+
+
+# ── Whop webhook ───────────────────────────────────────────────────────────────
+
+@app.post("/api/whop/webhook")
+async def whop_webhook(request: Request):
+    """Receive Whop payment webhook, issue license key, email buyer with download link."""
+    from .whop import process_webhook as whop_process, WhopWebhookError
+    body = await request.body()
+    signature = request.headers.get("Whop-Signature", "")
+    try:
+        result = whop_process(body, signature)
+        return result
+    except WhopWebhookError as e:
+        if "signature" in str(e):
+            raise HTTPException(401, str(e))
+        log.warning("whop webhook skipped: %s", e)
+        return {"skipped": True, "reason": str(e)}
+    except RuntimeError as e:
+        raise HTTPException(500, str(e))
+
+
+class WhopConfigBody(BaseModel):
+    signing_secret: str = ""
+
+
+@app.get("/api/admin/whop-config")
+def admin_get_whop_config(request: Request):
+    _require_owner(request)
+    raw = db.get_app_config_secure("whop_signing_secret", "")
+    masked = ("••••" + raw[-4:]) if len(raw) > 4 else ("•" * len(raw) if raw else "")
+    return {"signing_secret_set": bool(raw), "signing_secret_masked": masked}
+
+
+@app.patch("/api/admin/whop-config")
+def admin_patch_whop_config(body: WhopConfigBody, request: Request):
+    _require_owner(request)
+    if body.signing_secret is not None and body.signing_secret.strip():
+        db.set_app_config_secure("whop_signing_secret", body.signing_secret.strip())
+        db.log_audit("license", "updated Whop signing secret", "")
+    raw = db.get_app_config_secure("whop_signing_secret", "")
+    masked = ("••••" + raw[-4:]) if len(raw) > 4 else ("•" * len(raw) if raw else "")
+    return {"signing_secret_set": bool(raw), "signing_secret_masked": masked}
+
+
+# ── Protected download endpoint ────────────────────────────────────────────────
+
+@app.get("/download/{token}")
+async def download_file(token: str, request: Request):
+    """Serve the TradeBot zip using a one-time download token.
+
+    Token must not be expired and must have attempts remaining.
+    Each valid request decrements the attempt counter; when exhausted
+    the token is permanently invalidated.
+    """
+    import pathlib
+    row = db.consume_download_token(token)
+    if not row:
+        raise HTTPException(410, "This download link has expired or has already been used the maximum number of times. "
+                                 "Please contact support to request a new link.")
+
+    zip_path_str = os.environ.get("TRADEBOT_ZIP_PATH", "")
+    if not zip_path_str:
+        raise HTTPException(503, "Download file not configured on server. Please contact support.")
+
+    zip_path = pathlib.Path(zip_path_str)
+    if not zip_path.exists():
+        log.error("Download zip not found at %s", zip_path)
+        raise HTTPException(503, "Download file not available. Please contact support.")
+
+    log.info("download served: token=%s email=%s attempts_left=%s",
+             token[:8] + "...", row["buyer_email"], row["attempts_remaining"])
+
+    return FileResponse(
+        str(zip_path),
+        media_type="application/zip",
+        filename="PrimusTrader.zip",
+    )
 
 
 # ── Account & market ───────────────────────────────────────────────────────────
