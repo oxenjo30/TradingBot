@@ -69,10 +69,16 @@ def _get_weekly_pl_pct(account: dict) -> float:
     except ValueError:
         stored_eq = 0.0
 
-    if stored_date != monday_str or stored_eq <= 0:
-        db.set_app_config("week_start_date", monday_str)
-        db.set_app_config("week_start_equity", str(equity))
+    # Only reset baseline when equity is positive — a zero/negative equity
+    # (unfunded account) would permanently disable the weekly guard.
+    if stored_date != monday_str:
+        if equity > 0:
+            db.set_app_config("week_start_date", monday_str)
+            db.set_app_config("week_start_equity", str(equity))
         return 0.0
+
+    if stored_eq <= 0 or equity <= 0:
+        return 0.0  # can't compute meaningful P&L, skip guard
 
     return (equity - stored_eq) / stored_eq * 100.0
 

@@ -20,8 +20,12 @@ _last_run: dict = {"ts": None, "ran": [], "signals": [], "error": None, "risk": 
 
 def _run_take_profit_pass(acct_client, acct_id: int, take_profit_pct: float,
                           local_positions: dict) -> None:
-    """Sell any position whose unrealized gain >= take_profit_pct. Skips kill switch and risk checks."""
+    """Sell any position whose unrealized gain >= take_profit_pct."""
     if take_profit_pct <= 0:
+        return
+    # Respect per-account kill switch
+    if db.get_account_kill_switch(acct_id):
+        log.debug("take-profit skipped for acct %d — kill switch active", acct_id)
         return
     try:
         live_positions = acct_client.get_positions()
@@ -483,10 +487,19 @@ def start(interval_seconds: int = 60):
 def shutdown():
     global _scheduler, _tuner_timer
     if _tuner_timer:
-        _tuner_timer.cancel()
+        try:
+            _tuner_timer.cancel()
+        except Exception as e:
+            log.warning("tuner timer cancel error (ignored): %s", e)
         _tuner_timer = None
     if _scheduler:
-        _scheduler.shutdown(wait=False)
+        # APScheduler is bound to the asyncio loop, which uvicorn may already be
+        # tearing down on Ctrl+C. Swallow the teardown-race error so the process
+        # exits cleanly and releases the port instead of being killed half-alive.
+        try:
+            _scheduler.shutdown(wait=False)
+        except Exception as e:
+            log.warning("scheduler shutdown error (ignored): %s", e)
         _scheduler = None
 
 
