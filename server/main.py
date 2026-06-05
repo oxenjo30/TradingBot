@@ -1789,8 +1789,17 @@ def refund_page():
 
 @app.get("/api/buy-url")
 def buy_url():
-    """Return the Lemon Squeezy buy URL for the landing page."""
-    url = os.environ.get("LEMON_SQUEEZY_BUY_URL", "")
+    """Return the checkout URL for the landing page.
+
+    Payments go through Whop. Prefer WHOP_BUY_URL from the environment; fall back
+    to the public Whop checkout link so the buy buttons are never broken.
+    (LEMON_SQUEEZY_BUY_URL is still honored as a last resort for legacy setups.)
+    """
+    url = (
+        os.environ.get("WHOP_BUY_URL", "")
+        or "https://whop.com/primustrader/primustrader-with-ai-tuning/"
+        or os.environ.get("LEMON_SQUEEZY_BUY_URL", "")
+    )
     return {"url": url}
 
 
