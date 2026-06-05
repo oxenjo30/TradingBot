@@ -1584,25 +1584,68 @@ button { cursor: pointer; font-family: inherit; }
   }
 }
 
-/* Phones: collapse dense inline stat/metric grids (4/5/6-up and 3-up) to 2
-   columns so they become 2×N instead of squishing off-screen. `auto-fill
-   minmax(...)` grids are already fluid and intentionally NOT matched here. */
-@media (max-width: 600px) {
+/* Tablet (641–1024px): dense inline stat/metric grids (3/4/5/6-up) drop to 2
+   columns. `auto-fill minmax(...)` grids are already fluid — not matched. */
+@media (min-width: 641px) and (max-width: 1024px) {
+  .main [style*="grid-template-columns:repeat(3"],
+  .main [style*="grid-template-columns: repeat(3"],
   .main [style*="grid-template-columns:repeat(4"],
   .main [style*="grid-template-columns: repeat(4"],
   .main [style*="grid-template-columns:repeat(5"],
   .main [style*="grid-template-columns: repeat(5"],
   .main [style*="grid-template-columns:repeat(6"],
-  .main [style*="grid-template-columns: repeat(6"],
-  .main [style*="grid-template-columns:repeat(3"],
-  .main [style*="grid-template-columns: repeat(3"] {
+  .main [style*="grid-template-columns: repeat(6"] {
     grid-template-columns: 1fr 1fr !important;
   }
-  /* Two-up inline grids stack fully on the narrowest screens. */
-  .main [style*="grid-template-columns:1fr 1fr"],
-  .main [style*="grid-template-columns: 1fr 1fr"] {
+}
+
+/* Phones (<=640px): collapse EVERY inline multi-column grid to a single column.
+   The card content (risk circuit breakers, dashboard stats, P&L breakdown) is too
+   dense to read at 2-up on a phone, so one full-width column per item is correct. */
+@media (max-width: 640px) {
+  .main [style*="grid-template-columns"] {
     grid-template-columns: 1fr !important;
   }
+  /* Exception: tiny sparkline stat chips and broker-logo grids stay multi-up —
+     they're compact and look fine 2-wide. (auto-fill grids already handle this.) */
+  .main [style*="repeat(auto-fill"],
+  .main [style*="repeat(auto-fit"] {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)) !important;
+  }
+}
+
+/* Tables that exceed the viewport must scroll horizontally inside their card,
+   not push the page wide. Covers the data tables on logs, ai-tuning, dashboard
+   recent-signals, performance, etc. */
+@media (max-width: 1024px) {
+  .card { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  table { min-width: max-content; }
+}
+
+/* The floating Stop / panic button is a fixed wrapper (#panic-wrap). On mobile,
+   shrink it and nudge it into the corner so it doesn't cover card content. */
+@media (max-width: 640px) {
+  #panic-wrap {
+    bottom: .85rem !important;
+    right: .85rem !important;
+    z-index: 1000 !important;
+  }
+  .panic-fab {
+    width: 44px !important; height: 44px !important;
+  }
+  .panic-fab-label { font-size: 9px !important; }
+}
+
+/* Strategy list rows: on narrow screens, let the name/desc and the status badge
+   stack instead of the badge overlapping a wrapped strategy name. */
+@media (max-width: 640px) {
+  .strat-row {
+    flex-wrap: wrap !important;
+    row-gap: .35rem !important;
+  }
+  .strat-info { min-width: 0 !important; flex: 1 1 100% !important; }
+  .strat-name { white-space: normal !important; }
+  .strat-actions { flex: 1 1 100% !important; justify-content: flex-start !important; }
 }
 
 /* Belt-and-suspenders: never allow horizontal scroll of the whole page. */

@@ -7,7 +7,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="/static/styles.css?v=182">
+  <link rel="stylesheet" href="/static/styles.css?v=183">
 </head>
 <body data-page="settings">
 
@@ -404,6 +404,45 @@
       </div>
 
       <div id="update-error" class="field-msg err" style="display:none;margin-top:.75rem;"></div>
+    </div>
+
+    <!-- ── Change Password ── -->
+    <div class="card" id="change-password-card">
+      <div class="settings-section-head">
+        <div class="icon-circle icon-blue" style="width:38px;height:38px;flex-shrink:0;">
+          <svg width="17" height="17" fill="none" stroke="#3B82F6" stroke-width="2" viewBox="0 0 24 24">
+            <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+          </svg>
+        </div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:14px;font-weight:600;">Change Password</div>
+          <div class="text-muted" style="font-size:12px;margin-top:2px;">Update your dashboard login password</div>
+        </div>
+      </div>
+
+      <div style="border-top:1px solid var(--border);margin:1rem 0;"></div>
+
+      <div style="max-width:420px;">
+        <div style="margin-bottom:.9rem;">
+          <div class="field-label">Current password</div>
+          <input id="cp-current" type="password" class="input-field" style="width:100%;"
+                 autocomplete="current-password" placeholder="Enter current password">
+        </div>
+        <div style="margin-bottom:.9rem;">
+          <div class="field-label">New password</div>
+          <input id="cp-new" type="password" class="input-field" style="width:100%;"
+                 autocomplete="new-password" placeholder="At least 8 characters">
+        </div>
+        <div style="margin-bottom:.9rem;">
+          <div class="field-label">Confirm new password</div>
+          <input id="cp-confirm" type="password" class="input-field" style="width:100%;"
+                 autocomplete="new-password" placeholder="Re-enter new password">
+        </div>
+        <div style="display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;">
+          <button id="cp-save" class="btn btn-sm btn-primary">Change Password</button>
+          <span id="cp-msg" class="field-msg hidden"></span>
+        </div>
+      </div>
     </div>
 
     <!-- ── License Management (owner-only; revealed by initSettings via /api/app-info) ── -->
