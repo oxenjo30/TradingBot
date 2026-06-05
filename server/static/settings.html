@@ -412,9 +412,26 @@
 
       <div id="license-mgmt-body" style="display:none;margin-top:1rem;">
 
-        <!-- Lemon Squeezy signing secret -->
+        <!-- Whop signing secret (primary payment processor) -->
         <div style="margin-bottom:1.25rem;padding-bottom:1.25rem;border-bottom:1px solid var(--border);">
-          <div class="field-label">Lemon Squeezy Signing Secret</div>
+          <div class="field-label">Whop Signing Secret</div>
+          <div style="display:flex;gap:.5rem;align-items:center;">
+            <input id="whop-signing-secret" type="password" class="input-field"
+                   style="font-family:monospace;font-size:12px;flex:1;" autocomplete="off"
+                   placeholder="Enter signing secret">
+            <button class="btn btn-sm" id="save-whop-secret">Save</button>
+          </div>
+          <div class="field-hint" id="whop-secret-status" style="margin-top:.4rem;">Not configured.</div>
+          <div style="margin-top:.6rem;background:#0D1117;border:1px solid #1E2D45;border-radius:8px;padding:.75rem;font-size:11px;color:#94A3B8;line-height:1.7;">
+            Set this to the <b style="color:#E6EBF5;">Webhook secret</b> from your Whop webhook
+            (Developer tab). Point the webhook at:<br>
+            <code style="color:#10B981;" id="whop-webhook-url">…/api/whop/webhook</code>
+          </div>
+        </div>
+
+        <!-- Lemon Squeezy signing secret (legacy / dormant) -->
+        <div style="margin-bottom:1.25rem;padding-bottom:1.25rem;border-bottom:1px solid var(--border);">
+          <div class="field-label">Lemon Squeezy Signing Secret <span style="font-size:10px;color:#64748B;font-weight:400;">(legacy)</span></div>
           <div style="display:flex;gap:.5rem;align-items:center;">
             <input id="lemon-signing-secret" type="password" class="input-field"
                    style="font-family:monospace;font-size:12px;flex:1;" autocomplete="off"
@@ -579,8 +596,50 @@ function toggleLicenseMgmt() {
   const chevron = document.getElementById('license-mgmt-chevron');
   body.style.display    = lmOpen ? 'block' : 'none';
   chevron.style.transform = lmOpen ? 'rotate(180deg)' : '';
-  if (lmOpen) { loadLicenses(1); loadLemonConfig(); }
+  if (lmOpen) { loadLicenses(1); loadWhopConfig(); loadLemonConfig(); }
 }
+
+// ── Whop signing secret (primary) ──
+async function loadWhopConfig() {
+  const urlEl = document.getElementById('whop-webhook-url');
+  if (urlEl) urlEl.textContent = `${location.origin}/api/whop/webhook`;
+  const statusEl = document.getElementById('whop-secret-status');
+  const inputEl  = document.getElementById('whop-signing-secret');
+  try {
+    const cfg = await api('/api/admin/whop-config');
+    if (cfg.signing_secret_set) {
+      if (statusEl) { statusEl.textContent = `Configured (${cfg.signing_secret_masked})`; statusEl.style.color = 'var(--green)'; }
+      if (inputEl) inputEl.placeholder = cfg.signing_secret_masked || '••••••••';
+    } else {
+      if (statusEl) { statusEl.textContent = 'Not configured.'; statusEl.style.color = ''; }
+      if (inputEl) inputEl.placeholder = 'Enter signing secret';
+    }
+  } catch (e) {
+    if (statusEl) { statusEl.textContent = `Failed to load: ${_esc(e.message)}`; statusEl.style.color = 'var(--red)'; }
+  }
+}
+
+document.getElementById('save-whop-secret')?.addEventListener('click', async () => {
+  const inputEl  = document.getElementById('whop-signing-secret');
+  const statusEl = document.getElementById('whop-secret-status');
+  const val = (inputEl?.value || '').trim();
+  if (!val) {
+    if (statusEl) { statusEl.textContent = 'Enter a secret to save.'; statusEl.style.color = 'var(--red)'; }
+    return;
+  }
+  try {
+    const cfg = await api('/api/admin/whop-config', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ signing_secret: val }),
+    });
+    if (inputEl) inputEl.value = '';   // clear the field; never echo the secret back
+    if (statusEl) { statusEl.textContent = `Saved (${cfg.signing_secret_masked})`; statusEl.style.color = 'var(--green)'; }
+    if (inputEl) inputEl.placeholder = cfg.signing_secret_masked || '••••••••';
+  } catch (e) {
+    if (statusEl) { statusEl.textContent = `Save failed: ${_esc(e.message)}`; statusEl.style.color = 'var(--red)'; }
+  }
+});
 
 // ── Lemon Squeezy signing secret ──
 async function loadLemonConfig() {
