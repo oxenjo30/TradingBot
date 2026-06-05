@@ -583,25 +583,12 @@ async def whop_webhook(request: Request):
     """Receive Whop payment webhook, issue license key, email buyer with download link."""
     from .whop import process_webhook as whop_process, WhopWebhookError
     body = await request.body()
-    signature = request.headers.get("Whop-Signature", "")
-
-    # TEMP DIAGNOSTIC (remove after capturing the real Whop payload): dump the raw
-    # body + ALL headers to a file so we can match whop.py to Whop's actual event
-    # names and field shapes. File-based because journald capture proved unreliable.
+    # Whop signs with Svix: webhook-signature ("v1,<sig>"), webhook-id, webhook-timestamp.
+    signature = request.headers.get("webhook-signature", "") or request.headers.get("Whop-Signature", "")
+    webhook_id = request.headers.get("webhook-id", "")
+    timestamp = request.headers.get("webhook-timestamp", "")
     try:
-        import json as _json, pathlib as _pl
-        _dump = {
-            "headers": {k: v for k, v in request.headers.items()},
-            "body": body.decode("utf-8", "replace")[:8000],
-        }
-        _p = _pl.Path(__file__).resolve().parent.parent / "whop_debug.log"
-        with _p.open("a", encoding="utf-8") as _f:
-            _f.write(_json.dumps(_dump) + "\n")
-    except Exception as _e:
-        log.warning("WHOP_WEBHOOK_RAW file dump failed: %s", _e)
-
-    try:
-        result = whop_process(body, signature)
+        result = whop_process(body, signature, webhook_id, timestamp)
         return result
     except WhopWebhookError as e:
         if "signature" in str(e):

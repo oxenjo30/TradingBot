@@ -12,39 +12,71 @@ class WhopWebhookError(Exception):
     pass
 
 
-def verify_signature(body: bytes, signature: str, secret: str) -> None:
-    """Raise WhopWebhookError if the HMAC-SHA256 signature does not match.
+def _svix_secret_bytes(secret: str) -> bytes:
+    """Whop/Svix signing secrets look like 'whsec_<base64>'. The HMAC key is the
+    base64-decoded portion after the prefix. If no prefix/decoding fails, fall back
+    to the raw secret bytes (covers older 'sha256=<hex>' style secrets)."""
+    import base64
+    s = secret.strip()
+    if s.startswith("whsec_"):
+        s = s[len("whsec_"):]
+    try:
+        return base64.b64decode(s)
+    except Exception:
+        return secret.encode()
 
-    Whop sends the signature as 'sha256=<hex>' in the Whop-Signature header.
+
+def verify_signature(body: bytes, signature: str, secret: str,
+                     webhook_id: str = "", timestamp: str = "") -> None:
+    """Verify a Whop (Svix) webhook signature.
+
+    Whop signs with Svix: the signed content is "{id}.{timestamp}.{body}", HMAC-
+    SHA256 with the base64-decoded secret, and the `webhook-signature` header is a
+    space-separated list of "v1,<base64sig>" entries. We accept if ANY entry matches.
+
+    Falls back to the legacy plain-body HMAC (hex, optional 'sha256=' prefix) when
+    no id/timestamp are supplied, so older configurations still verify.
     """
-    if signature.startswith("sha256="):
-        signature = signature[7:]
-    expected = hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
-    if not hmac.compare_digest(expected, signature):
+    import base64
+    key = _svix_secret_bytes(secret)
+
+    # Svix mode: needs id + timestamp
+    if webhook_id and timestamp:
+        signed = f"{webhook_id}.{timestamp}.".encode() + body
+        expected = base64.b64encode(hmac.new(key, signed, hashlib.sha256).digest()).decode()
+        for part in signature.split():
+            # each part is like "v1,<sig>"
+            ver, _, sig = part.partition(",")
+            if sig and hmac.compare_digest(sig, expected):
+                return
+        raise WhopWebhookError("invalid signature")
+
+    # Legacy fallback: HMAC of the raw body, hex digest, optional 'sha256=' prefix.
+    sig = signature[7:] if signature.startswith("sha256=") else signature
+    expected_hex = hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(expected_hex, sig):
         raise WhopWebhookError("invalid signature")
 
 
 def extract_order_data(payload: dict) -> tuple[str, str]:
     """Return (order_id, buyer_email) from a Whop webhook payload.
 
-    Whop sends different event types; we only care about 'payment.succeeded'.
-    Raises WhopWebhookError if event is not a completed payment or data is missing.
+    Whop's real payload shape (captured from a live webhook):
+      { "type": "payment.succeeded", "data": { "id": "pay_…",
+        "user": { "email": "…" }, "membership": {…}, … } }
+    The event name is in `type` (NOT `event`), and the buyer email is at
+    data.user.email. We only act on completed payments / valid memberships.
     """
-    event = payload.get("event", "")
-    if event not in ("payment.succeeded", "membership.went_valid"):
+    event = payload.get("type", "") or payload.get("event", "")  # `type` is current; `event` legacy
+    if event not in ("payment.succeeded", "membership.went_valid", "membership.created"):
         raise WhopWebhookError(f"unhandled event type: {event}")
 
     try:
-        data = payload.get("data", {})
-        # Whop membership event shape
-        if event == "membership.went_valid":
-            order_id = str(data.get("id", ""))
-            user = data.get("user", {})
-            buyer_email = user.get("email", "")
-        else:
-            # payment.succeeded shape
-            order_id = str(data.get("id", ""))
-            buyer_email = data.get("user_email", "") or (data.get("user", {}) or {}).get("email", "")
+        data = payload.get("data", {}) or {}
+        order_id = str(data.get("id", ""))
+        user = data.get("user", {}) or {}
+        # email may be at data.user.email (current) or data.user_email (legacy fallback)
+        buyer_email = user.get("email", "") or data.get("user_email", "")
     except (KeyError, TypeError, AttributeError) as e:
         raise WhopWebhookError(f"malformed payload: {e}")
 
@@ -122,11 +154,14 @@ def build_license_email_html(buyer_email: str, license_key: str, download_url: s
 </html>"""
 
 
-def process_webhook(body: bytes, signature: str) -> dict:
+def process_webhook(body: bytes, signature: str,
+                    webhook_id: str = "", timestamp: str = "") -> dict:
     """Full pipeline: verify → extract → mint key → store → generate download token → email.
 
     Returns dict with order_id, buyer_email, license_key, emailed, duplicate.
     Raises WhopWebhookError on signature failure or unhandled event.
+    `webhook_id`/`timestamp` are the Svix webhook-id / webhook-timestamp headers,
+    required for signature verification of current Whop payloads.
     """
     import json
     from server import db
@@ -141,7 +176,7 @@ def process_webhook(body: bytes, signature: str) -> dict:
         )
 
     if signature:
-        verify_signature(body, signature, signing_secret)
+        verify_signature(body, signature, signing_secret, webhook_id, timestamp)
 
     payload = json.loads(body)
     order_id, buyer_email = extract_order_data(payload)
