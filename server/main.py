@@ -584,6 +584,17 @@ async def whop_webhook(request: Request):
     from .whop import process_webhook as whop_process, WhopWebhookError
     body = await request.body()
     signature = request.headers.get("Whop-Signature", "")
+
+    # TEMP DIAGNOSTIC (remove after capturing the real Whop payload): log the raw
+    # body + signature-header names so we can match whop.py to Whop's actual event
+    # names and field shapes. Logs at WARNING so it shows up in journalctl.
+    try:
+        _sig_headers = {k: v for k, v in request.headers.items()
+                        if "signature" in k.lower() or "whop" in k.lower()}
+        log.warning("WHOP_WEBHOOK_RAW headers=%s body=%s", _sig_headers, body.decode("utf-8", "replace")[:4000])
+    except Exception as _e:
+        log.warning("WHOP_WEBHOOK_RAW logging failed: %s", _e)
+
     try:
         result = whop_process(body, signature)
         return result
