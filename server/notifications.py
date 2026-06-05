@@ -39,10 +39,17 @@ def _build_smtp(smtp_host: str, port: int, user: str, password: str):
         srv.login(user, password)
     except smtplib.SMTPAuthenticationError:
         srv.quit()
+        host = (smtp_host or "").lower()
+        if "gmail" in host:
+            raise RuntimeError(
+                "Gmail login failed. You must use an App Password, NOT your regular Gmail password.\n"
+                "Create one at: myaccount.google.com → Security → App Passwords\n"
+                "(Requires 2-Step Verification to be enabled on your Google account first.)"
+            )
         raise RuntimeError(
-            "Gmail login failed. You must use an App Password, NOT your regular Gmail password.\n"
-            "Create one at: myaccount.google.com → Security → App Passwords\n"
-            "(Requires 2-Step Verification to be enabled on your Google account first.)"
+            f"SMTP login failed for {user} on {smtp_host}. Check the username and password "
+            "(for most hosts this is the full email address and its mailbox password). "
+            "If your provider requires it, use an app-specific password."
         )
     except smtplib.SMTPException as e:
         srv.quit()
