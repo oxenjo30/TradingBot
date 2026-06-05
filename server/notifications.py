@@ -18,6 +18,40 @@ def _settings():
     return db.get_notification_settings()
 
 
+# ── Branded email template ──────────────────────────────────────────────────────
+
+def render_email(heading: str, inner_html: str, accent: str = "#3B82F6",
+                 button_label: str = "", button_url: str = "") -> str:
+    """Wrap content in the branded PrimusTrader email card (matches the license
+    email). `inner_html` is the body markup; pass an optional CTA button.
+
+    Centralizes the look so every email — test, trade alerts, risk, daily summary,
+    price alerts, and license delivery — shares one consistent design.
+    """
+    button = ""
+    if button_label and button_url:
+        button = (
+            f'<a href="{button_url}" style="display:inline-block;background:{accent};'
+            f'color:#fff;text-decoration:none;border-radius:8px;padding:12px 24px;'
+            f'font-weight:600;font-size:14px;margin:8px 0 4px;">{button_label}</a>'
+        )
+    return f"""<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"></head>
+<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#F1F5F9;margin:0;padding:32px;color:#0F172A;">
+  <div style="background:#FFFFFF;border-radius:12px;max-width:560px;margin:0 auto;padding:36px 40px;box-shadow:0 2px 8px rgba(0,0,0,.08);">
+    <div style="font-size:22px;font-weight:800;color:{accent};margin-bottom:18px;">PrimusTrader</div>
+    <div style="font-size:18px;font-weight:700;margin-bottom:14px;">{heading}</div>
+    <div style="font-size:14px;color:#334155;line-height:1.7;">{inner_html}</div>
+    {button}
+    <div style="font-size:12px;color:#94A3B8;text-align:center;margin-top:28px;border-top:1px solid #E2E8F0;padding-top:16px;">
+      PrimusTrader &mdash; Automated Algorithmic Trading Platform
+    </div>
+  </div>
+</body>
+</html>"""
+
+
 def _send_async(fn, *args, **kwargs):
     threading.Thread(target=fn, args=args, kwargs=kwargs, daemon=True).start()
 
@@ -179,17 +213,15 @@ def notify_trade(strategy: str, symbol: str, side: str, qty,
     amount = f"${notional:.2f}" if notional else f"{qty} shares"
 
     subject = f"{side_emoji} {symbol} — {amount}"
-    html = f"""
-    <div style="font-family:sans-serif;max-width:480px">
-      <h2 style="color:{'#16c784' if side=='buy' else '#ea3943'}">{side_emoji} {symbol}</h2>
-      <table style="width:100%;border-collapse:collapse">
-        <tr><td style="padding:6px 0;color:#888">Strategy</td><td><b>{strategy}</b></td></tr>
-        <tr><td style="padding:6px 0;color:#888">Amount</td><td><b>{amount}</b></td></tr>
-        <tr><td style="padding:6px 0;color:#888">Signal</td><td>{reason}</td></tr>
-        <tr><td style="padding:6px 0;color:#888">Order ID</td><td style="font-size:.8em">{order_id}</td></tr>
-      </table>
-      <p style="color:#888;font-size:.8em;margin-top:1rem">TradeBot — Automated Trading</p>
-    </div>"""
+    inner = f"""
+      <table style="width:100%;border-collapse:collapse;">
+        <tr><td style="padding:6px 0;color:#64748B">Strategy</td><td><b>{strategy}</b></td></tr>
+        <tr><td style="padding:6px 0;color:#64748B">Amount</td><td><b>{amount}</b></td></tr>
+        <tr><td style="padding:6px 0;color:#64748B">Signal</td><td>{reason}</td></tr>
+        <tr><td style="padding:6px 0;color:#64748B">Order ID</td><td style="font-size:.8em">{order_id}</td></tr>
+      </table>"""
+    html = render_email(f"{side_emoji} {symbol}", inner,
+                        accent=('#16C784' if side == 'buy' else '#EA3943'))
 
     tg = f"{side_emoji} <b>{symbol}</b> — {amount}\n📋 {strategy}\n💬 {reason}"
     plain = f"TradeBot | {side_emoji} {symbol} — {amount} [{strategy}]"
@@ -205,12 +237,10 @@ def notify_risk_block(symbol: str, side: str, reason: str):
         return
 
     subject = f"⚠️ Trade Blocked — {symbol}"
-    html = f"""
-    <div style="font-family:sans-serif">
-      <h2 style="color:#f0b90b">⚠️ Trade Blocked</h2>
+    inner = f"""
       <p><b>{side.upper()} {symbol}</b> was blocked by risk controls.</p>
-      <p style="color:#888">{reason}</p>
-    </div>"""
+      <p style="color:#64748B">{reason}</p>"""
+    html = render_email("⚠️ Trade Blocked", inner, accent="#F0B90B")
     tg = f"⚠️ <b>Trade Blocked</b>\n{side.upper()} {symbol}\n{reason}"
     plain = f"TradeBot | BLOCKED {side.upper()} {symbol}: {reason}"
     _send_async(_send_email, subject, html)
@@ -221,13 +251,11 @@ def notify_risk_block(symbol: str, side: str, reason: str):
 
 def notify_kill_switch(day_pl_pct: float):
     subject = "🛑 Kill Switch Activated"
-    html = f"""
-    <div style="font-family:sans-serif">
-      <h2 style="color:#ea3943">🛑 Kill Switch Activated</h2>
+    inner = f"""
       <p>Daily loss limit hit. All automated trading has been halted.</p>
-      <p style="color:#888">Day P&L: <b>{day_pl_pct:.2f}%</b></p>
-      <p>Log into TradeBot to review your positions and re-enable trading.</p>
-    </div>"""
+      <p style="color:#64748B">Day P&L: <b>{day_pl_pct:.2f}%</b></p>
+      <p>Log into PrimusTrader to review your positions and re-enable trading.</p>"""
+    html = render_email("🛑 Kill Switch Activated", inner, accent="#EA3943")
     tg = f"🛑 <b>Kill Switch Activated</b>\nDay P&amp;L: {day_pl_pct:.2f}%\nAll auto-trading halted."
     _send_async(_send_email, subject, html)
     _send_async(_send_telegram, tg)
@@ -252,23 +280,20 @@ def send_daily_summary(account: dict, signals_today: list):
     ) or "<tr><td colspan='3' style='color:#888;padding:4px 8px'>No trades today</td></tr>"
 
     subject = f"{emoji} Daily Summary — {sign}{plp:.2f}% today"
-    html = f"""
-    <div style="font-family:sans-serif;max-width:520px">
-      <h2>{emoji} TradeBot Daily Summary</h2>
+    inner = f"""
       <table style="width:100%;border-collapse:collapse;margin-bottom:1rem">
-        <tr><td style="color:#888;padding:6px 0">Equity</td><td><b>${eq:,.2f}</b></td></tr>
-        <tr><td style="color:#888;padding:6px 0">Day P&L</td>
-            <td style="color:{'#16c784' if pl>=0 else '#ea3943'}"><b>{sign}${abs(pl):,.2f} ({sign}{plp:.2f}%)</b></td></tr>
+        <tr><td style="color:#64748B;padding:6px 0">Equity</td><td><b>${eq:,.2f}</b></td></tr>
+        <tr><td style="color:#64748B;padding:6px 0">Day P&L</td>
+            <td style="color:{'#16C784' if pl>=0 else '#EA3943'}"><b>{sign}${abs(pl):,.2f} ({sign}{plp:.2f}%)</b></td></tr>
       </table>
-      <h3>Trades Today</h3>
+      <div style="font-weight:700;font-size:14px;margin:8px 0;">Trades Today</div>
       <table style="width:100%;border-collapse:collapse;font-size:.9em">
-        <tr style="color:#888"><th style="text-align:left;padding:4px 8px">Symbol</th>
+        <tr style="color:#64748B"><th style="text-align:left;padding:4px 8px">Symbol</th>
           <th style="text-align:left;padding:4px 8px">Side</th>
           <th style="text-align:left;padding:4px 8px">Strategy</th></tr>
         {trade_rows}
-      </table>
-      <p style="color:#888;font-size:.8em;margin-top:1.5rem">TradeBot</p>
-    </div>"""
+      </table>"""
+    html = render_email(f"{emoji} Daily Summary", inner)
 
     tg = f"{emoji} <b>Daily Summary</b>\nEquity: ${eq:,.2f}\nDay P&L: {sign}${abs(pl):,.2f} ({sign}{plp:.2f}%)\nTrades: {len(signals_today)}"
     _send_async(_send_email, subject, html)
@@ -279,12 +304,10 @@ def notify_price_alert(symbol: str, direction: str, target: float, current_price
     msg = (f"TradeBot | Price Alert: {symbol} is {direction} ${target:.2f} "
            f"(current: ${current_price:.2f})")
     subject = f"Price Alert: {symbol} {direction} ${target:.2f}"
-    html = f"""
-    <div style="font-family:sans-serif">
-      <h2>🔔 Price Alert Triggered</h2>
+    inner = f"""
       <p><b>{symbol}</b> is now {direction} ${target:.2f}</p>
-      <p>Current price: <b>${current_price:.2f}</b></p>
-    </div>"""
+      <p>Current price: <b>${current_price:.2f}</b></p>"""
+    html = render_email("🔔 Price Alert Triggered", inner)
     _send_async(_send_email, subject, html)
     _send_async(_send_telegram, f"🔔 <b>Price Alert</b>\n{msg}")
     _send_async(_send_slack, msg)

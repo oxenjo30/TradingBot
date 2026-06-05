@@ -1813,7 +1813,12 @@ def test_notification(body: dict, request: Request):
                 user     = body.get("email_user", "").strip(),
                 password = form_pass,
                 subject  = "Test Notification",
-                body     = "<p>Your TradeBot email notifications are working correctly!</p>"
+                body     = notifications.render_email(
+                    "Email notifications are working",
+                    "<p>This is a test from PrimusTrader. If you can read this, your "
+                    "email settings are configured correctly and buyers will receive "
+                    "their license keys and download links here.</p>"
+                ),
             )
         return {"ok": True}
     except RuntimeError as e:
