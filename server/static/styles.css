@@ -1584,6 +1584,29 @@ button { cursor: pointer; font-family: inherit; }
   }
 }
 
+/* Named-class grids with hardcoded columns and no responsive rule of their own
+   (.metric-grid was repeat(6) on every screen — that's the cramped dashboard
+   strip). Give them tablet/phone breakpoints. */
+@media (min-width: 641px) and (max-width: 1024px) {
+  .metric-grid { grid-template-columns: repeat(3, minmax(0,1fr)) !important; }
+  .row-3col    { grid-template-columns: repeat(2, minmax(0,1fr)) !important; }
+}
+@media (max-width: 640px) {
+  .metric-grid { grid-template-columns: 1fr 1fr !important; }  /* compact KPI chips: 2-up is fine */
+  /* 3-up grids would be unreadable on a phone → single column. */
+  .row-3col,
+  .broker-picker,
+  .bp-grid     { grid-template-columns: 1fr !important; }
+  /* 2-up form/selector grids stack for comfortable tap targets. */
+  .row-2col,
+  .form-row,
+  .mode-selector,
+  .type-selector,
+  .acct-type-grid,
+  .settings-field-grid,
+  .mot-tabs    { grid-template-columns: 1fr !important; }
+}
+
 /* Tablet (641–1024px): dense inline stat/metric grids (3/4/5/6-up) drop to 2
    columns. `auto-fill minmax(...)` grids are already fluid — not matched. */
 @media (min-width: 641px) and (max-width: 1024px) {
