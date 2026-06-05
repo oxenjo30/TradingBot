@@ -3,6 +3,10 @@
 Customer-facing release notes. Each entry summarizes what changed in that version
 in plain language. (Internal/infrastructure changes are omitted.)
 
+## v1.6 — What's New panel
+- See exactly what changed in each update: the Software Updates page now shows a
+  plain-language changelog and a "View full changelog" history.
+
 ## v1.5 — Purchasing & delivery
 - Buy PrimusTrader on either **Whop** or **Gumroad** — pick your preferred store.
 - Instant delivery: your license key and a secure download link arrive by email the
