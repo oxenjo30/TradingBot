@@ -883,10 +883,15 @@
           <li><svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> Lifetime license — use forever</li>
         </ul>
 
-        <a href="BUY_URL_PLACEHOLDER" class="pricing-cta" id="pricing-buy-btn">
-          Buy Now — $249 one-time
-        </a>
-        <p class="pricing-note">Secure checkout via Whop · License key delivered instantly by email</p>
+        <div style="display:flex;gap:.75rem;flex-wrap:wrap;justify-content:center;">
+          <a href="WHOP_BUY_URL" class="pricing-cta" id="pricing-buy-whop" style="flex:1;min-width:200px;text-align:center;">
+            Buy on Whop — $249
+          </a>
+          <a href="GUMROAD_BUY_URL" class="pricing-cta" id="pricing-buy-gumroad" style="flex:1;min-width:200px;text-align:center;background:#FF90E8;color:#000;">
+            Buy on Gumroad — $249
+          </a>
+        </div>
+        <p class="pricing-note">Secure checkout via Whop or Gumroad · License key delivered instantly by email</p>
       </div>
     </div>
   </div>
@@ -1006,20 +1011,24 @@
   });
 
   // ── Buy URL injection ─────────────────────────────────────────────────────
-  // Fetches the Whop checkout URL from the server (/api/buy-url).
-  // Falls back to the Whop checkout link so buttons are never broken.
+  // Two stores: Whop and Gumroad. /api/buy-url returns both; we fall back to the
+  // public checkout links so buttons are never broken.
   (async () => {
-    let url = 'https://whop.com/primustrader/primustrader-with-ai-tuning/';
+    let whop = 'https://whop.com/primustrader/primustrader-with-ai-tuning/';
+    let gumroad = 'https://primustrader.gumroad.com/l/oxchvv';
     try {
       const r = await fetch('/api/buy-url');
       if (r.ok) {
         const d = await r.json();
-        if (d.url) url = d.url;
+        if (d.whop) whop = d.whop;
+        if (d.gumroad) gumroad = d.gumroad;
+        if (d.url && !d.whop) whop = d.url;  // backward-compat with old {url}
       }
     } catch (_) {}
-    document.querySelectorAll('[href="BUY_URL_PLACEHOLDER"]').forEach(el => {
-      el.href = url;
-    });
+    // Legacy single-store buttons (nav, hero, footer CTA) point at Whop.
+    document.querySelectorAll('[href="BUY_URL_PLACEHOLDER"]').forEach(el => { el.href = whop; });
+    document.querySelectorAll('[href="WHOP_BUY_URL"]').forEach(el => { el.href = whop; });
+    document.querySelectorAll('[href="GUMROAD_BUY_URL"]').forEach(el => { el.href = gumroad; });
   })();
 
   // ── Smooth scroll for nav links ──────────────────────────────────────────

@@ -1859,18 +1859,17 @@ def refund_page():
 
 @app.get("/api/buy-url")
 def buy_url():
-    """Return the checkout URL for the landing page.
+    """Return the checkout URLs for the landing page.
 
-    Payments go through Whop. Prefer WHOP_BUY_URL from the environment; fall back
-    to the public Whop checkout link so the buy buttons are never broken.
-    (LEMON_SQUEEZY_BUY_URL is still honored as a last resort for legacy setups.)
+    Two stores: Whop and Gumroad. Each is overridable via env (WHOP_BUY_URL /
+    GUMROAD_BUY_URL); both fall back to the public checkout links so the buy
+    buttons are never broken. `url` is kept for backward-compatibility (= whop).
     """
-    url = (
-        os.environ.get("WHOP_BUY_URL", "")
-        or "https://whop.com/primustrader/primustrader-with-ai-tuning/"
-        or os.environ.get("LEMON_SQUEEZY_BUY_URL", "")
-    )
-    return {"url": url}
+    whop = (os.environ.get("WHOP_BUY_URL", "")
+            or "https://whop.com/primustrader/primustrader-with-ai-tuning/")
+    gumroad = (os.environ.get("GUMROAD_BUY_URL", "")
+               or "https://primustrader.gumroad.com/l/oxchvv")
+    return {"whop": whop, "gumroad": gumroad, "url": whop}
 
 
 # ── Backtesting ───────────────────────────────────────────────────────────────
