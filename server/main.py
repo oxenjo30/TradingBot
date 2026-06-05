@@ -635,6 +635,60 @@ def admin_patch_whop_config(body: WhopConfigBody, request: Request):
     return {"signing_secret_set": bool(raw), "signing_secret_masked": masked}
 
 
+# ── Gumroad webhook (Ping) ──────────────────────────────────────────────────────
+
+@app.post("/api/gumroad/webhook")
+async def gumroad_webhook(request: Request):
+    """Receive a Gumroad Ping (form-encoded), issue a license, email the buyer."""
+    from .gumroad import process_webhook as gumroad_process, GumroadWebhookError
+    form = dict(await request.form())
+    try:
+        return gumroad_process(form)
+    except GumroadWebhookError as e:
+        # seller_id mismatch is an auth failure; everything else (refund, dup, etc.)
+        # is a benign skip — ack with 200 so Gumroad doesn't retry forever.
+        if "seller_id" in str(e):
+            raise HTTPException(401, str(e))
+        log.warning("gumroad webhook skipped: %s", e)
+        return {"skipped": True, "reason": str(e)}
+    except RuntimeError as e:
+        raise HTTPException(500, str(e))
+
+
+class GumroadConfigBody(BaseModel):
+    seller_id: str = ""
+    permalink: str = ""
+
+
+@app.get("/api/admin/gumroad-config")
+def admin_get_gumroad_config(request: Request):
+    _require_owner(request)
+    raw = db.get_app_config_secure("gumroad_seller_id", "")
+    masked = ("••••" + raw[-4:]) if len(raw) > 4 else ("•" * len(raw) if raw else "")
+    return {
+        "seller_id_set": bool(raw),
+        "seller_id_masked": masked,
+        "permalink": db.get_app_config("gumroad_permalink", ""),
+    }
+
+
+@app.patch("/api/admin/gumroad-config")
+def admin_patch_gumroad_config(body: GumroadConfigBody, request: Request):
+    _require_owner(request)
+    if body.seller_id is not None and body.seller_id.strip():
+        db.set_app_config_secure("gumroad_seller_id", body.seller_id.strip())
+        db.log_audit("license", "updated Gumroad seller id", "")
+    if body.permalink is not None:
+        db.set_app_config("gumroad_permalink", body.permalink.strip())
+    raw = db.get_app_config_secure("gumroad_seller_id", "")
+    masked = ("••••" + raw[-4:]) if len(raw) > 4 else ("•" * len(raw) if raw else "")
+    return {
+        "seller_id_set": bool(raw),
+        "seller_id_masked": masked,
+        "permalink": db.get_app_config("gumroad_permalink", ""),
+    }
+
+
 # ── Protected download endpoint ────────────────────────────────────────────────
 
 @app.get("/download/{token}")

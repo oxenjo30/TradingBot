@@ -429,6 +429,29 @@
           </div>
         </div>
 
+        <!-- Gumroad seller ID (second payment processor) -->
+        <div style="margin-bottom:1.25rem;padding-bottom:1.25rem;border-bottom:1px solid var(--border);">
+          <div class="field-label">Gumroad Seller ID</div>
+          <div style="display:flex;gap:.5rem;align-items:center;">
+            <input id="gumroad-seller-id" type="password" class="input-field"
+                   style="font-family:monospace;font-size:12px;flex:1;" autocomplete="off"
+                   placeholder="Enter seller ID">
+            <button class="btn btn-sm" id="save-gumroad-config">Save</button>
+          </div>
+          <div style="display:flex;gap:.5rem;align-items:center;margin-top:.5rem;">
+            <input id="gumroad-permalink" type="text" class="input-field"
+                   style="font-family:monospace;font-size:12px;flex:1;" autocomplete="off"
+                   placeholder="Product permalink (optional, e.g. oxchvv)">
+          </div>
+          <div class="field-hint" id="gumroad-config-status" style="margin-top:.4rem;">Not configured.</div>
+          <div style="margin-top:.6rem;background:#0D1117;border:1px solid #1E2D45;border-radius:8px;padding:.75rem;font-size:11px;color:#94A3B8;line-height:1.7;">
+            Set the <b style="color:#E6EBF5;">Seller ID</b> from your Gumroad account
+            (Settings → Advanced shows it on the Ping). Set the Ping URL to:<br>
+            <code style="color:#10B981;" id="gumroad-webhook-url">…/api/gumroad/webhook</code><br>
+            Optionally set the product permalink to only honor that product's sales.
+          </div>
+        </div>
+
         <!-- Lemon Squeezy signing secret (legacy / dormant) -->
         <div style="margin-bottom:1.25rem;padding-bottom:1.25rem;border-bottom:1px solid var(--border);">
           <div class="field-label">Lemon Squeezy Signing Secret <span style="font-size:10px;color:#64748B;font-weight:400;">(legacy)</span></div>
@@ -596,7 +619,7 @@ function toggleLicenseMgmt() {
   const chevron = document.getElementById('license-mgmt-chevron');
   body.style.display    = lmOpen ? 'block' : 'none';
   chevron.style.transform = lmOpen ? 'rotate(180deg)' : '';
-  if (lmOpen) { loadLicenses(1); loadWhopConfig(); loadLemonConfig(); }
+  if (lmOpen) { loadLicenses(1); loadWhopConfig(); loadGumroadConfig(); loadLemonConfig(); }
 }
 
 // ── Whop signing secret (primary) ──
@@ -636,6 +659,52 @@ document.getElementById('save-whop-secret')?.addEventListener('click', async () 
     if (inputEl) inputEl.value = '';   // clear the field; never echo the secret back
     if (statusEl) { statusEl.textContent = `Saved (${cfg.signing_secret_masked})`; statusEl.style.color = 'var(--green)'; }
     if (inputEl) inputEl.placeholder = cfg.signing_secret_masked || '••••••••';
+  } catch (e) {
+    if (statusEl) { statusEl.textContent = `Save failed: ${_esc(e.message)}`; statusEl.style.color = 'var(--red)'; }
+  }
+});
+
+// ── Gumroad seller ID ──
+async function loadGumroadConfig() {
+  const urlEl = document.getElementById('gumroad-webhook-url');
+  if (urlEl) urlEl.textContent = `${location.origin}/api/gumroad/webhook`;
+  const statusEl = document.getElementById('gumroad-config-status');
+  const inputEl  = document.getElementById('gumroad-seller-id');
+  const permEl   = document.getElementById('gumroad-permalink');
+  try {
+    const cfg = await api('/api/admin/gumroad-config');
+    if (permEl && cfg.permalink) permEl.value = cfg.permalink;
+    if (cfg.seller_id_set) {
+      if (statusEl) { statusEl.textContent = `Configured (${cfg.seller_id_masked})`; statusEl.style.color = 'var(--green)'; }
+      if (inputEl) inputEl.placeholder = cfg.seller_id_masked || '••••••••';
+    } else {
+      if (statusEl) { statusEl.textContent = 'Not configured.'; statusEl.style.color = ''; }
+      if (inputEl) inputEl.placeholder = 'Enter seller ID';
+    }
+  } catch (e) {
+    if (statusEl) { statusEl.textContent = `Failed to load: ${_esc(e.message)}`; statusEl.style.color = 'var(--red)'; }
+  }
+}
+
+document.getElementById('save-gumroad-config')?.addEventListener('click', async () => {
+  const inputEl  = document.getElementById('gumroad-seller-id');
+  const permEl   = document.getElementById('gumroad-permalink');
+  const statusEl = document.getElementById('gumroad-config-status');
+  const sellerId = (inputEl?.value || '').trim();
+  const permalink = (permEl?.value || '').trim();
+  if (!sellerId && !permalink) {
+    if (statusEl) { statusEl.textContent = 'Enter a seller ID to save.'; statusEl.style.color = 'var(--red)'; }
+    return;
+  }
+  try {
+    const cfg = await api('/api/admin/gumroad-config', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ seller_id: sellerId, permalink: permalink }),
+    });
+    if (inputEl) inputEl.value = '';   // clear; never echo the id back
+    if (statusEl) { statusEl.textContent = `Saved (${cfg.seller_id_masked})`; statusEl.style.color = 'var(--green)'; }
+    if (inputEl) inputEl.placeholder = cfg.seller_id_masked || '••••••••';
   } catch (e) {
     if (statusEl) { statusEl.textContent = `Save failed: ${_esc(e.message)}`; statusEl.style.color = 'var(--red)'; }
   }
