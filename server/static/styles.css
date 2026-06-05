@@ -1424,8 +1424,15 @@ button { cursor: pointer; font-family: inherit; }
     transform: translateX(-100%);
     transition: transform .25s ease;
     z-index: 50;
+    /* 100vh on mobile includes the browser chrome, pushing the footer (Paper
+       Trading card + Sign Out) below the visible area. 100dvh accounts for the
+       address/tool bars; the whole sidebar can also scroll if content is taller. */
+    height: 100dvh;
+    overflow-y: auto;
   }
   .sidebar.mobile-open { transform: translateX(0); }
+  /* Keep the footer (paper card + sign out + theme) from being squeezed away. */
+  .sidebar-footer { flex-shrink: 0; }
 
   /* Main content fills full width */
   .main { margin-left: 0 !important; }
