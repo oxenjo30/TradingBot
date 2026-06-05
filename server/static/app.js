@@ -5653,6 +5653,38 @@ function initUpdateCard() {
   const errorEl      = document.getElementById('update-error');
   const metaEl       = document.getElementById('update-meta');
 
+  // ── Curated changelog (CHANGELOG.md via /api/changelog) ──
+  // Shows the latest version's notes in the "What's new" box, and a modal with the
+  // full history. Replaces the old raw-commit / GitHub-link behavior.
+  let _changelogEntries = [];
+  async function loadChangelog() {
+    try {
+      const data = await api('/api/changelog');
+      _changelogEntries = data.entries || [];
+      if (_changelogEntries.length && releaseBox && releaseNotes) {
+        const latest = _changelogEntries[0];
+        releaseTitle.textContent = latest.title;
+        releaseNotes.textContent = latest.notes.map(n => '• ' + n).join('\n');
+        releaseBox.style.display = '';
+      }
+    } catch (_) { /* changelog is best-effort */ }
+  }
+  if (releaseLink) {
+    releaseLink.addEventListener('click', (e) => {
+      e.preventDefault();
+      const body = document.getElementById('changelog-body');
+      const modal = document.getElementById('changelog-modal');
+      if (!body || !modal) return;
+      body.innerHTML = _changelogEntries.map(en =>
+        `<div style="margin-bottom:1rem;">
+           <div style="font-weight:600;color:var(--fg);margin-bottom:.35rem;">${en.title}</div>
+           <ul style="margin:0;padding-left:1.1rem;">${en.notes.map(n => `<li>${n}</li>`).join('')}</ul>
+         </div>`).join('') || '<div>No changelog available.</div>';
+      modal.style.display = 'flex';
+    });
+  }
+  loadChangelog();
+
   // SVG icons used in multiple states
   const refreshIcon = `<svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
     <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
@@ -5728,11 +5760,8 @@ function initUpdateCard() {
       btn.innerHTML = refreshIcon + ' Check Again';
       btn.onclick = doCheck;
       actionsEl.appendChild(btn);
-      // "What's new" box — incoming commit subjects
-      releaseTitle.textContent = "What's new";
-      releaseNotes.textContent = data.release_notes;
-      releaseLink.href = 'https://github.com/oxenjo30/TradingBot/commits/master';
-      releaseBox.style.display = data.release_notes ? '' : 'none';
+      // The "What's new" box is driven by the curated changelog (loadChangelog),
+      // shown in all states — no need to overwrite it with raw commit subjects here.
     }
 
     else if (state === 'updating') {

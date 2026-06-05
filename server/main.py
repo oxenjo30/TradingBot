@@ -433,6 +433,30 @@ def apply_update(request: Request):
     return result
 
 
+@app.get("/api/changelog")
+def get_changelog():
+    """Return the curated, customer-facing changelog (CHANGELOG.md), parsed into
+    per-version entries. Public so the dashboard 'What's new' can link to it.
+    """
+    path = BASE_DIR / "CHANGELOG.md"
+    if not path.exists():
+        return {"entries": [], "raw": ""}
+    raw = path.read_text(encoding="utf-8")
+    # Split on '## ' version headers into {title, notes[]} entries.
+    entries = []
+    current = None
+    for line in raw.splitlines():
+        if line.startswith("## "):
+            if current:
+                entries.append(current)
+            current = {"title": line[3:].strip(), "notes": []}
+        elif current is not None and line.strip().startswith("- "):
+            current["notes"].append(line.strip()[2:].strip())
+    if current:
+        entries.append(current)
+    return {"entries": entries, "raw": raw}
+
+
 # ── License ───────────────────────────────────────────────────────────────────
 
 class LicenseActivate(BaseModel):

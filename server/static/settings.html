@@ -382,14 +382,25 @@
           <span style="font-size:11px;font-weight:600;color:var(--blue);background:rgba(59,130,246,.1);padding:2px 8px;border-radius:6px;">Latest release</span>
         </div>
         <div id="update-release-notes" style="font-size:12px;color:var(--muted);line-height:1.65;white-space:pre-wrap;"></div>
-        <a id="update-release-link" href="#" target="_blank" rel="noopener noreferrer"
-           style="display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--blue);margin-top:.75rem;text-decoration:none;">
-          View full release on GitHub
+        <a id="update-release-link" href="#"
+           style="display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--blue);margin-top:.75rem;text-decoration:none;cursor:pointer;">
+          View full changelog
           <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
-            <polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+            <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
           </svg>
         </a>
+      </div>
+
+      <!-- Full changelog modal -->
+      <div id="changelog-modal" style="display:none;position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.6);align-items:center;justify-content:center;padding:1rem;">
+        <div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;max-width:560px;width:100%;max-height:80vh;overflow:auto;padding:1.5rem;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
+            <span style="font-size:16px;font-weight:700;">What's New in PrimusTrader</span>
+            <button onclick="document.getElementById('changelog-modal').style.display='none'"
+                    style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;line-height:1;">&times;</button>
+          </div>
+          <div id="changelog-body" style="font-size:13px;color:var(--muted);line-height:1.7;"></div>
+        </div>
       </div>
 
       <div id="update-error" class="field-msg err" style="display:none;margin-top:.75rem;"></div>
