@@ -642,17 +642,6 @@ async def gumroad_webhook(request: Request):
     """Receive a Gumroad Ping (form-encoded), issue a license, email the buyer."""
     from .gumroad import process_webhook as gumroad_process, GumroadWebhookError
     form = dict(await request.form())
-
-    # TEMP DIAGNOSTIC (remove after capturing seller_id): dump the raw Ping form to
-    # a file so the seller can read their seller_id + see the real field shape.
-    try:
-        import json as _json, pathlib as _pl
-        _p = _pl.Path(__file__).resolve().parent.parent / "gumroad_debug.log"
-        with _p.open("a", encoding="utf-8") as _f:
-            _f.write(_json.dumps(form) + "\n")
-    except Exception as _e:
-        log.warning("gumroad raw dump failed: %s", _e)
-
     try:
         return gumroad_process(form)
     except GumroadWebhookError as e:
