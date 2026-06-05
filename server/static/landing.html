@@ -501,7 +501,7 @@
     <a href="#strategies" class="nav-link">Strategies</a>
     <a href="#pricing"    class="nav-link">Pricing</a>
     <a href="#faq"        class="nav-link">FAQ</a>
-    <a href="BUY_URL_PLACEHOLDER" class="nav-cta" id="nav-buy-btn">Get PrimusTrader →</a>
+    <a href="#pricing" class="nav-cta" id="nav-buy-btn">Get PrimusTrader →</a>
   </div>
 </nav>
 
@@ -522,7 +522,7 @@
           and lets you test everything risk-free on paper before going live.
         </p>
         <div class="hero-actions" style="justify-content:flex-start;">
-          <a href="BUY_URL_PLACEHOLDER" class="btn-primary" id="hero-buy-btn">Get PrimusTrader — $249</a>
+          <a href="#pricing" class="btn-primary" id="hero-buy-btn">Get PrimusTrader — $249</a>
           <a href="#showcase" class="btn-ghost">See it in action</a>
         </div>
         <p class="hero-note" style="text-align:left;">Test on paper first · Lifetime license · Windows &amp; Linux</p>
@@ -963,7 +963,7 @@
   <div class="cta-banner">
     <h2 class="cta-banner-title">Start trading smarter today</h2>
     <p class="cta-banner-sub">One-time payment. Instant delivery. No monthly fees.</p>
-    <a href="BUY_URL_PLACEHOLDER" class="btn-primary" style="font-size:17px;padding:16px 40px;" id="cta-buy-btn">
+    <a href="#pricing" class="btn-primary" style="font-size:17px;padding:16px 40px;" id="cta-buy-btn">
       Get PrimusTrader — $249
     </a>
     <p style="margin-top:16px;font-size:13px;color:var(--muted2);">Secure checkout · License key by email · Windows &amp; Linux</p>
@@ -1025,8 +1025,8 @@
         if (d.url && !d.whop) whop = d.url;  // backward-compat with old {url}
       }
     } catch (_) {}
-    // Legacy single-store buttons (nav, hero, footer CTA) point at Whop.
-    document.querySelectorAll('[href="BUY_URL_PLACEHOLDER"]').forEach(el => { el.href = whop; });
+    // The nav/hero/footer "Get PrimusTrader" buttons scroll to #pricing, where both
+    // store buttons live — so every CTA leads to a Whop-or-Gumroad choice.
     document.querySelectorAll('[href="WHOP_BUY_URL"]').forEach(el => { el.href = whop; });
     document.querySelectorAll('[href="GUMROAD_BUY_URL"]').forEach(el => { el.href = gumroad; });
   })();
