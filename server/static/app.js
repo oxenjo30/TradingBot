@@ -5673,19 +5673,24 @@ function initUpdateCard() {
       }
     } catch (_) { /* changelog is best-effort */ }
   }
-  if (releaseLink) {
+  const changelogModal = document.getElementById('changelog-modal');
+  const closeChangelog = () => changelogModal && changelogModal.classList.add('hidden');
+  if (releaseLink && changelogModal) {
     releaseLink.addEventListener('click', (e) => {
       e.preventDefault();
       const body = document.getElementById('changelog-body');
-      const modal = document.getElementById('changelog-modal');
-      if (!body || !modal) return;
-      body.innerHTML = _changelogEntries.map(en =>
-        `<div style="margin-bottom:1rem;">
-           <div style="font-weight:600;color:var(--fg);margin-bottom:.35rem;">${en.title}</div>
-           <ul style="margin:0;padding-left:1.1rem;">${en.notes.map(n => `<li>${n}</li>`).join('')}</ul>
+      if (!body) return;
+      body.innerHTML = _changelogEntries.map((en, i) =>
+        `<div style="${i ? 'margin-top:1.1rem;padding-top:1.1rem;border-top:1px solid var(--border);' : ''}">
+           <div style="font-weight:700;color:var(--text);margin-bottom:.4rem;">${en.title}</div>
+           <ul style="margin:0;padding-left:1.1rem;line-height:1.8;">${en.notes.map(n => `<li>${n}</li>`).join('')}</ul>
          </div>`).join('') || '<div>No changelog available.</div>';
-      modal.style.display = 'flex';
+      changelogModal.classList.remove('hidden');
     });
+    // Close on × button, on backdrop click, and on Escape.
+    document.getElementById('changelog-close')?.addEventListener('click', closeChangelog);
+    changelogModal.addEventListener('click', (e) => { if (e.target === changelogModal) closeChangelog(); });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeChangelog(); });
   }
   loadChangelog();
 
