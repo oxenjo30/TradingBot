@@ -29,6 +29,11 @@ Thumbs.db
 # Claude Code local settings (may contain API keys from permission allowlists)
 .claude/settings.local.json
 .mcp.json
+.superpowers/
+
+# SSH keys — never commit private keys to the repo
+/id
+/id.pub
 
 # Internal dev / seller-only files
 docs/superpowers/

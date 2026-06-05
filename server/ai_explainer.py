@@ -24,7 +24,7 @@ def _ollama_model() -> str:
 
 
 def _claude_api_key() -> str:
-    return db.get_app_config("ai_claude_api_key", "")
+    return db.get_app_config_secure("ai_claude_api_key", "")
 
 
 def _claude_model() -> str:

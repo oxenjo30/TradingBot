@@ -165,6 +165,16 @@ CREATE TABLE IF NOT EXISTS issued_licenses (
     revoked     INTEGER NOT NULL DEFAULT 0,
     resent_at   TEXT
 );
+
+CREATE TABLE IF NOT EXISTS download_tokens (
+    token           TEXT PRIMARY KEY,
+    buyer_email     TEXT NOT NULL,
+    license_key     TEXT NOT NULL,
+    created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+    expires_at      TEXT NOT NULL,
+    attempts_remaining INTEGER NOT NULL DEFAULT 3,
+    exhausted       INTEGER NOT NULL DEFAULT 0
+);
 """
 
 RISK_DEFAULTS = {
@@ -373,6 +383,16 @@ def init_db():
                 CREATE INDEX IF NOT EXISTS idx_open_trades_lookup
                     ON open_trades(strategy, symbol, account_id, opened_at ASC);
             """)
+    # Migration: create sessions table for persistent login sessions
+    with get_conn() as c:
+        tables = [r[0] for r in c.execute("SELECT name FROM sqlite_master WHERE type='table'")]
+        if "sessions" not in tables:
+            c.executescript("""
+                CREATE TABLE IF NOT EXISTS sessions (
+                    token      TEXT PRIMARY KEY,
+                    expires_at REAL NOT NULL
+                );
+            """)
 
 
 def get_risk_settings() -> dict:
@@ -445,8 +465,7 @@ def set_license_key(key: str) -> None:
         import logging, traceback
         stack = "".join(traceback.format_stack()[:-1])  # exclude this frame
         logging.getLogger("license").warning(
-            "license_key cleared (set to empty). Caller stack:
-%s", stack,
+            "license_key cleared (set to empty). Caller stack:\n%s", stack,
         )
         try:
             # Record the FULL stack into the audit detail so the caller is captured
@@ -524,6 +543,49 @@ def update_resent_at(license_id: int) -> None:
         )
 
 
+# ── Download tokens ────────────────────────────────────────────────────────────
+
+def create_download_token(token: str, buyer_email: str, license_key: str,
+                           expires_hours: int = 72, max_attempts: int = 3) -> None:
+    with get_conn() as c:
+        c.execute(
+            "INSERT INTO download_tokens (token, buyer_email, license_key, expires_at, attempts_remaining) "
+            "VALUES (?, ?, ?, datetime('now', ? || ' hours'), ?)",
+            (token, buyer_email, license_key, str(expires_hours), max_attempts),
+        )
+
+
+def consume_download_token(token: str) -> dict | None:
+    """Validate token, decrement attempts, return row if valid. Returns None if invalid/expired/exhausted."""
+    with get_conn() as c:
+        row = c.execute(
+            "SELECT * FROM download_tokens WHERE token=?", (token,)
+        ).fetchone()
+        if not row:
+            return None
+        row = dict(row)
+        if row["exhausted"]:
+            return None
+        if row["attempts_remaining"] <= 0:
+            c.execute("UPDATE download_tokens SET exhausted=1 WHERE token=?", (token,))
+            return None
+        # Check expiry
+        expired = c.execute(
+            "SELECT 1 FROM download_tokens WHERE token=? AND expires_at < datetime('now')", (token,)
+        ).fetchone()
+        if expired:
+            return None
+        # Decrement
+        new_attempts = row["attempts_remaining"] - 1
+        exhausted = 1 if new_attempts <= 0 else 0
+        c.execute(
+            "UPDATE download_tokens SET attempts_remaining=?, exhausted=? WHERE token=?",
+            (new_attempts, exhausted, token),
+        )
+        row["attempts_remaining"] = new_attempts
+        return row
+
+
 def get_webhook_token() -> str:
     return get_app_config("webhook_token", "")
 
@@ -535,6 +597,48 @@ def rotate_webhook_token() -> str:
     token = secrets.token_hex(32)
     set_webhook_token(token)
     return token
+
+
+# Fields stored encrypted in app_config
+_ENCRYPTED_CONFIG_KEYS = {
+    "email_pass", "telegram_token", "slack_webhook_url",
+    "discord_webhook_url", "ai_claude_api_key", "lemon_signing_secret",
+}
+
+
+def _encrypt_config(value: str) -> str:
+    """Encrypt a sensitive config value. Falls back to plaintext if crypto not initialised."""
+    if not value:
+        return value
+    try:
+        from . import crypto
+        return crypto.encrypt(value)
+    except Exception:
+        return value
+
+
+def _decrypt_config(value: str) -> str:
+    """Decrypt a sensitive config value. Returns empty string on failure."""
+    if not value:
+        return value
+    try:
+        from . import crypto
+        return crypto.decrypt(value)
+    except Exception:
+        # Value may be legacy plaintext — return as-is so existing installs don't break
+        return value
+
+
+def set_app_config_secure(key: str, value: str) -> None:
+    """Store a config value, encrypting it if it's a sensitive key."""
+    stored = _encrypt_config(value) if key in _ENCRYPTED_CONFIG_KEYS else value
+    set_app_config(key, stored)
+
+
+def get_app_config_secure(key: str, default: str = "") -> str:
+    """Read a config value, decrypting it if it's a sensitive key."""
+    raw = get_app_config(key, default)
+    return _decrypt_config(raw) if key in _ENCRYPTED_CONFIG_KEYS else raw
 
 
 def get_notification_settings() -> dict:
@@ -562,6 +666,10 @@ def get_notification_settings() -> dict:
         ).fetchall()
     result = dict(defaults)
     result.update({r["key"]: r["value"] for r in rows})
+    # Decrypt sensitive fields
+    for k in _ENCRYPTED_CONFIG_KEYS:
+        if k in result:
+            result[k] = _decrypt_config(result[k])
     for bk in ["email_enabled", "telegram_enabled", "slack_enabled", "discord_enabled",
                 "notify_on_trade", "notify_on_block", "notify_daily_summary"]:
         result[bk] = result.get(bk, "") == "true"
@@ -661,12 +769,15 @@ def log_signal(strategy: str, symbol: str, side: str, qty: float, reason: str,
         return cur.lastrowid
 
 
-def recent_signals(limit: int = 100, since: str | None = None, until: str | None = None) -> list[dict]:
+def recent_signals(limit: int = 100, since: str | None = None, until: str | None = None,
+                   account_id: int | None = None) -> list[dict]:
     where, args = [], []
     if since:
         where.append("ts >= ?"); args.append(since)
     if until:
         where.append("ts <= ?"); args.append(until + "T23:59:59")
+    if account_id is not None:
+        where.append("account_id = ?"); args.append(account_id)
     clause = ("WHERE " + " AND ".join(where)) if where else ""
     with get_conn() as c:
         rows = c.execute(
@@ -821,6 +932,62 @@ def get_broker_account_credentials(account_id: int) -> dict | None:
             "SELECT api_key, api_secret, account_type, broker FROM broker_accounts WHERE id=?", (account_id,)
         ).fetchone()
         return dict(r) if r else None
+
+
+class SecretKeyMismatchError(RuntimeError):
+    """Raised when DB_SECRET_KEY cannot decrypt stored broker credentials."""
+
+
+def verify_secret_key_matches_credentials() -> None:
+    """Fail loudly at startup if DB_SECRET_KEY can no longer decrypt stored broker
+    credentials.
+
+    Without this check a changed/lost DB_SECRET_KEY surfaces only as "API key
+    invalid" errors in the UI — making a key-mismatch look like a broker problem.
+    We try to decrypt each account's api_key; if a non-empty ciphertext fails to
+    decrypt, the key does not match what encrypted the data.
+
+    No-op (returns) when:
+      - crypto is not initialised (no DB_SECRET_KEY set — separate, handled case)
+      - there are no broker accounts, or none have a stored api_key
+      - a stored api_key is legacy plaintext (decrypt fails but value isn't Fernet
+        ciphertext — we only flag values that look like Fernet tokens, "gAAAAA…")
+    """
+    from . import crypto
+    if crypto._fernet is None:
+        return  # no key configured; encrypt/decrypt already guard this elsewhere
+
+    accounts = get_broker_accounts()
+    checked = 0
+    for a in accounts:
+        ciphertext = a.get("api_key") or ""
+        if not ciphertext:
+            continue
+        # Fernet tokens are urlsafe-base64 starting with "gAAAAA". Skip anything
+        # that clearly isn't encrypted (legacy plaintext keys) so we don't false-alarm.
+        if not ciphertext.startswith("gAAAAA"):
+            continue
+        checked += 1
+        try:
+            crypto.decrypt(ciphertext)
+            return  # at least one credential decrypts → key matches, all good
+        except Exception:
+            continue  # try the next account before concluding
+
+    if checked == 0:
+        return  # nothing encrypted to verify against
+
+    # Every encrypted credential failed to decrypt → the key does not match the data.
+    raise SecretKeyMismatchError(
+        "DB_SECRET_KEY does not match the encrypted broker credentials in the "
+        "database. The key in your .env was likely changed or regenerated.\n"
+        "  • Your stored credentials are intact but cannot be read with this key.\n"
+        "  • If you have the ORIGINAL DB_SECRET_KEY, restore it to .env and restart.\n"
+        "  • Otherwise, start the app, go to Settings → Broker Accounts, and "
+        "re-enter your API keys (they will be re-encrypted with the current key).\n"
+        "This guard exists so a key mismatch fails loudly instead of looking like "
+        "an invalid-API-key error."
+    )
 
 
 def update_broker_account(account_id: int, *, label: str | None = None, account_type: str | None = None) -> None:
@@ -1420,6 +1587,37 @@ def set_signal_explanation(signal_id: int, text: str, ai_provider: str | None = 
             "UPDATE signals SET ai_explanation=?, ai_provider=?, ai_model=? WHERE id=?",
             (text, ai_provider, ai_model, signal_id),
         )
+
+
+# ── Persistent sessions ────────────────────────────────────────────────────────
+
+def save_session(token: str, expires_at: float) -> None:
+    with get_conn() as c:
+        c.execute("INSERT OR REPLACE INTO sessions(token, expires_at) VALUES(?,?)",
+                  (token, expires_at))
+
+
+def load_session(token: str) -> float | None:
+    """Return expiry timestamp or None if not found."""
+    with get_conn() as c:
+        row = c.execute("SELECT expires_at FROM sessions WHERE token=?", (token,)).fetchone()
+    return row["expires_at"] if row else None
+
+
+def update_session_expiry(token: str, expires_at: float) -> None:
+    with get_conn() as c:
+        c.execute("UPDATE sessions SET expires_at=? WHERE token=?", (expires_at, token))
+
+
+def delete_session(token: str) -> None:
+    with get_conn() as c:
+        c.execute("DELETE FROM sessions WHERE token=?", (token,))
+
+
+def purge_expired_sessions() -> None:
+    import time
+    with get_conn() as c:
+        c.execute("DELETE FROM sessions WHERE expires_at < ?", (time.time(),))
 
 
 def get_unexplained_signals(limit: int = 50) -> list[dict]:

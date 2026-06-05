@@ -3,10 +3,40 @@ import hashlib
 import hmac
 import os
 import time
+import threading
 from .db import get_conn, init_db
 
 SESSION_TTL = 60 * 60 * 24  # 24 hours
-_sessions: dict[str, float] = {}  # token → expiry_ts
+
+# ── Brute-force protection ────────────────────────────────────────────────────
+_FAIL_LIMIT   = 5          # lock after this many consecutive failures
+_LOCKOUT_SECS = 300        # 5-minute lockout
+_fail_lock    = threading.Lock()
+_fail_count   = 0          # consecutive failed attempts
+_locked_until = 0.0        # epoch timestamp when lockout expires
+
+
+def check_login_allowed() -> tuple[bool, int]:
+    """Return (allowed, seconds_remaining). Call before checking password."""
+    global _locked_until
+    with _fail_lock:
+        remaining = max(0, int(_locked_until - time.time()))
+        return (remaining == 0), remaining
+
+
+def record_login_success():
+    global _fail_count, _locked_until
+    with _fail_lock:
+        _fail_count   = 0
+        _locked_until = 0.0
+
+
+def record_login_failure():
+    global _fail_count, _locked_until
+    with _fail_lock:
+        _fail_count += 1
+        if _fail_count >= _FAIL_LIMIT:
+            _locked_until = time.time() + _LOCKOUT_SECS
 
 
 # ── Password ──────────────────────────────────────────────────────────────────
@@ -54,30 +84,35 @@ def check_password(password: str) -> bool:
     return _verify_pw(password, h)
 
 
-# ── Sessions ──────────────────────────────────────────────────────────────────
+# ── Sessions (DB-backed, survive restarts) ────────────────────────────────────
 
 def create_session() -> str:
+    from .db import save_session, purge_expired_sessions
     token = os.urandom(32).hex()
-    _sessions[token] = time.time() + SESSION_TTL
+    expires_at = time.time() + SESSION_TTL
+    save_session(token, expires_at)
+    purge_expired_sessions()  # clean up old sessions opportunistically
     return token
 
 
 def validate_session(token: str | None) -> bool:
     if not token:
         return False
-    expiry = _sessions.get(token)
-    if not expiry:
+    from .db import load_session, update_session_expiry
+    expiry = load_session(token)
+    if expiry is None:
         return False
     if time.time() > expiry:
-        _sessions.pop(token, None)
+        revoke_session(token)
         return False
     # refresh TTL on activity
-    _sessions[token] = time.time() + SESSION_TTL
+    update_session_expiry(token, time.time() + SESSION_TTL)
     return True
 
 
 def revoke_session(token: str):
-    _sessions.pop(token, None)
+    from .db import delete_session
+    delete_session(token)
 
 
 # ── Setup state ───────────────────────────────────────────────────────────────
