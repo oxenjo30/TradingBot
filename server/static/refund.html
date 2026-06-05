@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Refund Policy — PrimusTrader</title>
+  <meta name="description" content="PrimusTrader Refund Policy — all sales are final because the license key and download are delivered instantly.">
+  <meta name="robots" content="index, follow">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #060C14;
+      --bg2:      #0A1220;
+      --card:     #0F1A2A;
+      --card2:    #142030;
+      --border:   #1E3050;
+      --blue:     #3B82F6;
+      --blue2:    #2563EB;
+      --purple:   #8B5CF6;
+      --green:    #10B981;
+      --yellow:   #F59E0B;
+      --red:      #EF4444;
+      --text:     #E8EFF8;
+      --muted:    #94A3B8;
+      --muted2:   #64748B;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    /* ── Gradient mesh background (fixed, behind everything) ──────────────── */
+    .bg-mesh {
+      position: fixed; inset: 0; z-index: -2; pointer-events: none;
+      background:
+        radial-gradient(48% 36% at 18% 8%,  rgba(59,130,246,.20) 0%, transparent 60%),
+        radial-gradient(42% 34% at 86% 6%,  rgba(139,92,246,.18) 0%, transparent 60%),
+        radial-gradient(55% 45% at 50% 0%,  rgba(37,99,235,.12)  0%, transparent 55%),
+        var(--bg);
+    }
+
+    /* ── Utility ─────────────────────────────────────────────────────────── */
+    .container { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+    .text-muted  { color: var(--muted); }
+
+    /* ── Nav ─────────────────────────────────────────────────────────────── */
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      background: rgba(6,12,20,.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid rgba(59,130,246,.12);
+      padding: 0 24px;
+      height: 60px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .nav-logo {
+      display: flex; align-items: center; gap: 10px;
+      font-size: 18px; font-weight: 800; color: var(--text);
+      text-decoration: none;
+    }
+    .nav-logo-mark {
+      width: 32px; height: 32px; border-radius: 8px;
+      background: linear-gradient(135deg, var(--blue), var(--purple));
+      display: flex; align-items: center; justify-content: center;
+    }
+    .nav-links { display: flex; align-items: center; gap: 8px; }
+    .nav-link {
+      color: var(--muted); font-size: 13px; font-weight: 500;
+      text-decoration: none; padding: 6px 12px; border-radius: 6px;
+      transition: color .15s;
+    }
+    .nav-link:hover { color: var(--text); }
+
+    /* ── Legal content ───────────────────────────────────────────────────── */
+    .legal-head {
+      padding: 120px 0 32px;
+      border-bottom: 1px solid var(--border);
+    }
+    .legal-eyebrow {
+      font-size: 11px; font-weight: 700; color: var(--blue);
+      text-transform: uppercase; letter-spacing: .12em; margin-bottom: 12px;
+    }
+    .legal-title {
+      font-size: clamp(30px, 5vw, 46px); font-weight: 800;
+      letter-spacing: -.02em; line-height: 1.12; margin-bottom: 14px;
+    }
+    .legal-updated { font-size: 13px; color: var(--muted2); }
+
+    .legal {
+      max-width: 760px;
+      padding: 48px 0 80px;
+      font-size: 15px;
+      color: var(--muted);
+      line-height: 1.75;
+    }
+    .legal .lede {
+      font-size: 16px; color: var(--text); margin-bottom: 32px;
+    }
+    .legal h2 {
+      font-size: 19px; font-weight: 700; color: var(--text);
+      margin: 36px 0 12px; letter-spacing: -.01em;
+    }
+    .legal h2:first-of-type { margin-top: 0; }
+    .legal h2 .num { color: var(--blue); margin-right: 8px; }
+    .legal p { margin-bottom: 14px; }
+    .legal ul { margin: 0 0 14px; padding-left: 22px; }
+    .legal li { margin-bottom: 8px; }
+    .legal strong { color: var(--text); font-weight: 600; }
+    .legal a { color: var(--blue); text-decoration: none; }
+    .legal a:hover { text-decoration: underline; }
+    .legal .callout {
+      background: rgba(239,68,68,.06);
+      border: 1px solid rgba(239,68,68,.22);
+      border-radius: 10px; padding: 16px 18px; margin: 24px 0;
+      color: #FCA5A5; font-size: 14px;
+    }
+    .legal .callout strong { color: #FECACA; }
+
+    .back-home {
+      display: inline-flex; align-items: center; gap: 6px;
+      color: var(--muted); font-size: 13px; font-weight: 500;
+      text-decoration: none; margin-top: 8px;
+      transition: color .15s;
+    }
+    .back-home:hover { color: var(--text); }
+
+    /* ── Footer ──────────────────────────────────────────────────────────── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 32px 0;
+      text-align: center;
+      font-size: 13px;
+      color: var(--muted2);
+    }
+    footer a { color: var(--muted); text-decoration: none; margin: 0 12px; }
+    footer a:hover { color: var(--text); }
+
+    /* ── Disclaimer banner ───────────────────────────────────────────────── */
+    .disclaimer {
+      background: rgba(245,158,11,.07);
+      border-top: 1px solid rgba(245,158,11,.2);
+      padding: 12px 24px;
+      text-align: center;
+      font-size: 12px;
+      color: rgba(245,158,11,.8);
+    }
+  </style>
+</head>
+<body>
+
+<!-- Gradient mesh background -->
+<div class="bg-mesh" aria-hidden="true"></div>
+
+<!-- ── Nav ───────────────────────────────────────────────────────────────── -->
+<nav>
+  <a href="/" class="nav-logo">
+    <div class="nav-logo-mark">
+      <svg width="16" height="16" viewBox="0 0 22 22" fill="none">
+        <path d="M11 2L20 7.5V14.5L11 20L2 14.5V7.5L11 2Z" fill="white"/>
+      </svg>
+    </div>
+    PrimusTrader
+  </a>
+  <div class="nav-links">
+    <a href="/#features"  class="nav-link">Features</a>
+    <a href="/#pricing"   class="nav-link">Pricing</a>
+    <a href="/" class="nav-link">← Home</a>
+  </div>
+</nav>
+
+<!-- ── Header ─────────────────────────────────────────────────────────────── -->
+<header class="legal-head">
+  <div class="container">
+    <div class="legal-eyebrow">Legal</div>
+    <h1 class="legal-title">Refund Policy</h1>
+    <div class="legal-updated">Last updated: June 5, 2026</div>
+  </div>
+</header>
+
+<!-- ── Body ───────────────────────────────────────────────────────────────── -->
+<main class="container">
+  <div class="legal">
+
+    <p class="lede">
+      PrimusTrader is a digital product. Your license key and download access are delivered to you
+      <strong>instantly upon purchase</strong>. Because the product is delivered immediately and cannot be
+      returned once accessed, <strong>all sales are final</strong>.
+    </p>
+
+    <div class="callout">
+      <strong>All sales are final — no refunds.</strong> When you complete checkout, your license key is
+      issued and your download is made available right away. For this reason we do not offer refunds,
+      returns, or exchanges once a purchase is complete.
+    </div>
+
+    <h2><span class="num">1.</span>Why All Sales Are Final</h2>
+    <p>
+      PrimusTrader is downloadable software licensed to you, not a physical good or a recurring
+      subscription. Once your payment is processed, your lifetime license key is generated and your
+      download is unlocked immediately. As the software has been delivered and cannot be &ldquo;returned,&rdquo;
+      purchases are non-refundable.
+    </p>
+
+    <h2><span class="num">2.</span>Try Before You Buy</h2>
+    <p>
+      Before purchasing, we encourage you to review the full feature list, screenshots, and frequently
+      asked questions on our website so you know exactly what you are buying. PrimusTrader ships with a
+      built-in <strong>paper-trading mode</strong> so you can run every strategy with no real money at
+      risk after purchase. If you have questions before buying, reach out to us first at
+      <a href="mailto:kurtis@primustrader.com">kurtis@primustrader.com</a> — we&rsquo;re happy to help.
+    </p>
+
+    <h2><span class="num">3.</span>Technical Issues</h2>
+    <p>
+      If you run into a technical problem installing or running PrimusTrader, contact us at
+      <a href="mailto:kurtis@primustrader.com">kurtis@primustrader.com</a> and we will do our best to help
+      you get up and running. Trading losses, dissatisfaction with strategy performance, or a change of
+      mind are <strong>not</strong> eligible for a refund — see our
+      <a href="/terms">Terms of Service</a> regarding trading risk.
+    </p>
+
+    <h2><span class="num">4.</span>Payment Processor &amp; Buyer Protection</h2>
+    <p>
+      Our purchases are handled by <strong>Lemon Squeezy</strong>, which acts as the merchant of record.
+      In limited circumstances, Lemon Squeezy may apply its own buyer-protection or chargeback policies,
+      which operate independently of this Refund Policy and may override it where required by their terms
+      or by applicable law. Where the law grants you a non-waivable right to a refund, nothing in this
+      policy limits that right.
+    </p>
+
+    <h2><span class="num">5.</span>Changes to This Policy</h2>
+    <p>
+      We may update this Refund Policy from time to time. The &ldquo;Last updated&rdquo; date above
+      reflects the most recent revision. The policy in effect at the time of your purchase applies to that
+      purchase.
+    </p>
+
+    <h2><span class="num">6.</span>Contact</h2>
+    <p>
+      Questions about this policy? Contact us at
+      <a href="mailto:kurtis@primustrader.com">kurtis@primustrader.com</a>.
+    </p>
+
+    <a href="/" class="back-home">← Back to home</a>
+  </div>
+</main>
+
+<!-- ── Footer ─────────────────────────────────────────────────────────────── -->
+<footer>
+  <div class="container">
+    <p style="margin-bottom:12px;">
+      <a href="/#features">Features</a>
+      <a href="/#pricing">Pricing</a>
+      <a href="/terms">Terms</a>
+      <a href="/privacy">Privacy</a>
+      <a href="/refund">Refund</a>
+    </p>
+    <p>&copy; 2026 PrimusTrader · Zimmerman Holdings. All rights reserved.</p>
+  </div>
+</footer>
+
+<!-- ── Disclaimer ─────────────────────────────────────────────────────────── -->
+<div class="disclaimer">
+  ⚠ Trading involves substantial risk of loss. PrimusTrader is a software tool, not financial advice.
+  Past strategy performance does not guarantee future results. Never risk money you cannot afford to lose.
+</div>
+
+</body>
+</html>

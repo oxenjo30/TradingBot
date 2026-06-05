@@ -1673,6 +1673,32 @@ def landing_page():
     return FileResponse(str(landing))
 
 
+def _legal_page(filename: str):
+    """Serve a public legal page from static/ at a clean URL."""
+    page = STATIC_DIR / filename
+    if not page.exists():
+        raise HTTPException(404, "Page not found")
+    return FileResponse(str(page))
+
+
+@app.get("/terms")
+def terms_page():
+    """Public Terms of Service — always accessible."""
+    return _legal_page("terms.html")
+
+
+@app.get("/privacy")
+def privacy_page():
+    """Public Privacy Policy — always accessible."""
+    return _legal_page("privacy.html")
+
+
+@app.get("/refund")
+def refund_page():
+    """Public Refund Policy — always accessible."""
+    return _legal_page("refund.html")
+
+
 @app.get("/api/buy-url")
 def buy_url():
     """Return the Lemon Squeezy buy URL for the landing page."""
