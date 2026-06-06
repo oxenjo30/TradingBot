@@ -5688,19 +5688,28 @@ function initUpdateCard() {
   // ── Curated changelog (CHANGELOG.md via /api/changelog) ──
   // Shows the latest version's notes in the "What's new" box, and a modal with the
   // full history. Replaces the old raw-commit / GitHub-link behavior.
-  let _changelogEntries = [];
-  async function loadChangelog() {
-    try {
-      const data = await api('/api/changelog');
-      _changelogEntries = data.entries || [];
-      if (_changelogEntries.length && releaseBox && releaseNotes) {
-        const latest = _changelogEntries[0];
-        releaseTitle.textContent = latest.title;
-        releaseNotes.textContent = latest.notes.map(n => '• ' + n).join('\n');
-        releaseBox.style.display = '';
-      }
-    } catch (_) { /* changelog is best-effort */ }
+  // "What's New" is now driven by the update check, NOT a manual changelog:
+  // it lists the incoming commit subjects (what an update would bring) and is
+  // shown ONLY when an update is available. When up to date, the box is hidden.
+  let _incoming = [];
+  // Hide internal/scratch commits from customers (temp/chore/ci/build/version bumps).
+  const _isNoise = (s) => /^(temp|chore|ci|build|wip)(\([^)]*\))?!?:/i.test(String(s));
+  function renderWhatsNew(info) {
+    if (!releaseBox || !releaseNotes) return;
+    _incoming = ((info && info.incoming) || []).filter(s => !_isNoise(s));
+    const behind = info && !info.up_to_date && _incoming.length > 0;
+    if (!behind) { releaseBox.style.display = 'none'; return; }
+    releaseTitle.textContent = "What's new in the latest update";
+    releaseNotes.textContent = _incoming.map(s => '• ' + _prettyCommit(s)).join('\n');
+    releaseBox.style.display = '';
   }
+  // Turn a commit subject into a readable line: drop the conventional-commit
+  // prefix (feat:/fix:/docs:…) and the trailing scope, capitalize.
+  function _prettyCommit(s) {
+    let t = String(s).replace(/^(feat|fix|docs|refactor|perf|style|chore|build|ci|test)(\([^)]*\))?!?:\s*/i, '');
+    return t.charAt(0).toUpperCase() + t.slice(1);
+  }
+
   const changelogModal = document.getElementById('changelog-modal');
   const closeChangelog = () => changelogModal && changelogModal.classList.add('hidden');
   if (releaseLink && changelogModal) {
@@ -5708,19 +5717,15 @@ function initUpdateCard() {
       e.preventDefault();
       const body = document.getElementById('changelog-body');
       if (!body) return;
-      body.innerHTML = _changelogEntries.map((en, i) =>
-        `<div style="${i ? 'margin-top:1.1rem;padding-top:1.1rem;border-top:1px solid var(--border);' : ''}">
-           <div style="font-weight:700;color:var(--text);margin-bottom:.4rem;">${en.title}</div>
-           <ul style="margin:0;padding-left:1.1rem;line-height:1.8;">${en.notes.map(n => `<li>${n}</li>`).join('')}</ul>
-         </div>`).join('') || '<div>No changelog available.</div>';
+      body.innerHTML = _incoming.length
+        ? `<ul style="margin:0;padding-left:1.1rem;line-height:1.9;">${_incoming.map(s => `<li>${_prettyCommit(s)}</li>`).join('')}</ul>`
+        : '<div>You\'re on the latest version — nothing new.</div>';
       changelogModal.classList.remove('hidden');
     });
-    // Close on × button, on backdrop click, and on Escape.
     document.getElementById('changelog-close')?.addEventListener('click', closeChangelog);
     changelogModal.addEventListener('click', (e) => { if (e.target === changelogModal) closeChangelog(); });
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeChangelog(); });
   }
-  loadChangelog();
 
   // SVG icons used in multiple states
   const refreshIcon = `<svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -5772,6 +5777,8 @@ function initUpdateCard() {
       btn.innerHTML = refreshIcon + ' Check Again';
       btn.onclick = doCheck;
       actionsEl.appendChild(btn);
+      // Up to date → nothing new to show.
+      renderWhatsNew({ up_to_date: true, incoming: [] });
     }
 
     else if (state === 'update-available') {
@@ -5797,8 +5804,8 @@ function initUpdateCard() {
       btn.innerHTML = refreshIcon + ' Check Again';
       btn.onclick = doCheck;
       actionsEl.appendChild(btn);
-      // The "What's new" box is driven by the curated changelog (loadChangelog),
-      // shown in all states — no need to overwrite it with raw commit subjects here.
+      // Update available → show What's New with the incoming commit subjects.
+      renderWhatsNew(data);
     }
 
     else if (state === 'updating') {
