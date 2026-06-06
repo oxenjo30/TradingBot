@@ -1826,8 +1826,16 @@ def test_notification(body: dict, request: Request):
     channel = body.get("channel", "email")
     try:
         if channel == "telegram":
-            token   = body.get("telegram_token", "").strip()
-            chat_id = body.get("telegram_chat_id", "").strip()
+            # The token field is blanked on page load (the secret never leaves the
+            # server), so an unchanged form sends an empty token. Fall back to the
+            # stored token when the field is empty or the masked placeholder — same
+            # pattern as email_pass below — so Send Test works without re-typing.
+            token = (body.get("telegram_token", "") or "").strip()
+            if not token or token == db.SECRET_PLACEHOLDER:
+                token = db.get_app_config_secure("telegram_token", "")
+            chat_id = (body.get("telegram_chat_id", "") or "").strip()
+            if not chat_id:
+                chat_id = db.get_app_config_secure("telegram_chat_id", "")
             notifications.send_telegram_direct(
                 token, chat_id,
                 "✅ <b>TradeBot</b> — Telegram notifications are working!"
