@@ -40,21 +40,36 @@ class TradierAccountClient:
             "Accept": "application/json",
         }
 
+    @staticmethod
+    def _raise_for_status(r: httpx.Response) -> None:
+        """Like httpx.raise_for_status() but includes Tradier's response body in the
+        message. Tradier returns the real reason (e.g. "Invalid parameter,
+        quantity: must be greater than 0.") in the body, which the default
+        raise_for_status() discards behind a generic 'Client error 400' link."""
+        if r.is_success:
+            return
+        detail = (r.text or "").strip()
+        if detail:
+            raise httpx.HTTPStatusError(
+                f"Tradier {r.status_code}: {detail}", request=r.request, response=r
+            )
+        r.raise_for_status()
+
     def _get(self, path: str, params: dict | None = None) -> dict:
         r = httpx.get(f"{self._base}{path}", headers=self._headers(),
                       params=params, timeout=15.0)
-        r.raise_for_status()
+        self._raise_for_status(r)
         return r.json()
 
     def _post(self, path: str, data: dict) -> dict:
         r = httpx.post(f"{self._base}{path}", headers=self._headers(),
                        data=data, timeout=15.0)
-        r.raise_for_status()
+        self._raise_for_status(r)
         return r.json()
 
     def _delete(self, path: str) -> dict:
         r = httpx.delete(f"{self._base}{path}", headers=self._headers(), timeout=15.0)
-        r.raise_for_status()
+        self._raise_for_status(r)
         return r.json()
 
     def _account_id_str(self) -> str:
@@ -163,7 +178,15 @@ class TradierAccountClient:
         if qty is None:
             quote = self.get_latest_quote(symbol)
             mid   = (quote["bid"] + quote["ask"]) / 2 or quote["ask"]
-            qty   = max(1, int(notional // mid))
+            # A zero/missing quote (common for thinly-traded micro-caps or a feed
+            # gap) would make notional//mid divide by zero or size a bogus order
+            # that Tradier rejects with a 400. Fail with a clear reason instead.
+            if not mid or mid <= 0:
+                raise ValueError(
+                    f"no valid Tradier quote for {symbol} (bid={quote['bid']}, "
+                    f"ask={quote['ask']}); cannot size a ${notional:.2f} order"
+                )
+            qty = max(1, int(notional // mid))
 
         acct_id = self._account_id_str()
         payload = {
