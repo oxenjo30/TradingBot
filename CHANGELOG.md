@@ -3,6 +3,23 @@
 Customer-facing release notes. Each entry summarizes what changed in that version
 in plain language. (Internal/infrastructure changes are omitted.)
 
+## v1.9 — Mobile-friendly dashboard
+- The whole dashboard now adapts to phones and tablets: cards stack into a single
+  readable column, tables scroll instead of getting cut off, and the menu opens
+  from a hamburger button.
+- Switch between light and dark mode anywhere — a theme toggle now sits in the
+  header on mobile, not just the sidebar.
+
+## v1.8 — Branded notification emails
+- Every email — license delivery, trade alerts, risk blocks, daily summaries, and
+  the test email — now uses one clean, branded PrimusTrader design.
+
+## v1.7 — Email & reliability fixes
+- Fixed an issue where saved email/notification settings (SMTP host, sender, app
+  password) could silently revert; they now save reliably.
+- Sensitive settings (passwords, tokens, signing secrets) are never sent back to
+  your browser, and a corrupted-password edge case was resolved.
+
 ## v1.6 — What's New panel
 - See exactly what changed in each update: the Software Updates page now shows a
   plain-language changelog and a "View full changelog" history.
