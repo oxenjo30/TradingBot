@@ -45,8 +45,10 @@ def _fetch():
         actives_raw = []
 
     try:
+        # Alpaca's /movers endpoint caps `top` at 50 (returns 400 above that),
+        # unlike /most-actives which allows 100.
         r2 = httpx.get(f"{_BASE}/movers", headers=hdrs,
-                        params={"top": 100}, timeout=15)
+                        params={"top": 50}, timeout=15)
         r2.raise_for_status()
         data = r2.json()
         gainers_raw = data.get("gainers", [])
