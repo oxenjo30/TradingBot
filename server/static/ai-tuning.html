@@ -224,7 +224,11 @@
 
     <!-- ── AI Provider Settings ── -->
     <div class="card">
-      <div style="font-size:14px;font-weight:700;margin-bottom:.75rem;">AI Provider Settings</div>
+      <div style="font-size:14px;font-weight:700;margin-bottom:.25rem;">AI Provider Settings</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:.75rem;">
+        The provider, key, and model below are used for <strong>both</strong> trade
+        explanations (Logs page) and weekly parameter tuning.
+      </div>
 
       <!-- Provider selector -->
       <div style="display:flex;gap:.5rem;margin-bottom:1.25rem;">
@@ -291,6 +295,26 @@
           <div style="font-size:11px;color:var(--muted);flex:1;min-width:200px;">
             Claude will aggressively adjust parameters to hit this win rate. Range: 50–90%. Default: 51%.
           </div>
+        </div>
+      </div>
+
+      <!-- Feature toggles (apply to the selected provider) -->
+      <div style="margin-top:1.1rem;padding-top:1rem;border-top:1px solid var(--border);">
+        <div class="ai-field-label">Features</div>
+        <div style="display:flex;gap:1.5rem;flex-wrap:wrap;margin-top:.5rem;">
+          <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-size:13px;">
+            <input type="checkbox" id="inp-explanations-enabled" style="width:15px;height:15px;accent-color:#3B82F6;">
+            Enable trade explanations
+          </label>
+          <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-size:13px;">
+            <input type="checkbox" id="inp-tuner-enabled" style="width:15px;height:15px;accent-color:#3B82F6;">
+            Enable weekly parameter tuning
+          </label>
+          <button class="btn btn-sm btn-primary" onclick="saveAiFeatureToggles()">Save</button>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-top:.5rem;">
+          Trade explanations generate a plain-English reason for each signal on the Logs page.
+          Weekly tuning optimizes strategy parameters every Sunday using the provider above.
         </div>
       </div>
 

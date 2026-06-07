@@ -4297,6 +4297,8 @@ async function initAiTuning() {
       if (el('inp-ollama-model')) el('inp-ollama-model').value = s.ollama_model || '';
       if (el('inp-claude-model') && s.claude_model) el('inp-claude-model').value = s.claude_model;
       if (el('inp-target-wr') && s.target_win_rate != null) el('inp-target-wr').value = s.target_win_rate;
+      if (el('inp-explanations-enabled')) el('inp-explanations-enabled').checked = !!s.explanations_enabled;
+      if (el('inp-tuner-enabled'))        el('inp-tuner-enabled').checked        = !!s.tuner_enabled;
       if (el('claude-key-status')) {
         el('claude-key-status').textContent = s.claude_api_key_set
           ? `Key saved: ${s.claude_api_key_masked}`
@@ -4373,6 +4375,19 @@ async function initAiTuning() {
     try {
       await jsonPatch('/api/ai/settings', { target_win_rate: val });
       if (msg) { msg.style.color = 'var(--green)'; msg.textContent = `Target win rate set to ${val}%.`; msg.style.display = ''; setTimeout(() => msg.style.display = 'none', 3000); }
+    } catch (e) {
+      if (msg) { msg.style.color = 'var(--red)'; msg.textContent = `Error: ${e.message}`; msg.style.display = ''; }
+    }
+  };
+
+  window.saveAiFeatureToggles = async function() {
+    const msg = document.getElementById('ai-settings-msg');
+    try {
+      await jsonPatch('/api/ai/settings', {
+        explanations_enabled: document.getElementById('inp-explanations-enabled')?.checked,
+        tuner_enabled:        document.getElementById('inp-tuner-enabled')?.checked,
+      });
+      if (msg) { msg.style.color = 'var(--green)'; msg.textContent = 'Feature settings saved.'; msg.style.display = ''; setTimeout(() => msg.style.display = 'none', 3000); }
     } catch (e) {
       if (msg) { msg.style.color = 'var(--red)'; msg.textContent = `Error: ${e.message}`; msg.style.display = ''; }
     }
@@ -5185,66 +5200,10 @@ async function initSettings() {
 
   loadAlerts();
 
-  // ── AI settings ───────────────────────────────────────────────────────────
-  async function loadAiSettings() {
-    try {
-      const [s, status] = await Promise.all([
-        api('/api/ai/settings'),
-        api('/api/ai/status'),
-      ]);
-      const urlEl   = document.getElementById('ai-ollama-url');
-      const modelEl = document.getElementById('ai-ollama-model');
-      const expEl   = document.getElementById('ai-explanations-enabled');
-      const tunEl   = document.getElementById('ai-tuner-enabled');
-      const dot     = document.getElementById('ai-dot');
-      const dotLbl  = document.getElementById('ai-dot-label');
-      if (urlEl)   urlEl.value   = s.ollama_url;
-      if (modelEl) modelEl.value = s.ollama_model;
-      if (expEl)   expEl.checked = s.explanations_enabled;
-      if (tunEl)   tunEl.checked = s.tuner_enabled;
-      if (dot)     dot.style.background = status.reachable ? '#10B981' : '#EF4444';
-      if (dotLbl)  dotLbl.textContent   = status.reachable ? 'Connected' : 'Offline';
-    } catch (_) {}
-  }
+  // AI provider/key/model + explanation & tuning toggles moved to the dedicated
+  // AI Tuning page (initAiTuning). The Settings AI Assistant card was removed to
+  // eliminate a second, Ollama-only provider config that conflicted with it.
 
-  document.getElementById('ai-save-btn')?.addEventListener('click', async () => {
-    const msg = document.getElementById('ai-save-msg');
-    try {
-      await api('/api/ai/settings', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ollama_url:           document.getElementById('ai-ollama-url')?.value?.trim(),
-          ollama_model:         document.getElementById('ai-ollama-model')?.value?.trim(),
-          explanations_enabled: document.getElementById('ai-explanations-enabled')?.checked,
-          tuner_enabled:        document.getElementById('ai-tuner-enabled')?.checked,
-        }),
-      });
-      if (msg) { msg.textContent = 'Saved'; msg.classList.remove('hidden'); setTimeout(() => msg.classList.add('hidden'), 2500); }
-    } catch (e) {
-      if (msg) { msg.textContent = e.message; msg.classList.remove('hidden'); }
-    }
-  });
-
-  document.getElementById('ai-tune-now-btn')?.addEventListener('click', async () => {
-    const btn = document.getElementById('ai-tune-now-btn');
-    const msg = document.getElementById('ai-save-msg');
-    btn.disabled = true; btn.textContent = 'Running…';
-    try {
-      const result = await api('/api/ai/tune-now', { method: 'POST' });
-      if (msg) {
-        msg.textContent = result.error ? `Error: ${result.error}` : `Done — ${result.tuned} updated`;
-        msg.classList.remove('hidden');
-        setTimeout(() => msg.classList.add('hidden'), 4000);
-      }
-    } catch (e) {
-      if (msg) { msg.textContent = e.message; msg.classList.remove('hidden'); }
-    } finally {
-      btn.disabled = false; btn.textContent = 'Run Tuning Now';
-    }
-  });
-
-  loadAiSettings();
   initUpdateCard();
   initChangePassword();
 }
