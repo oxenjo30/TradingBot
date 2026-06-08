@@ -837,8 +837,9 @@ def submit_order(o: OrderIn, request: Request):
         display = o.notional if o.notional else o.qty
         db.log_signal("manual", sym, o.side, display, label, result.get("id", ""), result.get("status", ""),
                       account_id=o.account_id)
-        if o.notional:
-            notifications.notify_trade("manual", sym, o.side, None, o.notional, label, result.get("id", ""))
+        # Notify on every manual order — previously this only fired for dollar-notional
+        # orders, so quantity-based orders (e.g. "buy 10 shares") sent no alert.
+        notifications.notify_trade("manual", sym, o.side, o.qty, o.notional, label, result.get("id", ""))
         return result
     except HTTPException:
         raise
