@@ -18,6 +18,18 @@ def _settings():
     return db.get_notification_settings()
 
 
+def _secret(key: str) -> str:
+    """Resolve a secret config value to its real (decrypted) form.
+
+    get_notification_settings() masks every encrypted secret with
+    SECRET_PLACEHOLDER so it never leaves the server in plaintext. The
+    background senders run server-side and need the real value, so they must
+    read it directly rather than trusting the masked settings dict — otherwise
+    they'd post the literal "********" as the token/password and silently fail.
+    """
+    return db.get_app_config_secure(key, "")
+
+
 # ── Branded email template ──────────────────────────────────────────────────────
 
 def render_email(heading: str, inner_html: str, accent: str = "#3B82F6",
@@ -112,12 +124,13 @@ def send_email_direct(to: str, smtp: str, port: int, user: str,
 def _send_email(subject: str, body: str):
     """Background email using saved DB settings — silently skips if not configured."""
     s = _settings()
-    if not s["email_enabled"] or not s["email_to"] or not s["email_pass"]:
+    email_pass = _secret("email_pass")  # s["email_pass"] is masked — read the real value
+    if not s["email_enabled"] or not s["email_to"] or not email_pass:
         return
     try:
         send_email_direct(
             s["email_to"], s["email_smtp"], int(s["email_port"] or 587),
-            s["email_user"], s["email_pass"], subject, body
+            s["email_user"], email_pass, subject, body
         )
     except Exception as e:
         log.warning("email failed: %s", e)
@@ -154,10 +167,11 @@ def send_telegram_direct(token: str, chat_id: str, text: str):
 def _send_telegram(text: str):
     """Background Telegram message using saved DB settings."""
     s = _settings()
-    if not s["telegram_enabled"] or not s["telegram_token"] or not s["telegram_chat_id"]:
+    token = _secret("telegram_token")  # s["telegram_token"] is masked — read the real value
+    if not s["telegram_enabled"] or not token or not s["telegram_chat_id"]:
         return
     try:
-        send_telegram_direct(s["telegram_token"], s["telegram_chat_id"], text)
+        send_telegram_direct(token, s["telegram_chat_id"], text)
     except Exception as e:
         log.warning("telegram failed: %s", e)
 
@@ -176,9 +190,10 @@ def send_slack_direct(webhook_url: str, text: str):
 
 def _send_slack(text: str):
     s = _settings()
-    if not s.get("slack_enabled") or not s.get("slack_webhook_url"):
+    webhook = _secret("slack_webhook_url")  # s["slack_webhook_url"] is masked — read the real value
+    if not s.get("slack_enabled") or not webhook:
         return
-    _send_async(send_slack_direct, s["slack_webhook_url"], text)
+    _send_async(send_slack_direct, webhook, text)
 
 
 # ── Discord ───────────────────────────────────────────────────────────────────
@@ -196,9 +211,10 @@ def send_discord_direct(webhook_url: str, content: str):
 
 def _send_discord(text: str):
     s = _settings()
-    if not s.get("discord_enabled") or not s.get("discord_webhook_url"):
+    webhook = _secret("discord_webhook_url")  # s["discord_webhook_url"] is masked — read the real value
+    if not s.get("discord_enabled") or not webhook:
         return
-    _send_async(send_discord_direct, s["discord_webhook_url"], text)
+    _send_async(send_discord_direct, webhook, text)
 
 
 # ── Public API ────────────────────────────────────────────────────────────────
