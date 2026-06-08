@@ -139,25 +139,45 @@ def _send_email(subject: str, body: str):
 # ── Telegram ──────────────────────────────────────────────────────────────────
 
 def send_telegram_direct(token: str, chat_id: str, text: str):
-    """Send a Telegram message — raises descriptive exception on failure."""
+    """Send a Telegram message — raises descriptive exception on failure.
+
+    Messages use HTML parse mode for the <b> emphasis, but dynamic content
+    (strategy reasons like "price < SMA60", symbols, etc.) can contain <, >, &
+    that break Telegram's HTML parser ("can't parse entities" → 400). If the HTML
+    send fails on a parse error, retry once as plain text so the alert still
+    arrives. Other errors (bad token, chat not found) still raise.
+    """
     if not token or not chat_id:
         raise RuntimeError("Telegram settings incomplete — fill in Bot Token and Chat ID, then Save.")
     url = f"https://api.telegram.org/bot{token}/sendMessage"
+
+    def _post(payload: dict):
+        r = httpx.post(url, json=payload, timeout=12)
+        return r.json()
+
     try:
-        r = httpx.post(url, json={"chat_id": chat_id, "text": text,
-                                   "parse_mode": "HTML"}, timeout=12)
-        data = r.json()
+        data = _post({"chat_id": chat_id, "text": text, "parse_mode": "HTML"})
         if not data.get("ok"):
             desc = data.get("description", "unknown error")
-            if "chat not found" in desc.lower():
+            low = desc.lower()
+            if "chat not found" in low:
                 raise RuntimeError(
                     f"Chat ID '{chat_id}' not found. "
                     "Make sure you have sent at least one message to your bot first."
                 )
-            if "unauthorized" in desc.lower():
+            if "unauthorized" in low:
                 raise RuntimeError(
                     "Bot token is invalid. Double-check the token from @BotFather."
                 )
+            # HTML parse failure → strip tags and resend as plain text.
+            if "parse entities" in low or "can't parse" in low or "unsupported start tag" in low:
+                import re
+                plain = re.sub(r"<[^>]+>", "", text)
+                data2 = _post({"chat_id": chat_id, "text": plain})
+                if not data2.get("ok"):
+                    raise RuntimeError(f"Telegram error: {data2.get('description', desc)}")
+                log.info("telegram sent (plain-text fallback)")
+                return
             raise RuntimeError(f"Telegram error: {desc}")
         log.info("telegram sent")
     except httpx.ConnectError:
