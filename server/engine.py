@@ -43,6 +43,19 @@ def _run_take_profit_pass(acct_client, acct_id: int, take_profit_pct: float,
         qty = p.get("qty", 0.0)
         if qty <= 0:
             continue
+        # Skip dust: positions too small to sell (e.g. a 0.000831 SOL remainder)
+        # get rejected by the broker's minimum-quantity / min-notional rule every
+        # tick, spamming errors. A crypto leg below 0.001 units, or any position
+        # worth under ~$1, can't be closed — leave it alone.
+        market_value = p.get("market_value")
+        if market_value is None:
+            px = p.get("current_price") or p.get("avg_entry_price") or 0.0
+            market_value = qty * px
+        is_crypto = "/" in symbol
+        if (is_crypto and qty < 0.001) or (market_value and market_value < 1.0):
+            log.debug("take-profit: skipping dust %s acct %d (qty=%s, value=$%.4f)",
+                      symbol, acct_id, qty, market_value or 0)
+            continue
         reason = f"take-profit: {plpc:.2f}% >= {take_profit_pct:.2f}%"
         log.info("take-profit triggered %s acct %d (%.2f%% gain)", symbol, acct_id, plpc)
         try:
