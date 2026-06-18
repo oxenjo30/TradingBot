@@ -55,6 +55,15 @@ class TradierAccountClient:
             )
         r.raise_for_status()
 
+    @staticmethod
+    def _clean_tag(client_order_id: str) -> str:
+        """Tradier's order `tag` accepts ONLY letters and digits (and is capped at
+        255). Our client_order_ids contain hyphens (e.g. 'tp-a1b2c3'), which Tradier
+        rejects with 'Invalid parameter, tag: contains invalid characters.' Strip to
+        alphanumeric so the order goes through."""
+        import re
+        return re.sub(r"[^A-Za-z0-9]", "", client_order_id)[:255]
+
     def _get(self, path: str, params: dict | None = None) -> dict:
         r = httpx.get(f"{self._base}{path}", headers=self._headers(),
                       params=params, timeout=15.0)
@@ -198,7 +207,7 @@ class TradierAccountClient:
             "duration": "day",
         }
         if client_order_id:
-            payload["tag"] = client_order_id[:255]
+            payload["tag"] = self._clean_tag(client_order_id)
 
         data  = self._post(f"/accounts/{acct_id}/orders", payload)
         order = data.get("order", {})
@@ -224,7 +233,7 @@ class TradierAccountClient:
             "duration": "day",
         }
         if client_order_id:
-            payload["tag"] = client_order_id[:255]
+            payload["tag"] = self._clean_tag(client_order_id)
 
         data  = self._post(f"/accounts/{acct_id}/orders", payload)
         order = data.get("order", {})
