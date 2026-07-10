@@ -56,7 +56,7 @@ def test_execution_schema_is_rerunnable(tmp_db):
 
 - [ ] **Step 2: Run RED**
 
-Run: `pytest tests/test_execution_ledger.py -q`  
+Run: `pytest tests/test_execution_ledger.py -q`
 Expected: import/schema failures because the execution model does not exist.
 
 - [ ] **Step 3: Add domain types**
@@ -73,7 +73,7 @@ Add `create_order_intent`, `mark_order_submitting`, `bind_order_ack`, `get_execu
 
 - [ ] **Step 6: Run GREEN and regression subset**
 
-Run: `pytest tests/test_execution_ledger.py tests/test_db_broker.py tests/test_db_backtest.py -q`  
+Run: `pytest tests/test_execution_ledger.py tests/test_db_broker.py tests/test_db_backtest.py -q`
 Expected: all pass.
 
 - [ ] **Step 7: Commit**
@@ -410,7 +410,7 @@ Commit Task 10 files.
 
 - [ ] **Step 1: Run complete tests**
 
-Run: `pytest -q`  
+Run: `pytest -q`
 Expected: zero failures.
 
 - [ ] **Step 2: Run static/import checks**
@@ -465,4 +465,3 @@ Observe at least two complete scheduler cycles, confirm no duplicate intents, no
 - [ ] **Step 7: Record deployment evidence**
 
 Document deployed revision, backup paths/checksums, migration mode, enabled/disabled sleeves, health results, and rollback command set.
-

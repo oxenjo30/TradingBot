@@ -30,6 +30,7 @@ Thumbs.db
 .claude/settings.local.json
 .mcp.json
 .superpowers/
+/.worktrees/
 
 # SSH keys — never commit private keys to the repo
 /id
