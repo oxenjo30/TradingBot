@@ -225,11 +225,33 @@ def run_tick():
             acct_client = acct_data["client"]
             account = acct_data["account"]
             day_trade_count = acct_data["dtc"]
+            # Account-level positions stay available ONLY for portfolio-exposure /
+            # risk checks below (open_positions_count, current_symbol_value).
             positions = acct_data["positions"]
+
+            # Strategy-owned positions drive EXIT decisions (§4.3): a strategy sees
+            # and can sell ONLY its own lots on this account — never account-level or
+            # another strategy's quantity. Convert canonical decimal text → float to
+            # match the existing strategy `positions` contract.
+            try:
+                owned_positions = {
+                    sym: float(qty)
+                    for sym, qty in db.get_strategy_positions(s["name"], acct_id).items()
+                }
+            except Exception:
+                owned_positions = {}
 
             try:
                 strat = strategies.build(s["name"], s["params"])
-                signals = strat.evaluate(positions, client=acct_client)
+                # Pass account_id only to strategies whose evaluate() accepts it, so
+                # ownership-aware entry lookups get the account without forcing every
+                # legacy strategy signature to change.
+                import inspect
+                _eval_params = inspect.signature(strat.evaluate).parameters
+                _eval_kwargs = {"client": acct_client}
+                if "account_id" in _eval_params:
+                    _eval_kwargs["account_id"] = acct_id
+                signals = strat.evaluate(owned_positions, **_eval_kwargs)
             except Exception as e:
                 log.exception("strategy %s acct %d failed", s["name"], acct_id)
                 db.log_signal(s["name"], "-", "-", 0, f"error: {e}", None, "error")

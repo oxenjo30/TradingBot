@@ -1882,24 +1882,25 @@ def record_open_trade(strategy: str, symbol: str, account_id: int | None,
 def close_trade_and_record_perf(strategy: str, symbol: str, account_id: int | None,
                                  sell_qty: float, sell_price: float) -> None:
     """
-    FIFO-match a sell against open buy rows for symbol+account (any strategy),
-    write realized P&L rows into strategy_perf attributed to the buying strategy,
-    and delete the consumed buy rows.
+    FIFO-match a sell against THIS strategy's own open buy rows for symbol+account,
+    write realized P&L rows into strategy_perf attributed to that strategy, and
+    delete the consumed buy rows.
 
-    Searches by symbol+account only — not strategy — because one strategy may open
-    a position that another strategy closes (e.g. volatility_breakout buys BNB,
-    rsi_bounce sells it when overbought).
+    Matching includes strategy + account + symbol (§4.3): a strategy can only close
+    its OWN lots, never another strategy's. The caller passes the owning strategy —
+    for take-profit that is the ORIGINAL opening strategy (resolved via
+    get_open_trade_strategy), never a different strategy's inventory.
     """
     if sell_qty <= 0 or sell_price <= 0:
         return
 
     with get_conn() as c:
-        # Fetch oldest open buys for this symbol+account regardless of which strategy opened them
+        # Fetch oldest open buys for THIS strategy on this symbol+account only.
         buys = c.execute(
             """SELECT id, strategy, qty, fill_price FROM open_trades
-               WHERE symbol=? AND (account_id=? OR (account_id IS NULL AND ? IS NULL))
+               WHERE strategy=? AND symbol=? AND (account_id=? OR (account_id IS NULL AND ? IS NULL))
                ORDER BY opened_at ASC""",
-            (symbol, account_id, account_id),
+            (strategy, symbol, account_id, account_id),
         ).fetchall()
 
         remaining = sell_qty
@@ -1999,6 +2000,15 @@ def _utc_micro() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f") + "Z"
 
 
+def canonical_symbol(symbol: str) -> str:
+    """Canonical instrument id used for all ownership/reconciliation selection keys.
+
+    Selection keys always include strategy + account + canonical symbol (§4.3, §19.6),
+    so lookups must not be defeated by case or surrounding whitespace. Slash pairs
+    (e.g. 'BTC/USDT') keep their shape; only case/whitespace are normalized."""
+    return (symbol or "").strip().upper()
+
+
 def create_order_intent(*, account_id: int, strategy: str, client_order_id: str,
                         symbol: str, side: str, order_type: str,
                         requested_qty: str | None = None,
@@ -2064,9 +2074,16 @@ def insert_fill_and_apply_fifo(order_id: int, *, broker_fill_id: str, qty: str,
     - A duplicate fill with identical economic values returns the existing row id.
     - A duplicate broker_fill_id with DIFFERENT values raises LedgerConflict (the
       account should freeze rather than overwrite).
-    Lot creation / FIFO matching is layered on in Task 2; this establishes the
-    idempotent fill-insert foundation.
+
+    Lot creation / FIFO matching (Task 2, §4.3, §19.5):
+      - A BUY fill opens a strategy-owned lot for (account, strategy, symbol) with
+        unit cost = price + allocated entry fee.
+      - A SELL fill FIFO-matches against that owner's own lots ONLY (ordered by
+        opening fill time then lot id) and reduces their remaining quantity. A
+        strategy can never consume another strategy's lot.
+    All of this happens inside the one BEGIN IMMEDIATE transaction (§19.5).
     """
+    from decimal import Decimal
     from .execution_models import decimal_text, LedgerConflict
     q, p, f = decimal_text(qty), decimal_text(price), decimal_text(fee)
 
@@ -2074,6 +2091,9 @@ def insert_fill_and_apply_fifo(order_id: int, *, broker_fill_id: str, qty: str,
     if order is None:
         raise ValueError(f"unknown execution_order {order_id}")
     account_id = order["account_id"]
+    strategy = order["strategy"]
+    side = order["side"]
+    sym = canonical_symbol(order["symbol"])
 
     c = sqlite3.connect(DB_PATH)
     c.row_factory = sqlite3.Row
@@ -2102,6 +2122,59 @@ def insert_fill_and_apply_fifo(order_id: int, *, broker_fill_id: str, qty: str,
             (order_id, account_id, broker_fill_id, q, p, f, fee_currency, filled_at),
         )
         fill_id = cur.lastrowid
+
+        # ── Lot creation / FIFO matching (§4.3, §19.5) ──────────────────────────
+        qty_d = Decimal(q)
+        if side == "buy":
+            # Unit cost includes the entry fee allocated across the filled quantity,
+            # applied once (§19.5). Fee currency other than USD is left in price only.
+            unit_cost = Decimal(p)
+            if fee_currency == "USD" and qty_d > 0:
+                unit_cost = unit_cost + (Decimal(f) / qty_d)
+            c.execute(
+                "INSERT INTO position_lots (account_id, strategy, symbol, opening_fill_id, "
+                "original_qty, remaining_qty, unit_cost, opened_at, provenance) "
+                "VALUES (?,?,?,?,?,?,?,?, 'verified')",
+                (account_id, strategy, sym, fill_id, q, q,
+                 decimal_text(unit_cost), filled_at),
+            )
+        else:  # sell → reduce this owner's own lots, FIFO by opening fill time then lot id
+            remaining = qty_d
+            lots = c.execute(
+                "SELECT pl.id AS id, pl.remaining_qty AS remaining_qty, pl.unit_cost AS unit_cost, "
+                "pl.opened_at AS opened_at, ef.filled_at AS fill_time "
+                "FROM position_lots pl "
+                "LEFT JOIN execution_fills ef ON ef.id = pl.opening_fill_id "
+                "WHERE pl.account_id=? AND pl.strategy=? AND pl.symbol=? "
+                "AND CAST(pl.remaining_qty AS REAL) > 0 "
+                "ORDER BY COALESCE(ef.filled_at, pl.opened_at) ASC, pl.id ASC",
+                (account_id, strategy, sym),
+            ).fetchall()
+            for lot in lots:
+                if remaining <= 0:
+                    break
+                lot_rem = Decimal(lot["remaining_qty"])
+                matched = min(remaining, lot_rem)
+                if matched <= 0:
+                    continue
+                new_rem = lot_rem - matched
+                closed_at = filled_at if new_rem == 0 else None
+                c.execute(
+                    "UPDATE position_lots SET remaining_qty=?, closed_at=COALESCE(?, closed_at) "
+                    "WHERE id=?",
+                    (decimal_text(new_rem), closed_at, lot["id"]),
+                )
+                entry_price = decimal_text(lot["unit_cost"])
+                net_pnl = decimal_text((Decimal(p) - Decimal(lot["unit_cost"])) * matched)
+                c.execute(
+                    "INSERT OR IGNORE INTO lot_matches (closing_fill_id, opening_lot_id, "
+                    "matched_qty, entry_price, exit_price, net_pnl) VALUES (?,?,?,?,?,?)",
+                    (fill_id, lot["id"], decimal_text(matched), entry_price, p, net_pnl),
+                )
+                remaining -= matched
+            # Unmatched sell quantity is preserved implicitly: it is a sell fill with
+            # no owned lots to attribute against (surfaced by reconciliation, §4.4).
+
         c.execute("COMMIT")
         return fill_id
     except LedgerConflict:
@@ -2114,3 +2187,234 @@ def insert_fill_and_apply_fifo(order_id: int, *, broker_fill_id: str, qty: str,
         raise
     finally:
         c.close()
+
+
+# ── Strategy-owned lots, reservations, and entry prices (Task 2, §4.3, §19.5) ────
+# Selection keys ALWAYS include strategy + account + canonical symbol so a strategy
+# can only ever see and sell its OWN lots on a specific account.
+
+# Nonterminal states of a reservation/exit order still hold quantity (§19.5). A
+# reservation is represented as a nonterminal SELL execution order whose owner is
+# f"{strategy}::exit_reservation" so it never collides with a real submitted order.
+_RESERVATION_SUFFIX = "::exit_reservation"
+_NONTERMINAL_STATES = (
+    "INTENT_PERSISTED", "SUBMITTING", "ACKNOWLEDGED",
+    "PARTIALLY_FILLED", "CANCEL_PENDING", "UNKNOWN",
+)
+
+
+def get_strategy_positions(strategy: str, account_id: int) -> dict[str, str]:
+    """Return {canonical_symbol: remaining_qty_text} for lots owned by this
+    strategy on this account. Only owned, non-external, still-open lots (§4.3).
+
+    Automated strategies receive only these positions for EXIT decisions; they can
+    never see or sell another strategy's or account-level quantity."""
+    with get_conn() as c:
+        rows = c.execute(
+            "SELECT symbol, SUM(CAST(remaining_qty AS REAL)) AS qty "
+            "FROM position_lots "
+            "WHERE strategy=? AND account_id=? AND provenance NOT IN ('external') "
+            "GROUP BY symbol HAVING SUM(CAST(remaining_qty AS REAL)) > 0",
+            (strategy, account_id),
+        ).fetchall()
+    out: dict[str, str] = {}
+    for r in rows:
+        # Recompute the exact remaining as canonical decimal text (avoid REAL drift).
+        out[r["symbol"]] = _sum_remaining_lots(strategy, account_id, r["symbol"])
+    return out
+
+
+def _sum_remaining_lots(strategy: str, account_id: int, symbol: str):
+    from decimal import Decimal
+    sym = canonical_symbol(symbol)
+    with get_conn() as c:
+        rows = c.execute(
+            "SELECT remaining_qty FROM position_lots "
+            "WHERE strategy=? AND account_id=? AND symbol=? "
+            "AND provenance NOT IN ('external')",
+            (strategy, account_id, sym),
+        ).fetchall()
+    from .execution_models import decimal_text
+    total = sum((Decimal(r["remaining_qty"]) for r in rows), Decimal("0"))
+    return decimal_text(total)
+
+
+def get_account_verified_qty(account_id: int) -> dict[str, str]:
+    """Return {canonical_symbol: remaining_qty_text} of VERIFIED internal lots across
+    ALL strategies for an account. Used by reconciliation to compare against settled
+    broker holdings (§19.6). Excludes external/manual quarantined lots."""
+    from decimal import Decimal
+    from .execution_models import decimal_text
+    with get_conn() as c:
+        rows = c.execute(
+            "SELECT symbol, remaining_qty FROM position_lots "
+            "WHERE account_id=? AND provenance NOT IN ('external')",
+            (account_id,),
+        ).fetchall()
+    totals: dict[str, Decimal] = {}
+    for r in rows:
+        sym = canonical_symbol(r["symbol"])
+        totals[sym] = totals.get(sym, Decimal("0")) + Decimal(r["remaining_qty"])
+    return {s: decimal_text(v) for s, v in totals.items()}
+
+
+def insert_reconciliation_snapshot(account_id: int, symbol: str, broker_qty: str,
+                                   internal_qty: str, delta: str, status: str) -> int:
+    """Persist a reconciliation row with a stable snapshot id (§19.6)."""
+    from .execution_models import decimal_text
+    with get_conn() as c:
+        cur = c.execute(
+            "INSERT INTO reconciliation_snapshots (account_id, symbol, broker_qty, "
+            "internal_qty, delta, status) VALUES (?,?,?,?,?,?)",
+            (account_id, canonical_symbol(symbol), decimal_text(broker_qty),
+             decimal_text(internal_qty), decimal_text(delta), status),
+        )
+        return cur.lastrowid
+
+
+def get_strategy_entry_price(strategy: str, account_id: int, symbol: str):
+    """Quantity-weighted average unit cost of this strategy's OPEN lots for the
+    (strategy, account, canonical symbol) key. Returns Decimal or None (§4.3)."""
+    from decimal import Decimal
+    sym = canonical_symbol(symbol)
+    with get_conn() as c:
+        rows = c.execute(
+            "SELECT remaining_qty, unit_cost FROM position_lots "
+            "WHERE strategy=? AND account_id=? AND symbol=? "
+            "AND provenance NOT IN ('external') AND CAST(remaining_qty AS REAL) > 0",
+            (strategy, account_id, sym),
+        ).fetchall()
+    total_qty = Decimal("0")
+    total_cost = Decimal("0")
+    for r in rows:
+        q = Decimal(r["remaining_qty"])
+        total_qty += q
+        total_cost += q * Decimal(r["unit_cost"])
+    if total_qty <= 0:
+        return None
+    return total_cost / total_qty
+
+
+def _reserved_exit_qty(c, strategy: str, account_id: int, symbol: str):
+    """Sum of UNFILLED quantity held by this owner's nonterminal exits/reservations.
+
+    Reservation held by an order == its requested_qty minus quantity already ingested
+    as fills against it, so a sell that has partially/fully filled stops
+    double-counting against the lots the fill already reduced (§19.5)."""
+    from decimal import Decimal
+    sym = canonical_symbol(symbol)
+    placeholders = ",".join("?" for _ in _NONTERMINAL_STATES)
+    rows = c.execute(
+        f"SELECT eo.id AS id, eo.requested_qty AS requested_qty, "
+        f"COALESCE((SELECT SUM(CAST(ef.qty AS REAL)) FROM execution_fills ef "
+        f"          WHERE ef.execution_order_id = eo.id), 0) AS filled "
+        f"FROM execution_orders eo "
+        f"WHERE eo.account_id=? AND eo.symbol=? AND eo.side='sell' "
+        f"AND eo.strategy IN (?, ?) AND eo.state IN ({placeholders}) "
+        f"AND eo.requested_qty IS NOT NULL",
+        (account_id, sym, strategy, strategy + _RESERVATION_SUFFIX, *_NONTERMINAL_STATES),
+    ).fetchall()
+    total = Decimal("0")
+    for r in rows:
+        # Per-order unfilled reservation, never negative.
+        unfilled = Decimal(r["requested_qty"]) - Decimal(str(r["filled"]))
+        if unfilled > 0:
+            total += unfilled
+    return total
+
+
+def get_sellable_qty(strategy: str, account_id: int, symbol: str):
+    """Remaining owned lots MINUS reserved nonterminal exits (§19.5).
+
+    Returns a non-negative Decimal. Rounds toward zero if reservations somehow
+    exceed owned quantity (never returns negative)."""
+    from decimal import Decimal
+    sym = canonical_symbol(symbol)
+    owned = Decimal(_sum_remaining_lots(strategy, account_id, sym))
+    with get_conn() as c:
+        reserved = _reserved_exit_qty(c, strategy, account_id, sym)
+    sellable = owned - reserved
+    return sellable if sellable > 0 else Decimal("0")
+
+
+def reserve_exit_qty(strategy: str, account_id: int, symbol: str, qty: str):
+    """Reserve up to `qty` of this strategy's sellable quantity for an exit.
+
+    Oversized requests round DOWN to the currently sellable amount (§19.5); a zero
+    sellable reserves nothing. Returns the Decimal quantity actually reserved."""
+    from decimal import Decimal
+    from .execution_models import decimal_text
+    sym = canonical_symbol(symbol)
+    want = Decimal(decimal_text(qty))
+    if want <= 0:
+        return Decimal("0")
+    # Atomically reserve against currently sellable quantity.
+    c = sqlite3.connect(DB_PATH)
+    c.row_factory = sqlite3.Row
+    c.execute("PRAGMA foreign_keys = ON")
+    try:
+        c.execute("BEGIN IMMEDIATE")
+        owned = Decimal(_sum_remaining_lots(strategy, account_id, sym))
+        reserved = _reserved_exit_qty(c, strategy, account_id, sym)
+        available = owned - reserved
+        if available <= 0:
+            c.execute("ROLLBACK")
+            return Decimal("0")
+        grant = want if want <= available else available   # round down to available
+        import uuid
+        cid = f"{strategy}{_RESERVATION_SUFFIX}-{uuid.uuid4().hex[:12]}"
+        now = _utc_micro()
+        c.execute(
+            "INSERT INTO execution_orders (account_id, strategy, client_order_id, symbol, "
+            "side, order_type, requested_qty, state, created_at, updated_at) "
+            "VALUES (?,?,?,?, 'sell', 'reservation', ?, 'INTENT_PERSISTED', ?, ?)",
+            (account_id, strategy + _RESERVATION_SUFFIX, cid, sym,
+             decimal_text(grant), now, now),
+        )
+        c.execute("COMMIT")
+        return grant
+    except Exception:
+        try:
+            c.execute("ROLLBACK")
+        except Exception:
+            pass
+        raise
+    finally:
+        c.close()
+
+
+def release_exit_reservation(strategy: str, account_id: int, symbol: str,
+                             qty: str | None = None) -> None:
+    """Release this strategy's exit reservations for the (strategy, account, symbol)
+    key. If `qty` is given, release approximately that much (oldest reservations
+    first); otherwise release all reservations for the key."""
+    from decimal import Decimal
+    from .execution_models import decimal_text
+    sym = canonical_symbol(symbol)
+    placeholders = ",".join("?" for _ in _NONTERMINAL_STATES)
+    with get_conn() as c:
+        rows = c.execute(
+            f"SELECT id, requested_qty FROM execution_orders "
+            f"WHERE account_id=? AND symbol=? AND side='sell' AND strategy=? "
+            f"AND state IN ({placeholders}) ORDER BY id ASC",
+            (account_id, sym, strategy + _RESERVATION_SUFFIX, *_NONTERMINAL_STATES),
+        ).fetchall()
+        if qty is None:
+            for r in rows:
+                c.execute("UPDATE execution_orders SET state='CANCELED', updated_at=? WHERE id=?",
+                          (_utc_micro(), r["id"]))
+            return
+        remaining = Decimal(decimal_text(qty))
+        for r in rows:
+            if remaining <= 0:
+                break
+            rq = Decimal(r["requested_qty"])
+            if rq <= remaining:
+                c.execute("UPDATE execution_orders SET state='CANCELED', updated_at=? WHERE id=?",
+                          (_utc_micro(), r["id"]))
+                remaining -= rq
+            else:
+                # Partial release: shrink this reservation by `remaining`.
+                c.execute("UPDATE execution_orders SET requested_qty=?, updated_at=? WHERE id=?",
+                          (decimal_text(rq - remaining), _utc_micro(), r["id"]))
+                remaining = Decimal("0")

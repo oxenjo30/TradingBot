@@ -73,7 +73,7 @@ class CryptoVolatilityBreakout(Strategy):
          "hint": "Maximum number of crypto pairs to hold at once."},
     ]
 
-    def evaluate(self, positions, client=None):
+    def evaluate(self, positions, client=None, account_id=None):
         out: list[Signal] = []
         period     = int(self.params.get("bb_period", 20))
         num_std    = float(self.params.get("bb_std", 2.0))
@@ -99,8 +99,15 @@ class CryptoVolatilityBreakout(Strategy):
             held  = positions.get(sym, 0.0)
 
             if held > 0:
-                # Entry price read from open_trades — instance state is lost each tick
-                entry_price = db.get_open_trade_entry_price(self.name, sym)
+                # Entry price for THIS strategy on THIS account (§4.3). Selection keys
+                # always include account_id so accounts isolate entry prices. Falls back
+                # to the legacy account-agnostic lookup only when no account is provided.
+                entry_price = None
+                if account_id is not None:
+                    ep = db.get_strategy_entry_price(self.name, account_id, sym)
+                    entry_price = float(ep) if ep is not None else None
+                if entry_price is None:
+                    entry_price = db.get_open_trade_entry_price(self.name, sym)
                 stop_hit = entry_price and price < entry_price * (1 - stop_pct / 100)
                 if price >= mid:
                     out.append(Signal(symbol=sym, side="sell", qty=held,
