@@ -2014,13 +2014,15 @@ def buy_url():
 
 class BacktestRequest(BaseModel):
     strategy:          str
-    symbols:           list[str] = Field(..., min_length=1)
+    symbols:           list[str] = Field(..., min_length=1, max_length=50)
     start_date:        date
     end_date:          date
-    initial_capital:   float = 10000.0
-    position_size_pct: float = 2.0
-    commission_pct:    float = 0.1
-    slippage_pct:      float = 0.05
+    # Reproducibility bounds (spec §9/§10): reject nonsensical requests at the
+    # API rather than letting the engine run on invalid parameters.
+    initial_capital:   float = Field(10000.0, gt=0, le=1_000_000_000)
+    position_size_pct: float = Field(2.0, gt=0, le=100)
+    commission_pct:    float = Field(0.1, ge=0, le=100)
+    slippage_pct:      float = Field(0.05, ge=0, le=100)
     strategy_params:   dict   = {}
 
     @field_validator("end_date", mode="after")

@@ -440,6 +440,15 @@ def init_db():
                 "ALTER TABLE backtest_runs ADD COLUMN is_benchmark INTEGER NOT NULL DEFAULT 0"
             )
 
+    # Migration (Task 7): add reproducibility metadata column to backtest_runs.
+    # Stores provider, timeframe, adjustment/event policy, data fingerprint(s),
+    # cost model, code revision, execution model, and end convention as JSON so a
+    # run can be reproduced (spec §9/§10). Additive + nullable; older rows are NULL.
+    with get_conn() as c:
+        cols = [r[1] for r in c.execute("PRAGMA table_info(backtest_runs)")]
+        if "reproducibility" not in cols:
+            c.execute("ALTER TABLE backtest_runs ADD COLUMN reproducibility TEXT DEFAULT NULL")
+
     # Migration: add ai_explanation / filled_qty / sentiment_score to signals if missing
     with get_conn() as c:
         cols = [r[1] for r in c.execute("PRAGMA table_info(signals)")]
@@ -1487,8 +1496,8 @@ def save_backtest_run(params: dict, results: dict) -> int:
                 created_at, name, strategy, symbols, start_date, end_date,
                 initial_capital, position_size_pct, commission_pct, slippage_pct,
                 total_return_pct, max_drawdown_pct, win_rate_pct, sharpe_ratio,
-                total_trades, equity_curve, trades, symbol_breakdown
-            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                total_trades, equity_curve, trades, symbol_breakdown, reproducibility
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (
                 now_iso(),
                 None,
@@ -1508,6 +1517,7 @@ def save_backtest_run(params: dict, results: dict) -> int:
                 json.dumps(results.get("equity_curve", [])),
                 json.dumps(results.get("trades", [])),
                 json.dumps(results.get("symbol_breakdown", [])),
+                json.dumps(results["reproducibility"]) if results.get("reproducibility") else None,
             ),
         )
         return cur.lastrowid
@@ -1535,7 +1545,7 @@ def get_backtest_run(run_id: int) -> dict | None:
             """SELECT id, created_at, name, strategy, symbols, start_date, end_date,
                       initial_capital, position_size_pct, commission_pct, slippage_pct,
                       total_return_pct, max_drawdown_pct, win_rate_pct, sharpe_ratio,
-                      total_trades, equity_curve, trades, symbol_breakdown
+                      total_trades, equity_curve, trades, symbol_breakdown, reproducibility
                FROM backtest_runs WHERE id=?""",
             (run_id,)
         ).fetchone()
@@ -1546,6 +1556,7 @@ def get_backtest_run(run_id: int) -> dict | None:
     d["equity_curve"] = json.loads(d["equity_curve"]) if d["equity_curve"] else []
     d["trades"] = json.loads(d["trades"]) if d["trades"] else []
     d["symbol_breakdown"] = json.loads(d["symbol_breakdown"]) if d.get("symbol_breakdown") else []
+    d["reproducibility"] = json.loads(d["reproducibility"]) if d.get("reproducibility") else None
     return d
 
 
