@@ -289,6 +289,43 @@ CREATE TABLE IF NOT EXISTS fill_watermarks (
     overlap_cursor     TEXT,                   -- start of the last overlap window
     updated_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f000Z','now'))
 );
+
+-- Task 9: reproducible walk-forward research runs (spec §11, §12, §19.10). This is
+-- research/reporting infrastructure ONLY — it never enables a strategy and never
+-- touches live automation. `research_runs` holds one row per validation cycle
+-- (frozen params, OOS/holdout summaries, the 12-criteria verdict, data fingerprint,
+-- code revision); `research_attempts` records EVERY attempted configuration so the
+-- §12.12 "every attempt visible" criterion is durably satisfied.
+CREATE TABLE IF NOT EXISTS research_runs (
+    id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f000Z','now')),
+    asset_class        TEXT NOT NULL,          -- 'stock' | 'crypto'
+    label              TEXT,
+    frozen_params      TEXT,                   -- JSON of the frozen parameter set
+    oos_return         TEXT,                   -- canonical decimal text
+    holdout_summary    TEXT,                   -- JSON
+    criteria           TEXT,                   -- JSON of the 12-criteria verdict
+    overall_pass       INTEGER NOT NULL DEFAULT 0,
+    data_fingerprint   TEXT,
+    code_revision      TEXT,
+    geometry           TEXT                    -- JSON of the fold geometry used
+);
+
+CREATE TABLE IF NOT EXISTS research_attempts (
+    id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id             INTEGER,                -- nullable: streamed attempts may precede the run row
+    created_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f000Z','now')),
+    role               TEXT NOT NULL,          -- 'training' | 'validation' | 'holdout'
+    params             TEXT NOT NULL,          -- JSON
+    window_start       TEXT,
+    window_end         TEXT,
+    from_cash          INTEGER NOT NULL DEFAULT 1,
+    net_return         TEXT,
+    calmar             TEXT,
+    max_drawdown       TEXT,
+    turnover           TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_research_attempts_run ON research_attempts(run_id, role);
 """
 
 RISK_DEFAULTS = {
@@ -1572,6 +1609,121 @@ def rename_backtest_run(run_id: int, name: str) -> bool:
             "UPDATE backtest_runs SET name=? WHERE id=?", (name, run_id)
         )
         return cur.rowcount > 0
+
+
+# ── Task 9: walk-forward research persistence (research/reporting only) ──────────
+#
+# These functions persist the outputs of server/research.py. They NEVER enable a
+# strategy, mutate live state, or touch automation — they are pure evidence storage
+# so the §12.12 "every attempt visible" and reproducibility criteria are durable.
+
+def _dec_text(v):
+    """Canonical decimal text for a Decimal/number, or None. Reporting-only."""
+    if v is None:
+        return None
+    from decimal import Decimal
+    from .execution_models import decimal_text
+    try:
+        return decimal_text(v if isinstance(v, Decimal) else Decimal(str(v)))
+    except Exception:
+        return str(v)
+
+
+def persist_research_attempt(attempt: dict, run_id: int | None = None) -> int:
+    """Record ONE attempted configuration (training/validation/holdout) verbatim.
+
+    Callable as the `persist` hook of research.run_walk_forward so every attempt is
+    durably visible (spec §12.12). Returns the new row id."""
+    with get_conn() as c:
+        cur = c.execute(
+            """INSERT INTO research_attempts (
+                run_id, role, params, window_start, window_end, from_cash,
+                net_return, calmar, max_drawdown, turnover
+            ) VALUES (?,?,?,?,?,?,?,?,?,?)""",
+            (
+                run_id,
+                attempt["role"],
+                json.dumps(attempt.get("params", {}), default=str, sort_keys=True),
+                attempt.get("window_start"),
+                attempt.get("window_end"),
+                1 if attempt.get("from_cash", True) else 0,
+                _dec_text(attempt.get("net_return")),
+                _dec_text(attempt.get("calmar")),
+                _dec_text(attempt.get("max_drawdown")),
+                _dec_text(attempt.get("turnover")),
+            ),
+        )
+        return cur.lastrowid
+
+
+def save_research_run(*, asset_class: str, frozen_params: dict | None,
+                      oos_return, holdout_summary: dict | None,
+                      criteria: dict | None, overall_pass: bool,
+                      data_fingerprint: str | None = None,
+                      code_revision: str | None = None,
+                      geometry: dict | None = None,
+                      label: str | None = None) -> int:
+    """Persist one research validation cycle's result (frozen params, OOS/holdout
+    summaries, the 12-criteria verdict, provenance). Returns the new run id.
+
+    Does NOT enable anything — deployment/enable is a separate, explicitly gated
+    Task 12 step."""
+    with get_conn() as c:
+        cur = c.execute(
+            """INSERT INTO research_runs (
+                asset_class, label, frozen_params, oos_return, holdout_summary,
+                criteria, overall_pass, data_fingerprint, code_revision, geometry
+            ) VALUES (?,?,?,?,?,?,?,?,?,?)""",
+            (
+                asset_class,
+                label,
+                json.dumps(frozen_params, default=str, sort_keys=True) if frozen_params is not None else None,
+                _dec_text(oos_return),
+                json.dumps(holdout_summary, default=str) if holdout_summary is not None else None,
+                json.dumps(criteria, default=str) if criteria is not None else None,
+                1 if overall_pass else 0,
+                data_fingerprint,
+                code_revision,
+                json.dumps(geometry, default=str) if geometry is not None else None,
+            ),
+        )
+        return cur.lastrowid
+
+
+def list_research_runs() -> list[dict]:
+    """List research runs (newest first), summary columns only."""
+    with get_conn() as c:
+        rows = c.execute(
+            """SELECT id, created_at, asset_class, label, oos_return,
+                      overall_pass, data_fingerprint, code_revision
+               FROM research_runs ORDER BY id DESC"""
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def get_research_run(run_id: int) -> dict | None:
+    """Full research run including frozen params, holdout, and the 12-criteria
+    verdict, plus every persisted attempt for that run."""
+    with get_conn() as c:
+        r = c.execute("SELECT * FROM research_runs WHERE id=?", (run_id,)).fetchone()
+        if r is None:
+            return None
+        d = dict(r)
+        for k in ("frozen_params", "holdout_summary", "criteria", "geometry"):
+            d[k] = json.loads(d[k]) if d.get(k) else None
+        attempts = c.execute(
+            "SELECT id, role, params, window_start, window_end, from_cash, "
+            "net_return, calmar, max_drawdown, turnover "
+            "FROM research_attempts WHERE run_id=? ORDER BY id ASC",
+            (run_id,),
+        ).fetchall()
+    out_attempts = []
+    for a in attempts:
+        ad = dict(a)
+        ad["params"] = json.loads(ad["params"]) if ad.get("params") else {}
+        out_attempts.append(ad)
+    d["attempts"] = out_attempts
+    return d
 
 
 # ── Watchlists ─────────────────────────────────────────────────────────────────

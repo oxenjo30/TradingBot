@@ -56,3 +56,38 @@
   and hidden=True. Startup seeds registry strategies into the `strategies` table with
   enabled=False and never auto-populates `strategy_accounts`, so "registered but
   disabled/unassigned by default" needs no extra guard beyond those class flags.
+
+## 2026-07-11 - Task 9: fold packing, embargo-as-warmup, freeze pass is an attempt
+
+- Insight: with anchored expanding folds, the embargo does NOT consume extra
+  calendar BETWEEN training and validation — it is the first `embargo_periods`
+  UNSCORED bars at the START of each validation window (and max-lookback warm-up is
+  drawn from the tail preceding validation). Modeling it as a separate gap made the
+  reduced fixtures unable to fit two folds. Rule: validation window = [train_end,
+  train_end + val_len); the first embargo bars are unscored; scored region begins
+  after. This is what §19.13 "Fold boundaries" means by an unscored embargo.
+- Mistake: reduced test geometry with min_years=3 + 1yr holdout left only 2
+  pre-holdout years, yielding just ONE fold, so the "anchored + advance" assertions
+  passed trivially (single-element sets are trivially sorted/unique). Rule: to truly
+  exercise multi-fold advancement, size the reduced fixture so pre-holdout spans
+  >= train_years + 2 windows (used min_years=4 -> 3 pre-holdout years -> 2 folds)
+  and assert the EXACT per-fold train.end indices and non-overlap.
+- Mistake: a persistence count asserted grid_n * n_folds training attempts, but the
+  pre-holdout FREEZE selection is itself a full grid pass over the whole pre-holdout
+  window and MUST be persisted too (§12.12 every attempt visible). Rule: training
+  attempts = grid_n * (n_folds + 1); validation = n_folds; holdout = exactly 1.
+- Rule: the statistical gate is three-valued. lower>0 PASS; upper<0 FAIL; spanning
+  zero (incl. lower==0) is INCONCLUSIVE and is NEVER a pass. C7 (<20 crypto round
+  trips) is likewise INCONCLUSIVE, not a pass. evaluate_all_criteria treats any
+  non-PASS verdict as failing overall.
+- Rule: profit concentration divides each group's positive P&L by TOTAL POSITIVE
+  P&L across all trades (losses excluded from both numerator and denominator);
+  loss concentration is a SEPARATE ratio over absolute losses. Don't net them.
+- Rule: the exposure-matched benchmark must be strictly causal — day-t return uses
+  day t-1's recorded exposure; it must never read the same-bar exposure key. Proved
+  with a dict subclass that records every key lookup and asserting the last bar's
+  own date is never consulted.
+- Rule (Task 9 boundary): research/db/main changes are ADDITIVE evidence infra only.
+  research_runs/research_attempts persist PASS/FAIL evidence; the API endpoints are
+  READ-ONLY (GET). No strategy is enabled and no live state mutated — enabling is a
+  separate Task 12 gated cutover.

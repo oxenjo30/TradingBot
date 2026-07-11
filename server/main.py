@@ -2090,6 +2090,27 @@ async def delete_backtest_run(run_id: int, request: Request):
     return {"status": "ok"}
 
 
+# ── Task 9: walk-forward research evidence (READ-ONLY) ──────────────────────────
+# These endpoints only READ persisted research runs (frozen params, OOS/holdout
+# summaries, the 12 §12 criteria verdict, and every attempted configuration). They
+# never start a run, never mutate live state, and never enable a strategy — the
+# actual data run and any enable happen in Tasks 11/12 under explicit gating.
+
+@app.get("/api/research/runs")
+async def list_research_runs(request: Request):
+    _require_auth(request)
+    return db.list_research_runs()
+
+
+@app.get("/api/research/runs/{run_id}")
+async def get_research_run(run_id: int, request: Request):
+    _require_auth(request)
+    run = db.get_research_run(run_id)
+    if run is None:
+        raise HTTPException(404, f"Research run {run_id} not found")
+    return run
+
+
 def _compute_drift_status(live_wr: float, live_ar: float,
                            bench_wr: float, bench_ar: float,
                            live_trades: int) -> str:
