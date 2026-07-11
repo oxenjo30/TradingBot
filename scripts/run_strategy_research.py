@@ -707,6 +707,18 @@ def main(argv=None):
     ap.add_argument("--json", action="store_true", help="emit machine-readable JSON")
     args = ap.parse_args(argv)
 
+    # Initialise Fernet from DB_SECRET_KEY so broker credentials decrypt — exactly
+    # what server/main.py does at startup. Without this every crypto.decrypt() fails
+    # and the real-data path falls back to synthetic (both sleeves INCONCLUSIVE).
+    # Defensive: if the key is absent/invalid, we DO NOT crash — the real-data path
+    # then raises, is caught, and the sleeve is honestly reported INCONCLUSIVE.
+    try:
+        from server import crypto
+        crypto.init_crypto()
+    except Exception as exc:  # noqa: BLE001 — never let key setup abort the run
+        print(f"# warning: crypto.init_crypto() failed ({exc}); "
+              f"real broker data will be unavailable.", file=sys.stderr)
+
     head = _git_head()
     sleeves = [
         ("stock", R.FoldGeometry.stock_default(), R.predeclared_grid("stock")),
