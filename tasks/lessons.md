@@ -29,3 +29,30 @@
   accumulated separately as entry_fees / exit_fees / other_costs. Never subtract
   costs into the gross numbers, and never reconstruct gross from the post-slippage
   fill price — store the gross mid entry on the lot and derive from it.
+
+## 2026-07-11 - Task 8: pure signal models, decision-bar exclusion, SMA-slope fixtures
+
+- Rule: "excluding the decision bar/candle" means the trailing-window thresholds
+  (prior-252 high, prior-20 avg volume, prior-55 high, prior-20 low) compute over
+  bars[:-1] and compare against bars[-1]. The decision bar is the last completed
+  bar in the oldest-first list. Never let the current bar contaminate its own
+  breakout/volume/low window (look-ahead guard).
+- Rule: entries use STRICT inequality (close > prior-window high). A close equal to
+  the prior high is NOT a breakout; test both the equal (no-entry) and just-above
+  (entry) control cases.
+- Mistake: a "flat SMA200 slope" regime fixture nudged only the final close up, but
+  that single high bar entered the recent-200 window and lifted SMA200(now) above
+  SMA200(20-ago), so the slope read as rising. Cause: SMA200(now)=closes[-200:] and
+  SMA200(offset20)=closes[-220:-20] overlap on the middle; a bump in the overlap
+  affects both, a bump only in the now-tail affects only now. Rule: to force an
+  EQUAL SMA slope, place one identical bump in the now-only region and one in the
+  offset-only region so each 200-window contains exactly one bump.
+- Mistake: an "ATR trailing-stop breach" exit test crashed price so hard that the
+  prior-20-low exit fired first (exit conditions are OR'd, first match wins) and the
+  reason string didn't mention "stop". Rule: to isolate ONE exit condition, build a
+  fixture where the others are provably quiet (close above prior-20 low, EMA200
+  unavailable or above close) so only the intended rule triggers.
+- Rule: research-candidate strategies register in REGISTRY but set auto_trade=False
+  and hidden=True. Startup seeds registry strategies into the `strategies` table with
+  enabled=False and never auto-populates `strategy_accounts`, so "registered but
+  disabled/unassigned by default" needs no extra guard beyond those class flags.

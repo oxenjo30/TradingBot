@@ -13,6 +13,8 @@ from .crypto_volatility_breakout import CryptoVolatilityBreakout
 from .crypto_grid import CryptoGrid
 from .ema_confluence import EMAConfluence
 from .chart_patterns import ClassicPatterns
+from .liquid_stock_trend import LiquidStockTrend
+from .btc_eth_trend import BtcEthTrend
 
 REGISTRY: dict[str, type[Strategy]] = {
     cls.name: cls for cls in (
@@ -30,6 +32,10 @@ REGISTRY: dict[str, type[Strategy]] = {
         CryptoGrid,
         EMAConfluence,
         ClassicPatterns,
+        # Task 8 research candidates — registered but auto_trade=False, so they
+        # exist in the registry yet are NOT auto-assigned or enabled by default.
+        LiquidStockTrend,
+        BtcEthTrend,
     )
 }
 
