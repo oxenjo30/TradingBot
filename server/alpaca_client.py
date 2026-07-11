@@ -346,10 +346,11 @@ def historical_provider(bars_by_symbol=None, corporate_actions=None):
 
     class _NetworkAlpacaProvider(AlpacaHistoricalProvider):
         def _raw_bars(self, symbol: str) -> list[dict]:
-            # Wide daily window; fetch() narrows to the requested range. Exceptions
-            # propagate (never swallowed into empty success). Split+dividend adjusted
-            # so a multi-year series is continuous across corporate actions (§9).
-            return get_recent_bars(symbol, days=3650, adjustment="all")
+            # Wide daily window (~12y) so fetch() can serve a full 10y walk-forward
+            # from whatever history the feed holds; it then narrows to the requested
+            # range. Exceptions propagate (never swallowed into empty success).
+            # Split+dividend adjusted so the series is continuous across actions (§9).
+            return get_recent_bars(symbol, days=4380, adjustment="all")
 
     return _NetworkAlpacaProvider(corporate_actions=corporate_actions)
 

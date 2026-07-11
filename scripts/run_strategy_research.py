@@ -350,7 +350,11 @@ def _try_real_stock(geo) -> SleeveData:
     """
     from server import alpaca_client
     end = date.today()
-    start = end - timedelta(days=int(geo.min_years * 365.25) + 40)
+    # Request generously MORE than the minimum: the 10y walk-forward needs >= 2520
+    # sessions, but 10 calendar years of trading days is only ~2510. Ask for ~1.5y
+    # of extra margin so we capture all the daily history the feed actually holds
+    # (Alpaca IEX daily reaches ~2016) and comfortably clear the session minimum.
+    start = end - timedelta(days=int((geo.min_years + 1.5) * 365.25))
     provider = alpaca_client.historical_provider()  # network provider, no fixtures
     datasets, fps = {}, {}
     for sym in STOCK_UNIVERSE:
@@ -617,9 +621,25 @@ def run_sleeve(asset_class, geo, grid) -> SleeveResult:
     bt_baseline = _make_backtest_fn(data, baseline_cost)
     bt_stressed = _make_backtest_fn(data, stressed_cost)
 
-    # Full walk-forward under BASELINE costs (this drives selection + holdout).
-    wf = R.run_walk_forward(calendar=data.calendar, geometry=geo, grid=grid,
-                            backtest_fn=bt_baseline, persist=None)
+    # Insufficient history is an HONEST INCONCLUSIVE, not a crash: if the data
+    # source cannot supply the full walk-forward window (e.g. Alpaca's IEX daily
+    # history reaches only ~10y and lands a few sessions short of the 10y minimum),
+    # report this sleeve INCONCLUSIVE and let the OTHER sleeve still run. We do NOT
+    # weaken the geometry to fit the data.
+    try:
+        # Full walk-forward under BASELINE costs (this drives selection + holdout).
+        wf = R.run_walk_forward(calendar=data.calendar, geometry=geo, grid=grid,
+                                backtest_fn=bt_baseline, persist=None)
+    except R.InsufficientHistory as exc:
+        return SleeveResult(
+            asset_class=asset_class, source=data.source, verdict="INCONCLUSIVE",
+            reason=f"insufficient history for the {geo.min_years}y walk-forward: {exc}",
+            fingerprints=data.fingerprints,
+            limitations=data.limitations + [
+                f"Data source supplied {len(data.calendar)} sessions; the "
+                f"{geo.min_years}y walk-forward needs >= {geo.min_periods}. "
+                "A deeper historical feed is required for a scored verdict."],
+        )
 
     # Re-run the frozen params on the whole pre-holdout window under BOTH cost
     # models to get the baseline/stressed OOS figures (§12.1/§12.2), and gather the
