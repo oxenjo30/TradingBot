@@ -2231,6 +2231,43 @@ def set_fill_watermark(account_id: int, watermark: str,
             (account_id, watermark, overlap_cursor, now))
 
 
+# ── Portfolio risk state (Task 5, §19.1 — consolidated equity + hard stop) ──────
+# Durable key/value store for the high-water mark, daily/weekly baselines, snapshot
+# metadata, conversion rates, hard-stop step machine, and reset events. Values are
+# canonical decimal TEXT or short status strings — never REAL.
+
+def get_portfolio_risk(key: str, default: str = "") -> str:
+    """Read one portfolio_risk_state value, or `default` if unset."""
+    with get_conn() as c:
+        r = c.execute("SELECT value FROM portfolio_risk_state WHERE key=?",
+                      (key,)).fetchone()
+    return r["value"] if r else default
+
+
+def set_portfolio_risk(key: str, value: str) -> None:
+    """Upsert one portfolio_risk_state value (updated_at refreshed)."""
+    with get_conn() as c:
+        c.execute(
+            "INSERT INTO portfolio_risk_state(key, value, updated_at) "
+            "VALUES(?,?,strftime('%Y-%m-%dT%H:%M:%f000Z','now')) "
+            "ON CONFLICT(key) DO UPDATE SET value=excluded.value, "
+            "updated_at=excluded.updated_at",
+            (key, value))
+
+
+def delete_portfolio_risk(key: str) -> None:
+    """Remove one portfolio_risk_state key (used by owner clearance)."""
+    with get_conn() as c:
+        c.execute("DELETE FROM portfolio_risk_state WHERE key=?", (key,))
+
+
+def get_all_portfolio_risk() -> dict[str, str]:
+    """All portfolio_risk_state key/value pairs."""
+    with get_conn() as c:
+        rows = c.execute("SELECT key, value FROM portfolio_risk_state").fetchall()
+    return {r["key"]: r["value"] for r in rows}
+
+
 # ── Late fee adjustments (Task 3, §19.5 — fills are immutable; fees append) ──────
 
 def append_fee_adjustment(*, account_id: int, broker_fill_id: str, fee: str,

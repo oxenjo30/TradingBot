@@ -98,6 +98,43 @@ def _run_take_profit_pass(acct_client, acct_id: int, take_profit_pct: float,
                           f"{reason} | submit error: {e}", None, "error", account_id=acct_id)
 
 
+def _resume_hard_stop_if_pending() -> bool:
+    """Resume a pending durable hard stop before strategy evaluation (§19.2 step 9).
+
+    INERT IN SHADOW MODE: the portfolio controller can only engage a hard stop in
+    authoritative execution-ledger mode, so when the ledger is in shadow (the
+    default) this returns immediately and live behavior is unchanged. Fails OPEN on
+    any internal error so a controller bug can never wedge the legacy tick."""
+    try:
+        if not execution_router.is_authoritative():
+            return False
+        from . import portfolio_risk
+        if not portfolio_risk.is_hard_stopped():
+            return False
+
+        # Build broker clients lazily, one per participating paper account.
+        active_mode = db.get_risk_settings().get("trading_mode", "paper")
+        accounts = [a["id"] for a in db.get_broker_accounts()
+                    if a["account_type"] == active_mode]
+
+        def broker_for(account_id: int):
+            acct = db.get_broker_account(account_id)
+            _sec = acct.get("api_secret") or ""
+            return get_account_client(
+                broker=acct.get("broker", "alpaca"),
+                api_key=crypto.decrypt(acct["api_key"]),
+                api_secret=crypto.decrypt(_sec) if _sec else "",
+                paper=(acct["account_type"] == "paper"),
+                account_id=account_id,
+            )
+
+        return portfolio_risk.resume_pending_hard_stop(
+            accounts=accounts, broker_for=broker_for)
+    except Exception as exc:
+        log.warning("hard-stop resume skipped (%s)", exc)
+        return False
+
+
 def run_tick():
     """Run all enabled strategies across all assigned broker accounts."""
     global _last_run
@@ -124,6 +161,13 @@ def run_tick():
     # Global stock trading window (applies to all stock broker accounts)
     _stock_global_start = db.get_app_config("stock_trading_start", "") or ""
     _stock_global_end   = db.get_app_config("stock_trading_end",   "") or ""
+
+    # Durable hard stop (Task 5, §19.2 step 9): if a hard stop is engaged, resume the
+    # SAME shutdown BEFORE any strategy evaluation and keep the account frozen. INERT
+    # IN SHADOW MODE — a hard stop can only be engaged when the execution ledger is
+    # authoritative, so in shadow (default) this is a no-op and live behavior is
+    # unchanged. The account remains frozen; there is NO automatic reset.
+    _resume_hard_stop_if_pending()
 
     if risk.is_killed():
         _last_run["error"] = "kill switch active"

@@ -218,6 +218,33 @@ def check_all(symbol: str, side: str, account: dict, day_trade_count: int,
                 f"manual reset required"
             )
 
+    # 11. Consolidated portfolio risk (Task 5, §6, §19.1). INERT IN SHADOW MODE:
+    # the new portfolio controller only gates NEW ENTRIES when the execution ledger
+    # is AUTHORITATIVE. In shadow (default) the legacy guards above are the sole
+    # authority and this block is a no-op, so live behavior is unchanged.
+    if side == "buy":
+        _check_portfolio_entry_gate()
+
+
+def _check_portfolio_entry_gate() -> None:
+    """Freeze NEW entries when the consolidated portfolio controller says so.
+
+    Only active in authoritative execution-ledger mode. A hard stop, drawdown/loss
+    freeze, or stale consolidated equity blocks new entries (protective exits are
+    handled elsewhere and are never blocked here). Fails OPEN on any internal error
+    so a controller bug can never silently wedge live trading in shadow mode."""
+    try:
+        from . import execution_router
+        if not execution_router.is_authoritative():
+            return  # shadow mode → legacy guards only; new controller is inert
+        from . import portfolio_risk
+        if portfolio_risk.is_hard_stopped():
+            raise RiskViolation("portfolio HARD STOP engaged — new entries frozen")
+    except RiskViolation:
+        raise
+    except Exception as exc:  # never let a controller error block the legacy path
+        log.warning("portfolio entry gate skipped (%s)", exc)
+
 
 # ── Position sizing ───────────────────────────────────────────────────────────
 
