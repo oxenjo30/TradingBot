@@ -175,6 +175,110 @@ CREATE TABLE IF NOT EXISTS download_tokens (
     attempts_remaining INTEGER NOT NULL DEFAULT 3,
     exhausted       INTEGER NOT NULL DEFAULT 0
 );
+
+-- ── Execution ledger (strategy-rebuild spec §4.2, §19.5) ─────────────────────
+-- Additive, decimal-safe order/fill accounting. Money and quantities are stored
+-- as canonical decimal TEXT (never REAL). Acknowledgement is not a fill.
+
+CREATE TABLE IF NOT EXISTS execution_orders (
+    id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+    account_id         INTEGER NOT NULL,
+    strategy           TEXT NOT NULL,          -- owner/source (strategy, 'manual', 'webhook', 'take_profit', ...)
+    client_order_id    TEXT NOT NULL,
+    broker_order_id    TEXT,                   -- bound on acknowledgement
+    symbol             TEXT NOT NULL,
+    side               TEXT NOT NULL CHECK (side IN ('buy','sell')),
+    order_type         TEXT NOT NULL,
+    requested_qty      TEXT,                   -- decimal text, xor requested_notional
+    requested_notional TEXT,
+    state              TEXT NOT NULL DEFAULT 'INTENT_PERSISTED',
+    last_error         TEXT,
+    created_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f000Z','now')),
+    updated_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f000Z','now')),
+    UNIQUE (account_id, client_order_id),
+    CHECK (requested_qty IS NULL OR requested_qty NOT GLOB '*[eE]*'),
+    CHECK (requested_notional IS NULL OR requested_notional NOT GLOB '*[eE]*')
+);
+CREATE INDEX IF NOT EXISTS idx_exec_orders_acct_state ON execution_orders(account_id, state);
+CREATE INDEX IF NOT EXISTS idx_exec_orders_strat ON execution_orders(strategy, account_id, symbol);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_exec_orders_broker
+    ON execution_orders(account_id, broker_order_id)
+    WHERE broker_order_id IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS execution_fills (
+    id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+    execution_order_id INTEGER NOT NULL REFERENCES execution_orders(id),
+    account_id         INTEGER NOT NULL,
+    broker_fill_id     TEXT NOT NULL,          -- stable broker trade id (idempotency key)
+    qty                TEXT NOT NULL,          -- decimal text
+    price              TEXT NOT NULL,          -- decimal text
+    fee                TEXT NOT NULL DEFAULT '0',
+    fee_currency       TEXT NOT NULL DEFAULT 'USD',
+    filled_at          TEXT NOT NULL,          -- UTC ISO-8601 with microseconds
+    created_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f000Z','now')),
+    UNIQUE (account_id, broker_fill_id),
+    CHECK (qty NOT GLOB '*[eE]*' AND price NOT GLOB '*[eE]*' AND fee NOT GLOB '*[eE]*')
+);
+CREATE INDEX IF NOT EXISTS idx_exec_fills_order ON execution_fills(execution_order_id);
+
+CREATE TABLE IF NOT EXISTS fee_adjustments (
+    id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+    execution_fill_id  INTEGER NOT NULL REFERENCES execution_fills(id),
+    fee                TEXT NOT NULL,          -- signed decimal text (append-only; fills are immutable)
+    fee_currency       TEXT NOT NULL DEFAULT 'USD',
+    reason             TEXT,
+    created_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f000Z','now')),
+    CHECK (fee NOT GLOB '*[eE]*')
+);
+
+CREATE TABLE IF NOT EXISTS position_lots (
+    id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+    account_id         INTEGER NOT NULL,
+    strategy           TEXT NOT NULL,
+    symbol             TEXT NOT NULL,
+    opening_fill_id    INTEGER REFERENCES execution_fills(id),
+    original_qty       TEXT NOT NULL,          -- decimal text
+    remaining_qty      TEXT NOT NULL,          -- decimal text
+    unit_cost          TEXT NOT NULL,          -- decimal text, includes allocated entry fees
+    opened_at          TEXT NOT NULL,
+    closed_at          TEXT,
+    provenance         TEXT NOT NULL DEFAULT 'verified',  -- verified | legacy_verified | legacy_unverified | external
+    CHECK (original_qty NOT GLOB '*[eE]*' AND remaining_qty NOT GLOB '*[eE]*' AND unit_cost NOT GLOB '*[eE]*')
+);
+CREATE INDEX IF NOT EXISTS idx_lots_owner ON position_lots(strategy, account_id, symbol);
+
+CREATE TABLE IF NOT EXISTS lot_matches (
+    id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+    closing_fill_id    INTEGER NOT NULL REFERENCES execution_fills(id),
+    opening_lot_id     INTEGER NOT NULL REFERENCES position_lots(id),
+    matched_qty        TEXT NOT NULL,
+    entry_price        TEXT NOT NULL,
+    exit_price         TEXT NOT NULL,
+    entry_cost         TEXT NOT NULL DEFAULT '0',
+    exit_cost          TEXT NOT NULL DEFAULT '0',
+    net_pnl            TEXT NOT NULL,
+    created_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f000Z','now')),
+    UNIQUE (closing_fill_id, opening_lot_id),
+    CHECK (matched_qty NOT GLOB '*[eE]*' AND net_pnl NOT GLOB '*[eE]*')
+);
+
+CREATE TABLE IF NOT EXISTS reconciliation_snapshots (
+    id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+    account_id         INTEGER NOT NULL,
+    symbol             TEXT NOT NULL,
+    broker_qty         TEXT NOT NULL,
+    internal_qty       TEXT NOT NULL,
+    delta              TEXT NOT NULL,
+    status             TEXT NOT NULL,          -- VERIFIED | DUST | FROZEN
+    created_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f000Z','now'))
+);
+CREATE INDEX IF NOT EXISTS idx_recon_acct ON reconciliation_snapshots(account_id, symbol);
+
+CREATE TABLE IF NOT EXISTS portfolio_risk_state (
+    key                TEXT PRIMARY KEY,       -- high_water_mark, daily_baseline, weekly_baseline, hard_stop_triggered, ...
+    value              TEXT NOT NULL,
+    updated_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f000Z','now'))
+);
 """
 
 RISK_DEFAULTS = {
@@ -1886,3 +1990,127 @@ def list_audit(limit: int = 200, since: str | None = None, until: str | None = N
             (*args, limit),
         ).fetchall()
     return [dict(r) for r in rows]
+
+
+# ── Execution ledger persistence (strategy-rebuild spec §4.1, §19.5) ────────────
+
+def _utc_micro() -> str:
+    """UTC ISO-8601 timestamp with microseconds (spec §19.5)."""
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f") + "Z"
+
+
+def create_order_intent(*, account_id: int, strategy: str, client_order_id: str,
+                        symbol: str, side: str, order_type: str,
+                        requested_qty: str | None = None,
+                        requested_notional: str | None = None) -> int:
+    """Persist an order intent BEFORE contacting the broker (§4.1 step 2).
+
+    Exactly one of requested_qty / requested_notional must be given, as canonical
+    decimal text. Duplicate (account_id, client_order_id) raises (idempotency)."""
+    from .execution_models import decimal_text
+    if (requested_qty is None) == (requested_notional is None):
+        raise ValueError("exactly one of requested_qty / requested_notional required")
+    q = decimal_text(requested_qty) if requested_qty is not None else None
+    n = decimal_text(requested_notional) if requested_notional is not None else None
+    now = _utc_micro()
+    with get_conn() as c:
+        cur = c.execute(
+            "INSERT INTO execution_orders (account_id, strategy, client_order_id, symbol, "
+            "side, order_type, requested_qty, requested_notional, state, created_at, updated_at) "
+            "VALUES (?,?,?,?,?,?,?,?,'INTENT_PERSISTED',?,?)",
+            (account_id, strategy, client_order_id, symbol, side, order_type, q, n, now, now),
+        )
+        return cur.lastrowid
+
+
+def mark_order_submitting(order_id: int) -> None:
+    """Persist SUBMITTING immediately before the network call (§19.3)."""
+    with get_conn() as c:
+        c.execute("UPDATE execution_orders SET state='SUBMITTING', updated_at=? WHERE id=?",
+                  (_utc_micro(), order_id))
+
+
+def bind_order_ack(order_id: int, *, broker_order_id: str | None,
+                   state: str, last_error: str | None = None) -> None:
+    """Record the broker acknowledgement (NOT a fill) and bind the broker id."""
+    with get_conn() as c:
+        c.execute(
+            "UPDATE execution_orders SET broker_order_id=?, state=?, last_error=?, updated_at=? WHERE id=?",
+            (broker_order_id, state, last_error, _utc_micro(), order_id),
+        )
+
+
+def get_execution_order(order_id: int) -> dict | None:
+    with get_conn() as c:
+        r = c.execute("SELECT * FROM execution_orders WHERE id=?", (order_id,)).fetchone()
+    return dict(r) if r else None
+
+
+def get_order_by_client_id(account_id: int, client_order_id: str) -> dict | None:
+    """Authoritative recovery lookup after a timeout/crash (§19.3)."""
+    with get_conn() as c:
+        r = c.execute(
+            "SELECT * FROM execution_orders WHERE account_id=? AND client_order_id=?",
+            (account_id, client_order_id),
+        ).fetchone()
+    return dict(r) if r else None
+
+
+def insert_fill_and_apply_fifo(order_id: int, *, broker_fill_id: str, qty: str,
+                               price: str, fee: str = "0", fee_currency: str = "USD",
+                               filled_at: str) -> int:
+    """Idempotently ingest a confirmed fill in one BEGIN IMMEDIATE transaction (§19.5).
+
+    - A duplicate fill with identical economic values returns the existing row id.
+    - A duplicate broker_fill_id with DIFFERENT values raises LedgerConflict (the
+      account should freeze rather than overwrite).
+    Lot creation / FIFO matching is layered on in Task 2; this establishes the
+    idempotent fill-insert foundation.
+    """
+    from .execution_models import decimal_text, LedgerConflict
+    q, p, f = decimal_text(qty), decimal_text(price), decimal_text(fee)
+
+    order = get_execution_order(order_id)
+    if order is None:
+        raise ValueError(f"unknown execution_order {order_id}")
+    account_id = order["account_id"]
+
+    c = sqlite3.connect(DB_PATH)
+    c.row_factory = sqlite3.Row
+    c.execute("PRAGMA foreign_keys = ON")
+    try:
+        c.execute("BEGIN IMMEDIATE")
+        existing = c.execute(
+            "SELECT id, qty, price, fee, fee_currency FROM execution_fills "
+            "WHERE account_id=? AND broker_fill_id=?",
+            (account_id, broker_fill_id),
+        ).fetchone()
+        if existing is not None:
+            same = (existing["qty"] == q and existing["price"] == p
+                    and existing["fee"] == f and existing["fee_currency"] == fee_currency)
+            c.execute("ROLLBACK")
+            if same:
+                return existing["id"]                    # idempotent no-op
+            raise LedgerConflict(
+                f"fill {broker_fill_id} on account {account_id} re-ingested with "
+                f"different values (was qty={existing['qty']} price={existing['price']}, "
+                f"now qty={q} price={p})"
+            )
+        cur = c.execute(
+            "INSERT INTO execution_fills (execution_order_id, account_id, broker_fill_id, "
+            "qty, price, fee, fee_currency, filled_at) VALUES (?,?,?,?,?,?,?,?)",
+            (order_id, account_id, broker_fill_id, q, p, f, fee_currency, filled_at),
+        )
+        fill_id = cur.lastrowid
+        c.execute("COMMIT")
+        return fill_id
+    except LedgerConflict:
+        raise
+    except Exception:
+        try:
+            c.execute("ROLLBACK")
+        except Exception:
+            pass
+        raise
+    finally:
+        c.close()
