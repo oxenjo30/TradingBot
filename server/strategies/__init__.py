@@ -15,6 +15,7 @@ from .ema_confluence import EMAConfluence
 from .chart_patterns import ClassicPatterns
 from .liquid_stock_trend import LiquidStockTrend
 from .btc_eth_trend import BtcEthTrend
+from .dual_momentum import DualMomentum
 
 REGISTRY: dict[str, type[Strategy]] = {
     cls.name: cls for cls in (
@@ -36,6 +37,7 @@ REGISTRY: dict[str, type[Strategy]] = {
         # exist in the registry yet are NOT auto-assigned or enabled by default.
         LiquidStockTrend,
         BtcEthTrend,
+        DualMomentum,
     )
 }
 
