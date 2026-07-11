@@ -92,6 +92,43 @@
   READ-ONLY (GET). No strategy is enabled and no live state mutated — enabling is a
   separate Task 12 gated cutover.
 
+## 2026-07-11 - Task 10: quarantine-owner classification, monotonic schema stamp, forward rollback
+
+- Insight: legacy inventory must be classified WITHOUT becoming sellable. db.get_
+  strategy_positions/get_sellable_qty exclude only provenance='external', so a
+  legacy_verified/legacy_unverified lot filed under the REAL strategy name would be
+  auto-adopted (violates §19.6 "ownership never inferred"). Rule: file classified
+  legacy lots under a QUARANTINE OWNER string ('legacy_verified'/'legacy_unverified'),
+  not a strategy name. get_strategy_positions("sma_cross",...) then returns nothing for
+  them. adopt_owner() reassigns strategy=real_owner + provenance='verified' only with
+  evidence + audit reason + bounded by the unexplained reconciled amount.
+- Rule: schema versioning for tables that live in the always-created SCHEMA string
+  (execution_* etc.) is NOT a lazy ALTER migration — init_db() STAMPS ledger_schema_
+  version monotonically (never downgrade). A fresh DB is already at the current version
+  because the tables exist. migration.current_schema_version delegates to
+  db.get_ledger_schema_version so both readers agree; keep the two LEDGER_SCHEMA_VERSION
+  constants in sync.
+- Rule: golden compatibility is a STRUCTURAL (keys+types, recursive) comparison, not a
+  value comparison. _shape_of maps dict→sorted-key shapes, list→first-element shape,
+  scalars→type name; golden_shape_matches must fail on a missing field, an EXTRA field,
+  or a type change, but pass when only VALUES differ. Test all four.
+- Rule: post-cutover rollback is FORWARD recovery, never "flip back and resume". It
+  quiesces automation, sets mode→shadow, and FREEZES every account (fail-closed). The
+  freeze clears ONLY after a fresh clean reconciliation (clear_freeze_after_
+  reconciliation) with an audit reason — an unexplained broker qty keeps it frozen.
+- Rule: cutover is GATED and ATOMIC. check_cutover_guards returns {ok, failed:[...]}
+  and every guard (backup marker, ZERO unknown-nonterminal orders, reconciliation pass
+  = golden recorded + no frozen account, paper-accounts-only, retention capability,
+  golden compatibility) must pass. perform_cutover raises CutoverBlocked and leaves
+  execution_ledger_mode UNCHANGED (still shadow) when any guard fails — it never flips
+  automatically. Default stays shadow; live behavior unchanged.
+- Rule: compatibility projections must emit the EXACT legacy API key sets. Read the
+  adapter's normalized dict (AccountClient.get_positions/get_orders) and match the key
+  set byte-for-byte (positions: symbol/qty/side/market_value/avg_entry_price/current_
+  price/unrealized_pl/unrealized_plpc; orders: id/client_order_id/symbol/side/qty/
+  filled_qty/filled_avg_price/type/status/submitted_at/filled_at). Golden shape tests
+  on the REAL endpoints prove the shapes weren't broken.
+
 ## 2026-07-11 - Task 11: honest INCONCLUSIVE is the win; force it in code
 
 - Insight: in this environment BOTH sleeves are INCONCLUSIVE and that is the CORRECT
@@ -124,3 +161,25 @@
   string, log, or exception — pass them only as positional args to the client. As
   defence-in-depth against a third-party exception echoing request material, redact
   any >=16-char alphanumeric run from any recorded failure reason (_safe_error).
+
+## 2026-07-11 - Real-data research on VPS: data-pipeline gotchas
+
+- Mistake: assumed "data unavailable" was fundamental. Root cause was LOCAL only —
+  no decryptable creds on the dev box. On the VPS (real DB_SECRET_KEY + accounts)
+  the data flows. Rule: for anything data/credential-dependent, test on the VPS, not
+  local; the honest verdict lives where the creds are.
+- Mistake: an ad-hoc VPS probe reported creds "empty/invalid" — because it never
+  called crypto.init_crypto(). The live app inits Fernet at startup (main.py); any
+  standalone script/probe MUST call crypto.init_crypto() first or every decrypt()
+  raises "crypto not initialised". The research runner had the same bug.
+- Rule: Alpaca daily bars are UNADJUSTED by default — a split shows as a huge gap
+  (AAPL 2020 4:1 = ~73% "crash"). Pass adjustment='all' for any multi-year backtest.
+  Keep the LIVE signal path on raw (default) — only the research provider opts in.
+- Rule: Binance fetch_ohlcv caps at 1000 rows/call; days>1000 silently truncates.
+  For multi-year history paginate with a `since` cursor (get_historical_bars). Do NOT
+  change the live single-call get_recent_bars.
+- Rule: a walk-forward that freezes NO params (selection rule rejects every grid
+  point across folds) yields "no holdout series" -> INCONCLUSIVE. That is a real
+  result (strategy not validated), not a bug. Do NOT weaken the geometry/selection
+  to force a verdict. 10y trading days ~= 2510, so a strict 252*min_years session
+  floor needs the fetch window widened (~+1.5y) to clear it, not lowered.

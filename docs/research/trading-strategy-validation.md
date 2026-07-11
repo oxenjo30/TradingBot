@@ -352,3 +352,43 @@ that the stock engine rarely trades. No strategy is enabled by this run.
 call, which Binance caps at 1000. A real 6-year crypto walk-forward requires
 paginating with the `since` parameter across multiple calls. Until then the
 crypto sleeve is INCONCLUSIVE on data-coverage grounds, not on merit.
+
+---
+
+## ADDENDUM 2 — Crypto with paginated history (2026-07-11)
+
+Added `BinanceAccountClient.get_historical_bars()` (paginated past Binance's
+1000-bar cap; commit `6a1f1ea`) so the crypto sleeve finally has enough history.
+
+### Real crypto verdict (deep data)
+
+| Sleeve | Data | Sessions | Verdict | Detail |
+|--------|------|----------|---------|--------|
+| Crypto | REAL (Binance, paginated) | 2232 (2020-06 → 2026-07) | **INCONCLUSIVE** | Froze `breakout=40, exit_low=15, trail_atr=3.5`; validation folds +7.4% net; **holdout took 0 trades → CI [0,0]**. |
+
+**Why 0 holdout trades is not a failure of the strategy:** the scored holdout
+window (2025-07 → 2026-07) is a severe crypto **bear market** — BTC fell
+$119,178 → $64,139 (**−46%**), ETH −48%, equal-weight buy-and-hold **−47%**. The
+frozen trend-following params correctly **stayed in cash** rather than buying a
+sustained downtrend. That is the strategy behaving as designed — but "flat" yields
+no return series, so the §12 gate cannot award a positive-edge PASS.
+
+**Net crypto reading:** the strategy is *sensible* (it traded 61× for +7.4% across
+the validation era and avoided a −47% crash) but is **NOT validated** by the strict
+holdout gate, because the single holdout window is a downtrend. Per §12/§19.13 it
+**remains disabled**.
+
+### Overall conclusion (both sleeves, real deep data)
+
+| Sleeve | Data quality | Verdict | Enabled? |
+|--------|--------------|---------|----------|
+| Stock (§7)  | Real, 10y, split-adjusted | INCONCLUSIVE (selection froze no params; edge ≈ 0 after costs) | **NO** |
+| Crypto (§8) | Real, 6y, paginated | INCONCLUSIVE (holdout is a bear market; strategy correctly flat) | **NO** |
+
+Neither strategy is a backtest-proven winner under the walk-forward + statistical
+gate. Both remain disabled. The rebuild infrastructure (execution ledger, risk,
+backtester, validation, migration) is deployed to the VPS in **shadow mode** with
+**no strategy enabled**. Getting a PASS would require either (a) a strategy/param
+redesign that survives walk-forward selection, or (b) a holdout window that spans a
+market regime where the strategy can demonstrate a positive edge — neither of which
+should be forced.
