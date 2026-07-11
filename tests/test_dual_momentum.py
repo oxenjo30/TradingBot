@@ -137,13 +137,17 @@ def test_rebalance_only_on_first_session_of_month():
     assert len([s for s in sig if s.side == "buy"]) == 2
 
 
-def test_registered_as_disabled_research_candidate():
-    """dual_momentum is in the registry but NOT auto-trading (safety)."""
+def test_registered_and_validated():
+    """dual_momentum is registered and (post-validation) allowed to trade.
+
+    It PASSED walk-forward validation on 2026-07-11, so auto_trade is True and it is
+    visible in the UI. Safety now lives at the per-account assignment level, not the
+    class flag: it only runs where an operator has explicitly enabled it."""
     from server.strategies import REGISTRY
     assert "dual_momentum" in REGISTRY
     cls = REGISTRY["dual_momentum"]
-    assert cls.auto_trade is False
-    assert cls.hidden is True
+    assert cls.auto_trade is True
+    assert cls.hidden is False
 
 
 def test_insufficient_history_no_signals():

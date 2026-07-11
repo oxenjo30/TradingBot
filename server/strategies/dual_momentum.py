@@ -20,9 +20,12 @@ PURE completed-bar signal model: NO network calls of its own (bars come from the
 account's broker client via the base helper), NO global state. Positions passed in
 are ONLY this strategy's owned lots on the account (Task 2 ledger).
 
-RESEARCH CANDIDATE: `auto_trade = False`, `hidden = True` — registered but NOT
-auto-assigned or enabled. Enabled only after walk-forward validation PASSES and an
-explicit paper cutover.
+VALIDATED (2026-07-11): PASSED walk-forward validation on real 10y split-adjusted
+data — holdout (2024-2026) +18.5% net, -7.8% max drawdown, daily-return 95% CI
+[+0.000014, +0.000351, +0.000729] (lower bound > 0). See
+docs/research/trading-strategy-validation.md (Addendum 3). It is therefore allowed
+to trade (`auto_trade = True`) and visible in the UI, but is only ACTIVE where an
+operator has explicitly assigned + enabled it on an account (paper first).
 """
 from typing import ClassVar
 
@@ -60,15 +63,17 @@ class DualMomentum(Strategy):
     name = "dual_momentum"
     label = "Dual-Momentum ETF Rotation"
     brokers: ClassVar[list[str]] = ["stock"]
-    # Research candidate — NOT auto-assigned/enabled until validation + cutover.
-    auto_trade: ClassVar[bool] = False
-    hidden: ClassVar[bool] = True
+    # VALIDATED (PASSED walk-forward, 2026-07-11) — allowed to trade. It only runs
+    # where an operator has explicitly assigned + enabled it on an account.
+    auto_trade: ClassVar[bool] = True
+    hidden: ClassVar[bool] = False
     description = (
         "Low-turnover monthly rotation across a diversified ETF universe "
         "(SPY, QQQ, IWM, DIA, GLD, TLT, EEM). Holds the top-K symbols ranked by "
         "6-month return, but only those still above their 200-day trend; goes to "
-        "cash when nothing qualifies (sits out broad crashes). Research candidate: "
-        "disabled by default until walk-forward validation passes."
+        "cash when nothing qualifies (sits out broad crashes). Validated by "
+        "walk-forward on 10y real data (holdout +18.5%, statistically significant "
+        "positive edge). Assign + enable per account to activate (paper first)."
     )
 
     UNIVERSE: ClassVar[list[str]] = [
