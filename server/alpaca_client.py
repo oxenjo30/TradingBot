@@ -319,6 +319,30 @@ def get_portfolio_history(period: str = "1M", timeframe: str = "1D") -> dict:
     return r.json()
 
 
+def historical_provider(bars_by_symbol=None, corporate_actions=None):
+    """Build a STOCK-ONLY daily historical provider (Task 6, spec §9).
+
+    Backtest/research infrastructure only — this does NOT change any live trading
+    path. When `bars_by_symbol` is supplied (tests / recorded fixtures) the
+    provider is fully deterministic and makes no network calls. Otherwise a network
+    provider is returned whose `_raw_bars` pulls daily bars via `get_recent_bars`;
+    it remains STOCK-ONLY and never falls back to a crypto source.
+    """
+    from .historical import AlpacaHistoricalProvider
+
+    if bars_by_symbol is not None:
+        return AlpacaHistoricalProvider(bars_by_symbol=bars_by_symbol,
+                                        corporate_actions=corporate_actions)
+
+    class _NetworkAlpacaProvider(AlpacaHistoricalProvider):
+        def _raw_bars(self, symbol: str) -> list[dict]:
+            # Wide daily window; fetch() narrows to the requested range. Exceptions
+            # propagate (never swallowed into empty success).
+            return get_recent_bars(symbol, days=3650)
+
+    return _NetworkAlpacaProvider(corporate_actions=corporate_actions)
+
+
 class SnapshotRegressionError(Exception):
     """A cumulative-fill snapshot regressed vs a prior snapshot (spec §19.4).
 

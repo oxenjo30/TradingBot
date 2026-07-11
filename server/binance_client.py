@@ -45,6 +45,32 @@ def _now_micro() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f") + "Z"
 
 
+def historical_provider(bars_by_symbol=None, corporate_actions=None, client=None):
+    """Build a CRYPTO-ONLY daily UTC historical provider (Task 6, spec §9).
+
+    Backtest/research infrastructure only — this does NOT change any live trading
+    path. When `bars_by_symbol` is supplied (tests / recorded fixtures) the provider
+    is fully deterministic and makes no network calls. Otherwise a network provider
+    is returned that pulls daily UTC bars from a live `BinanceAccountClient`; it
+    remains CRYPTO-ONLY and never falls back to a stock source.
+    """
+    from .historical import BinanceHistoricalProvider
+
+    if bars_by_symbol is not None:
+        return BinanceHistoricalProvider(bars_by_symbol=bars_by_symbol,
+                                         corporate_actions=corporate_actions)
+
+    class _NetworkBinanceProvider(BinanceHistoricalProvider):
+        def _raw_bars(self, symbol: str) -> list[dict]:
+            if client is None:
+                raise ValueError("network binance historical_provider requires a client")
+            # Daily UTC bars; fetch() narrows to the requested range. Exceptions
+            # propagate (never swallowed into empty success).
+            return client.get_recent_bars(symbol, days=1000)
+
+    return _NetworkBinanceProvider(corporate_actions=corporate_actions)
+
+
 class BinanceAccountClient:
     """
     Per-account Binance client. Same public interface as alpaca_client.AccountClient

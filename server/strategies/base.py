@@ -1,6 +1,12 @@
 from dataclasses import dataclass, field
 from typing import Literal, ClassVar, Protocol, runtime_checkable
 
+# Re-export the historical data contract (Task 6, spec §9) so strategies that
+# want point-in-time backtest data can reference it from the strategy base
+# without importing the whole module graph. Backtest/research infra only; the
+# live evaluate() path is unchanged.
+from ..historical import HistoricalRequest, HistoricalDataset, AssetClass  # noqa: F401
+
 # ── Broker asset-class sets ────────────────────────────────────────────────────
 # Add any new stock broker id here and it will automatically get all stock
 # strategies without touching individual strategy files.
