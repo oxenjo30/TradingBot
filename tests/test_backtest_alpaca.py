@@ -87,3 +87,61 @@ def test_bars_provider_protocol():
 
     # Protocol check: runtime_checkable lets us use isinstance
     assert isinstance(_MockProvider(), BarsProvider)
+
+
+# ── Split/dividend adjustment (research/backtest path) ──────────────────────────
+#
+# The live signal path must keep pulling RAW bars (default), but the historical
+# research provider needs split+dividend-adjusted bars so a 10-year backtest is not
+# poisoned by a split appearing as a price crash (e.g. AAPL 4:1 on 2020-08-31).
+
+class _FakeBar:
+    def __init__(self, ts, o, h, l, c, v):
+        from datetime import datetime, timezone
+        self.timestamp = datetime.fromisoformat(ts).replace(tzinfo=timezone.utc)
+        self.open, self.high, self.low, self.close, self.volume = o, h, l, c, v
+
+
+class _CaptureData:
+    """Stand-in for alpaca_client.data(): records the request it is handed."""
+    def __init__(self):
+        self.last_request = None
+
+    def get_stock_bars(self, req):
+        self.last_request = req
+        sym = req.symbol_or_symbols
+        return {sym: [_FakeBar("2024-01-02T00:00:00", 100, 101, 99, 100.5, 1e6)]}
+
+
+def test_get_recent_bars_defaults_to_raw(monkeypatch):
+    """Default call sends no split/dividend adjustment — live signals unchanged."""
+    cap = _CaptureData()
+    monkeypatch.setattr(ac, "data", lambda: cap)
+    ac.get_recent_bars("AAPL", days=30)
+    adj = getattr(cap.last_request, "adjustment", None)
+    # Either the SDK default (raw / None) — never split or all.
+    assert adj in (None, "raw") or getattr(adj, "value", None) in (None, "raw")
+
+
+def test_get_recent_bars_passes_adjustment_all(monkeypatch):
+    """adjustment='all' propagates to the StockBarsRequest (split + dividend)."""
+    cap = _CaptureData()
+    monkeypatch.setattr(ac, "data", lambda: cap)
+    ac.get_recent_bars("AAPL", days=3650, adjustment="all")
+    adj = getattr(cap.last_request, "adjustment", None)
+    val = getattr(adj, "value", adj)
+    assert val == "all"
+
+
+def test_network_historical_provider_requests_adjusted(monkeypatch):
+    """The research network provider pulls split+dividend-adjusted bars, not raw."""
+    seen = {}
+
+    def _fake_recent(symbol, days=60, adjustment="raw"):
+        seen["adjustment"] = adjustment
+        return [{"t": "2016-07-15T00:00:00+00:00", "o": 1, "h": 1, "l": 1, "c": 1, "v": 1}]
+
+    monkeypatch.setattr(ac, "get_recent_bars", _fake_recent)
+    prov = ac.historical_provider()          # network provider (no fixtures)
+    prov._raw_bars("AAPL")
+    assert seen["adjustment"] == "all"

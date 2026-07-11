@@ -339,37 +339,71 @@ class SleeveData:
 
 
 def _try_real_stock(geo) -> SleeveData:
-    """Attempt REAL Alpaca stock bars for the full window. Bounded by §19.13: even
-    with data, the unadjusted feed + in-window splits force INCONCLUSIVE."""
+    """Attempt REAL Alpaca stock bars for the full window.
+
+    Bars are pulled SPLIT+DIVIDEND-ADJUSTED at the source (Alpaca
+    ``adjustment='all'`` via ``get_recent_bars(..., adjustment='all')``), so the
+    series is continuous across corporate actions — verified: AAPL's 2020-08-31 4:1
+    split shows 124.81 -> 129.04 -> 134.18, not a fabricated ~73% gap. The verdict
+    is therefore NOT force-inconclusive; it comes from the §12 statistical gate on
+    real data. A structural spot-check still asserts continuity before trusting it.
+    """
     from server import alpaca_client
     end = date.today()
     start = end - timedelta(days=int(geo.min_years * 365.25) + 40)
     provider = alpaca_client.historical_provider()  # network provider, no fixtures
     datasets, fps = {}, {}
     for sym in STOCK_UNIVERSE:
+        # Source-adjusted upstream, so the historical layer must NOT re-apply a
+        # split transform (it would be a no-op with empty corporate_actions anyway).
         req = HistoricalRequest(
             asset_class=AssetClass.STOCK, provider="alpaca", symbol=sym,
             start=start, end=end, timeframe="1D",
-            adjustment=AdjustmentPolicy.SPLIT_ADJUSTED,
+            adjustment=AdjustmentPolicy.RAW,
             as_of_policy=AsOfPolicy.POINT_IN_TIME,
         )
         ds = provider.fetch(req)   # raises on missing creds/coverage
         datasets[sym] = ds
         fps[sym] = ds.fingerprint
+
+    # Guard: refuse to trust a series that still has an uncorrected split-sized gap
+    # (any adjacent-day close ratio outside [0.5, 2.0] on a liquid large-cap is a
+    # data defect, not a real move). If found, fall back to forced INCONCLUSIVE.
+    split_defect = _detect_split_gap(datasets)
+
     cal = sorted({date.fromisoformat(b["t"][:10])
                   for ds in datasets.values() for b in ds.bars})
     lim = [
-        "Network Alpaca provider passes NO corporate_actions -> stock bars are "
-        "UNADJUSTED for splits/dividends (KNOWN LIMITATION).",
-        "In-window forward splits that cannot be corrected: "
-        + "; ".join(f"{k} {v}" for k, v in KNOWN_STOCK_SPLITS.items()),
-        "Alpaca free/IEX feed may return < 10y and lags ~20 min.",
+        "Stock bars pulled SPLIT+DIVIDEND-adjusted at source (Alpaca "
+        "adjustment='all'); series verified continuous across known splits.",
+        "Adjustment is Alpaca's authoritative-vendor adjustment, not independently "
+        "reconciled against a second corporate-action source.",
+        "Alpaca free/IEX feed lags ~20 min; daily history reaches ~10y for the "
+        "fixed liquid universe (all currently listed — no delisting/symbol-change).",
     ]
-    return SleeveData("stock", "real", datasets, cal, fps, lim,
-                      forced_inconclusive=True,
-                      reason="Unadjusted stock feed with in-window splits and no "
-                             "corporate-action feed (spec §19.13): cannot produce "
-                             "a trustworthy/passing stock verdict.")
+    if split_defect:
+        lim.append(f"UNCORRECTED split-sized gap detected: {split_defect} -> "
+                   "verdict forced INCONCLUSIVE (data integrity).")
+        return SleeveData("stock", "real", datasets, cal, fps, lim,
+                          forced_inconclusive=True,
+                          reason=f"Adjacent-day price gap {split_defect} indicates "
+                                 "an uncorrected corporate action; not trustworthy.")
+    return SleeveData("stock", "real", datasets, cal, fps, lim)
+
+
+def _detect_split_gap(datasets) -> str:
+    """Return a description of the first adjacent-day close ratio outside [0.5, 2.0]
+    (a split-sized discontinuity), or '' if the series is clean."""
+    for sym, ds in datasets.items():
+        prev = None
+        for b in ds.bars:
+            c = float(b["c"])
+            if prev is not None and c > 0 and prev > 0:
+                r = c / prev
+                if r < 0.5 or r > 2.0:
+                    return f"{sym} {b['t'][:10]} ratio={r:.2f}"
+            prev = c
+    return ""
 
 
 def _try_real_crypto(geo) -> SleeveData:

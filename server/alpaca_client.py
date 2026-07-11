@@ -8,6 +8,7 @@ from alpaca.trading.enums import OrderSide, TimeInForce, QueryOrderStatus
 from alpaca.data.historical import StockHistoricalDataClient
 from alpaca.data.requests import StockBarsRequest, StockLatestQuoteRequest, StockSnapshotRequest
 from alpaca.data.timeframe import TimeFrame
+from alpaca.data.enums import Adjustment
 
 from .config import ALPACA_API_KEY, ALPACA_API_SECRET, PAPER
 
@@ -243,7 +244,15 @@ def get_snapshots(symbols: list[str]) -> list[dict]:
     return out
 
 
-def get_recent_bars(symbol: str, days: int = 60) -> list[dict]:
+def get_recent_bars(symbol: str, days: int = 60, adjustment: str = "raw") -> list[dict]:
+    """Daily bars for `symbol`.
+
+    `adjustment` controls corporate-action handling on the Alpaca feed:
+      - "raw" (default): live signal path — unchanged behavior.
+      - "all"/"split"/"dividend": for the historical/research provider, so a
+        multi-year backtest is not poisoned by a split appearing as a price crash
+        (e.g. AAPL 4:1 on 2020-08-31 shows as a 73% overnight drop when raw).
+    """
     if getattr(_bt, "bars", None) is not None:
         sym = symbol.upper()
         # days is intentionally ignored; caller pre-loads all bars into _bt.bars
@@ -259,6 +268,7 @@ def get_recent_bars(symbol: str, days: int = 60) -> list[dict]:
         timeframe=TimeFrame.Day,
         start=start,
         end=end,
+        adjustment=Adjustment(adjustment),
     )
     bars = data().get_stock_bars(req)
     out = []
@@ -337,8 +347,9 @@ def historical_provider(bars_by_symbol=None, corporate_actions=None):
     class _NetworkAlpacaProvider(AlpacaHistoricalProvider):
         def _raw_bars(self, symbol: str) -> list[dict]:
             # Wide daily window; fetch() narrows to the requested range. Exceptions
-            # propagate (never swallowed into empty success).
-            return get_recent_bars(symbol, days=3650)
+            # propagate (never swallowed into empty success). Split+dividend adjusted
+            # so a multi-year series is continuous across corporate actions (§9).
+            return get_recent_bars(symbol, days=3650, adjustment="all")
 
     return _NetworkAlpacaProvider(corporate_actions=corporate_actions)
 

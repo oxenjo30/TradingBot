@@ -116,6 +116,71 @@ def test_acquire_never_crashes_without_credentials(monkeypatch):
         assert any("real data unavailable" in lim for lim in data.limitations)
 
 
+# ── split-gap integrity guard (source-adjusted real stock path) ─────────────────
+
+def _ds(closes):
+    """Minimal dataset-like object with a .bars list of daily closes."""
+    from datetime import date, timedelta
+    d0 = date(2020, 1, 1)
+    class _DS:
+        bars = [{"t": (d0 + timedelta(days=i)).isoformat() + "T00:00:00+00:00",
+                 "o": c, "h": c, "l": c, "c": c, "v": 1.0}
+                for i, c in enumerate(closes)]
+    return _DS()
+
+
+def test_detect_split_gap_clean_series_returns_empty():
+    """A split-ADJUSTED (continuous) series has no split-sized gap."""
+    # AAPL-like continuity across the 2020 split, adjusted: no >2x jump.
+    assert sr._detect_split_gap({"AAPL": _ds([124.8, 129.0, 134.2, 131.4])}) == ""
+
+
+def test_detect_split_gap_flags_raw_split():
+    """An UNADJUSTED 4:1 split (499 -> 134) is a ~0.27 ratio -> flagged."""
+    got = sr._detect_split_gap({"AAPL": _ds([499.2, 134.2, 131.4])})
+    assert got and "AAPL" in got
+
+
+def test_real_stock_forced_inconclusive_if_split_gap_present(monkeypatch):
+    """If the feed EVER returns an uncorrected split gap, the stock sleeve is forced
+    INCONCLUSIVE — the adjustment fix does not blindly trust the data."""
+    from server import alpaca_client
+
+    class _FakeProvider:
+        def fetch(self, req):
+            class _DS:
+                bars = _ds([499.2, 134.2, 131.4, 130.0]).bars  # raw split gap
+                fingerprint = "sha256:deadbeef"
+            return _DS()
+
+    monkeypatch.setattr(alpaca_client, "historical_provider", lambda: _FakeProvider())
+    monkeypatch.setattr(sr, "STOCK_UNIVERSE", ["AAPL"])
+    data = sr._try_real_stock(_reduced("stock"))
+    assert data.source == "real"
+    assert data.forced_inconclusive is True
+    assert any("gap" in lim.lower() for lim in data.limitations)
+
+
+def test_real_stock_not_forced_when_series_continuous(monkeypatch):
+    """A clean source-adjusted series lets the sleeve reach the statistical gate
+    (NOT force-inconclusive) — the whole point of the adjustment fix."""
+    from server import alpaca_client
+
+    class _FakeProvider:
+        def fetch(self, req):
+            class _DS:
+                bars = _ds([120.0 + i * 0.1 for i in range(60)]).bars  # smooth
+                fingerprint = "sha256:cafef00d"
+            return _DS()
+
+    monkeypatch.setattr(alpaca_client, "historical_provider", lambda: _FakeProvider())
+    monkeypatch.setattr(sr, "STOCK_UNIVERSE", ["AAPL"])
+    data = sr._try_real_stock(_reduced("stock"))
+    assert data.source == "real"
+    assert data.forced_inconclusive is False
+    assert any("split+dividend" in lim.lower() for lim in data.limitations)
+
+
 def test_safe_error_redacts_credential_like_tokens():
     """A recorded failure reason must never surface an API-key-like token, even if
     a third-party exception echoed one (defence-in-depth)."""
