@@ -91,3 +91,36 @@
   research_runs/research_attempts persist PASS/FAIL evidence; the API endpoints are
   READ-ONLY (GET). No strategy is enabled and no live state mutated — enabling is a
   separate Task 12 gated cutover.
+
+## 2026-07-11 - Task 11: honest INCONCLUSIVE is the win; force it in code
+
+- Insight: in this environment BOTH sleeves are INCONCLUSIVE and that is the CORRECT
+  deliverable. Alpaca creds decrypt to empty (len 0) → no stock data; Binance creds
+  raise "crypto not initialised — DB_SECRET_KEY missing or invalid" → no crypto data
+  (the documented DB_SECRET_KEY hazard: key-mismatch reads creds as invalid, NOT an
+  API outage). Never manufacture a green run to hide missing data.
+- Rule: the stock sleeve is bounded to INCONCLUSIVE even WITH creds, because the
+  network stock provider passes NO corporate_actions so bars are UNADJUSTED, and the
+  §7 universe has in-window splits (AAPL 4:1 2020, NVDA 4:1 2021 + 10:1 2024, AMZN
+  20:1 2022, GOOGL 20:1 2022). §19.13: a provider that can't supply point-in-time
+  split/dividend bars "cannot produce a passing stock research result."
+- Rule: honesty-over-optics must be ENFORCED IN CODE, not just prose. A synthetic /
+  data-limited sleeve sets SleeveData.forced_inconclusive=True and the runner
+  OVERRIDES the raw statistical gate — even a positive bootstrap lower bound reports
+  INCONCLUSIVE. Locked by test_forced_inconclusive_overrides_positive_interval.
+- Mistake: first synthetic fixture produced 0 trades (smooth low-drift sine), so the
+  "infrastructure demo" proved nothing. Cause 1: breakout needs close > prior-window
+  HIGH, but hi = close*1.012 inflated the high so a rising close could never exceed
+  it — nothing ever fired. Cause 2: drift too small for a 55/252-day breakout. Rule:
+  to make a trend strategy actually trade on synthetic bars, keep the intraday high
+  only marginally above close (e.g. *1.0008) and give a decisive drift + long cycle;
+  verify closed-trade count > 0 before trusting the demo.
+- Rule: a research/evidence script must be READ-ONLY on live state: persist=None,
+  open trading.db only mode=ro, never set_execution_ledger_mode / enable a strategy /
+  submit an order / cutover. Catch a missing-credential error and record INCONCLUSIVE
+  instead of crashing. Verify post-run: mode still shadow, strategies still disabled,
+  trading.db unmodified in git.
+- Rule (security): decrypted API key/secret must NEVER be interpolated into any
+  string, log, or exception — pass them only as positional args to the client. As
+  defence-in-depth against a third-party exception echoing request material, redact
+  any >=16-char alphanumeric run from any recorded failure reason (_safe_error).
