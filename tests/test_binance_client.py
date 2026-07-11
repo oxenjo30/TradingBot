@@ -522,3 +522,98 @@ class TestSyntheticMonotonicFills:
         with pytest.raises(SnapshotRegressionError):
             client.get_order_fills("111", symbol="BTC")
 
+
+
+class TestGetHistoricalBars:
+    """Paginated daily history (research path). Live get_recent_bars is untouched."""
+
+    def _make(self):
+        mock_ex = MagicMock()
+        mock_ex.load_markets.return_value = {}
+        mock_ex.markets = {"BTC/USDT": {}}
+        with patch("ccxt.binance", return_value=mock_ex):
+            from server.binance_client import BinanceAccountClient
+            c = BinanceAccountClient.__new__(BinanceAccountClient)
+            c._paper = True
+            c._exchange = mock_ex
+            return c, mock_ex
+
+    @staticmethod
+    def _page(start_ms, n):
+        day = 86_400_000
+        return [[start_ms + i * day, 1.0, 2.0, 0.5, 1.5, 100.0] for i in range(n)]
+
+    def test_paginates_past_1000_cap(self):
+        """Two full pages + a short page assemble into one ascending, de-duped series."""
+        c, ex = self._make()
+        day = 86_400_000
+        base = 1_600_000_000_000
+        page1 = self._page(base, 1000)
+        page2 = self._page(base + 1000 * day, 1000)
+        page3 = self._page(base + 2000 * day, 300)   # short -> stop
+
+        def fake_fetch(sym, tf, since=None, limit=None):
+            if since is None or since <= page1[0][0]:
+                return page1
+            if since <= page2[0][0]:
+                return page2
+            return page3
+        ex.fetch_ohlcv.side_effect = fake_fetch
+
+        bars = c.get_historical_bars("BTC/USDT", days=2300)
+        # 1000 + 1000 + 300, no duplicates, strictly ascending timestamps.
+        assert len(bars) == 2300
+        ts = [b["t"] for b in bars]
+        assert ts == sorted(ts)
+        assert len(set(ts)) == len(ts)
+
+    def test_dedupes_overlapping_pages(self):
+        """Overlapping page boundaries do not double-count a timestamp.
+
+        Models a realistic feed: fetch_ohlcv returns bars at/after `since`, and a
+        "sloppy" boundary that also re-serves the bar just before `since`. The true
+        continuous series is 1200 bars ending ~now; the overlap must be de-duped.
+        """
+        from datetime import datetime, timezone
+        c, ex = self._make()
+        day = 86_400_000
+        now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+        # 1200 daily bars ending ~today, so a days=1300 window captures all of them.
+        base = now_ms - 1200 * day
+        full = self._page(base, 1200)
+
+        def fake_fetch(sym, tf, since=None, limit=None):
+            rows = [r for r in full if since is None or r[0] >= since]
+            if since is not None:
+                prior = [r for r in full if r[0] < since]
+                if prior:
+                    rows = [prior[-1]] + rows      # boundary overlap to de-dup
+            return rows[:1000]
+        ex.fetch_ohlcv.side_effect = fake_fetch
+
+        bars = c.get_historical_bars("BTC/USDT", days=1300)
+        ts = [b["t"] for b in bars]
+        assert len(set(ts)) == len(ts)             # no duplicates despite overlap
+        assert len(bars) == 1200                   # exactly the true series length
+
+    def test_stops_when_no_forward_progress(self):
+        """A page that does not advance the cursor must not loop forever."""
+        c, ex = self._make()
+        base = 1_600_000_000_000
+        stuck = self._page(base, 1000)             # always same 1000, same last ts
+        ex.fetch_ohlcv.return_value = stuck        # never advances
+        bars = c.get_historical_bars("BTC/USDT", days=5000)
+        # bounded: returns the single page's worth, does not hang
+        assert len(bars) == 1000
+
+    def test_empty_feed_returns_empty(self):
+        c, ex = self._make()
+        ex.fetch_ohlcv.return_value = []
+        assert c.get_historical_bars("BTC/USDT", days=2200) == []
+
+    def test_live_get_recent_bars_still_single_call(self):
+        """Regression: the LIVE path makes exactly ONE fetch_ohlcv call, unpaginated."""
+        c, ex = self._make()
+        ex.fetch_ohlcv.return_value = self._page(1_600_000_000_000, 60)
+        c.get_recent_bars("BTC/USDT", days=60)
+        assert ex.fetch_ohlcv.call_count == 1

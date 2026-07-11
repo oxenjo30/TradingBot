@@ -64,9 +64,10 @@ def historical_provider(bars_by_symbol=None, corporate_actions=None, client=None
         def _raw_bars(self, symbol: str) -> list[dict]:
             if client is None:
                 raise ValueError("network binance historical_provider requires a client")
-            # Daily UTC bars; fetch() narrows to the requested range. Exceptions
-            # propagate (never swallowed into empty success).
-            return client.get_recent_bars(symbol, days=1000)
+            # Daily UTC bars going back ~7y, PAGINATED past Binance's 1000-bar cap so
+            # a 6y walk-forward has enough history. fetch() narrows to the requested
+            # range. Exceptions propagate (never swallowed into empty success).
+            return client.get_historical_bars(symbol, days=2600)
 
     return _NetworkBinanceProvider(corporate_actions=corporate_actions)
 
@@ -310,6 +311,42 @@ class BinanceAccountClient:
         out = []
         for row in ohlcv:
             ts_ms, o, h, l, c, v = row
+            t = datetime.fromtimestamp(ts_ms / 1000, tz=timezone.utc).isoformat()
+            out.append({"t": t, "o": float(o), "h": float(h),
+                        "l": float(l), "c": float(c), "v": float(v)})
+        return out
+
+    def get_historical_bars(self, symbol: str, days: int = 2200) -> list[dict]:
+        """Daily UTC bars going back `days`, PAGINATED past Binance's 1000-bar cap.
+
+        Research/backtest ONLY — the live signal path uses get_recent_bars (single
+        call). Binance limits fetch_ohlcv to 1000 rows per call, so a multi-year
+        window needs successive `since`-anchored pages. Rows are de-duplicated by
+        timestamp and returned sorted ascending, exactly the shape get_recent_bars
+        emits. Bounded by a hard page cap so a misbehaving feed cannot loop forever.
+        """
+        from datetime import datetime, timezone, timedelta
+        self._ensure_markets()
+        sym = _to_ccxt(symbol)
+        day_ms = 86_400_000
+        start_ms = int((datetime.now(timezone.utc) - timedelta(days=days)).timestamp() * 1000)
+        cursor = start_ms
+        by_ts: dict[int, list] = {}
+        # (days/1000) pages suffice; allow generous slack, but cap to stay finite.
+        max_pages = max(4, days // 900 + 4)
+        for _ in range(max_pages):
+            page = self._exchange.fetch_ohlcv(sym, "1d", since=cursor, limit=1000)
+            if not page:
+                break
+            for row in page:
+                by_ts[int(row[0])] = row
+            last_ts = int(page[-1][0])
+            if len(page) < 1000 or last_ts <= cursor:
+                break                      # reached the present or no forward progress
+            cursor = last_ts + day_ms      # next page starts after the last bar
+        out = []
+        for ts_ms in sorted(by_ts):
+            _, o, h, l, c, v = by_ts[ts_ms]
             t = datetime.fromtimestamp(ts_ms / 1000, tz=timezone.utc).isoformat()
             out.append({"t": t, "o": float(o), "h": float(h),
                         "l": float(l), "c": float(c), "v": float(v)})
