@@ -554,6 +554,31 @@ def init_db():
                 );
             """)
 
+    # Ledger schema versioning (Task 10, spec §19.8). The execution-ledger tables are
+    # part of SCHEMA above (always created), so a freshly initialized DB is at the
+    # current ledger schema version. Stamp it monotonically — never downgrade.
+    _stamp_ledger_schema_version()
+
+
+# Bump ONLY when a new ADDITIVE ledger migration step is added (kept in sync with
+# server.migration.LEDGER_SCHEMA_VERSION).
+LEDGER_SCHEMA_VERSION = 1
+_LEDGER_SCHEMA_VERSION_KEY = "ledger_schema_version"
+
+
+def get_ledger_schema_version() -> int:
+    """Return the recorded ledger schema version (0 if never stamped)."""
+    try:
+        return int(get_app_config(_LEDGER_SCHEMA_VERSION_KEY, "0") or "0")
+    except (TypeError, ValueError):
+        return 0
+
+
+def _stamp_ledger_schema_version() -> None:
+    """Stamp the ledger schema version, monotonically (never downgrade)."""
+    if get_ledger_schema_version() < LEDGER_SCHEMA_VERSION:
+        set_app_config(_LEDGER_SCHEMA_VERSION_KEY, str(LEDGER_SCHEMA_VERSION))
+
 
 def get_risk_settings() -> dict:
     with get_conn() as c:

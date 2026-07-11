@@ -17,7 +17,7 @@ from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from . import ai_explainer, ai_tuner, alpaca_client, auth, backtest as bt_mod, crypto, db, engine, execution_router, notifications, risk, scanner, sentiment, strategies, updater, version
+from . import ai_explainer, ai_tuner, alpaca_client, auth, backtest as bt_mod, crypto, db, engine, execution_router, migration, notifications, risk, scanner, sentiment, strategies, updater, version
 from .config import STATIC_DIR, BASE_DIR
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
@@ -1867,6 +1867,120 @@ def reset_losses(request: Request):
 def get_audit_log(request: Request, limit: int = 200, since: str | None = None, until: str | None = None):
     _require_auth(request)
     return db.list_audit(limit=min(limit, 500), since=since, until=until)
+
+
+# ── Migration / cutover (Task 10, spec §19.6, §19.7, §19.8) ─────────────────────
+#
+# READ endpoints are auth-only (any logged-in user can observe migration status).
+# MUTATING endpoints (adopt-owner, cutover, rollback) are OWNER-ONLY and, for
+# cutover, additionally GATED by every guard in migration.check_cutover_guards — the
+# switch to authoritative NEVER flips automatically. The default mode stays 'shadow'.
+
+class OwnerAdoptIn(BaseModel):
+    account_id: int
+    symbol: str
+    owner: str
+    qty: str
+    unexplained_qty: str
+    reason: str
+
+
+class CutoverIn(BaseModel):
+    account_ids: list[int]
+
+
+class RollbackIn(BaseModel):
+    account_ids: list[int]
+    archive_path: str
+
+
+def _golden_live_snapshot() -> dict:
+    """Build the live golden response snapshot the cutover guard compares against the
+    recorded baseline. Uses the public /api/health shape only (no broker network)."""
+    return {"health": {"ok": True,
+                       "setup_complete": auth.setup_complete(),
+                       "has_password": auth.password_is_set()}}
+
+
+@app.get("/api/migration/status")
+def migration_status(request: Request):
+    """Ledger migration status: schema version, mode, whether a backup/golden exists."""
+    _require_auth(request)
+    return {
+        "schema_version": db.get_ledger_schema_version(),
+        "target_schema_version": migration.LEDGER_SCHEMA_VERSION,
+        "execution_ledger_mode": execution_router.execution_ledger_mode(),
+        "automation_quiesced": execution_router.automation_quiesced(),
+        "has_backup_marker": migration.has_backup_marker(db),
+        "has_golden_fixtures": migration.get_golden_fixtures(db) is not None,
+    }
+
+
+@app.get("/api/migration/classify/{account_id}")
+def migration_classify(account_id: int, request: Request):
+    """Read-only bootstrap classification of an account's legacy inventory (§19.6).
+    Never writes lots; ownership is not inferred."""
+    _require_auth(request)
+    if db.get_broker_account(account_id) is None:
+        raise HTTPException(404, "account not found")
+    return migration.classify_bootstrap_inventory(db, account_id)
+
+
+@app.get("/api/migration/guards")
+def migration_guards(request: Request, account_ids: str = ""):
+    """Report which cutover guards currently pass/fail (§19.8). Read-only."""
+    _require_auth(request)
+    ids = [int(x) for x in account_ids.split(",") if x.strip().isdigit()]
+    if not ids:
+        ids = [a["id"] for a in db.get_broker_accounts()
+               if (a.get("account_type") or "paper") == "paper"]
+    return migration.check_cutover_guards(db, ids, golden_live=_golden_live_snapshot())
+
+
+@app.post("/api/migration/run-shadow/{account_id}")
+def migration_run_shadow(account_id: int, request: Request):
+    """Run the additive, rerunnable shadow migration for one account (owner only).
+    Classifies legacy inventory into quarantine lots; never auto-adopts (§19.6, §19.8)."""
+    _require_owner(request)
+    if db.get_broker_account(account_id) is None:
+        raise HTTPException(404, "account not found")
+    return migration.run_shadow_migration(db, account_id)
+
+
+@app.post("/api/migration/adopt-owner")
+def migration_adopt_owner(body: OwnerAdoptIn, request: Request):
+    """Adopt quarantined legacy inventory to a strategy owner (owner only, §19.6).
+    Requires evidence + exact account/symbol/qty/owner + audit reason; adopted qty
+    cannot exceed the unexplained reconciled amount."""
+    _require_owner(request)
+    try:
+        adopted = migration.adopt_owner(
+            db, account_id=body.account_id, symbol=body.symbol, owner=body.owner,
+            qty=body.qty, unexplained_qty=body.unexplained_qty, reason=body.reason)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return {"adopted": str(adopted)}
+
+
+@app.post("/api/migration/cutover")
+def migration_cutover(body: CutoverIn, request: Request):
+    """GATED atomic cutover to authoritative mode (owner only, §19.8). Refuses (409)
+    when any guard fails — the switch never flips automatically."""
+    _require_owner(request)
+    try:
+        return migration.perform_cutover(
+            db, body.account_ids, golden_live=_golden_live_snapshot())
+    except migration.CutoverBlocked as e:
+        raise HTTPException(409, str(e))
+
+
+@app.post("/api/migration/rollback")
+def migration_rollback(body: RollbackIn, request: Request):
+    """Post-cutover FORWARD-recovery rollback (owner only, §19.8). Quiesces automation,
+    restores shadow mode, and freezes accounts fail-closed until reconciliation passes."""
+    _require_owner(request)
+    return migration.rollback_forward_recovery(
+        db, body.account_ids, archive_path=body.archive_path)
 
 
 # ── Notifications ──────────────────────────────────────────────────────────────

@@ -4151,8 +4151,34 @@ async function initLogs() {
     fetchAudit();
   });
 
+  // ── Ledger migration status (Task 10, spec §19.8) ──────────────────────
+  // READ-ONLY observability. Renders into #migration-status only if that element
+  // exists on the page, so the dashboard is unaffected where it is absent. The
+  // execution ledger stays in SHADOW mode until an owner performs a gated cutover;
+  // this panel never triggers a cutover — it only reports state.
+  async function fetchMigrationStatus() {
+    const el = document.getElementById('migration-status');
+    if (!el) return;
+    try {
+      const s = await api('/api/migration/status', { key: 'migration-status' });
+      const mode = s.execution_ledger_mode || 'shadow';
+      const modeCls = mode === 'authoritative' ? 'b-enabled' : 'b-disabled';
+      el.innerHTML =
+        `<span class="badge ${modeCls}">mode: ${mode}</span> ` +
+        `<span class="badge b-disabled">schema v${s.schema_version}/${s.target_schema_version}</span> ` +
+        `<span class="badge ${s.automation_quiesced ? 'b-error' : 'b-disabled'}">` +
+        `automation ${s.automation_quiesced ? 'quiesced' : 'active'}</span> ` +
+        `<span class="badge ${s.has_backup_marker ? 'b-enabled' : 'b-notrun'}">` +
+        `backup ${s.has_backup_marker ? 'ready' : 'missing'}</span>`;
+    } catch (e) {
+      if (e.name === 'AbortError') return;
+      el.textContent = 'Migration status unavailable';
+    }
+  }
+
   createPoller(fetchSignals, 30_000).start();
   createPoller(fetchAudit,   60_000).start();
+  createPoller(fetchMigrationStatus, 60_000).start();
 }
 
 // initAiTuning — ai-tuning.html
