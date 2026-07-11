@@ -329,15 +329,26 @@ class TestOrchestration:
 class TestSelection:
     def test_max_calmar_subject_to_drawdown_cap(self):
         attempts = [
-            # this has the best Calmar but violates the 5% training DD cap
+            # best Calmar but violates the 20% training DD cap (equity-appropriate)
             {"params": {"breakout": 126, "volume": D("1.0"), "trail_atr": D("2.5")},
-             "calmar": D("9"), "max_drawdown": D("-0.08"), "turnover": D("1")},
-            # eligible, lower Calmar
+             "calmar": D("9"), "max_drawdown": D("-0.25"), "turnover": D("1")},
+            # eligible (within -20%), lower Calmar
             {"params": {"breakout": 252, "volume": D("1.2"), "trail_atr": D("3.0")},
-             "calmar": D("3"), "max_drawdown": D("-0.03"), "turnover": D("1")},
+             "calmar": D("3"), "max_drawdown": D("-0.12"), "turnover": D("1")},
         ]
         sel = rf.select_params(attempts)
         assert sel["params"]["breakout"] == 252  # the DD-compliant one wins
+
+    def test_drawdown_cap_admits_normal_equity_drawdown(self):
+        """A -7% training drawdown (normal for long-only equity) is ELIGIBLE under
+        the -20% cap — the mis-calibrated -5% cap rejected every equity strategy."""
+        attempts = [
+            {"params": {"lookback": 63, "abs_sma": 150, "top_k": 2},
+             "calmar": D("2"), "max_drawdown": D("-0.071"), "turnover": D("1")},
+        ]
+        sel = rf.select_params(attempts)
+        assert sel is not None
+        assert sel["params"]["top_k"] == 2
 
     def test_tie_break_prefers_lower_turnover(self):
         attempts = [
@@ -363,7 +374,7 @@ class TestSelection:
     def test_no_eligible_config_returns_none(self):
         attempts = [
             {"params": {"breakout": 252, "volume": D("1.2"), "trail_atr": D("3.0")},
-             "calmar": D("3"), "max_drawdown": D("-0.09"), "turnover": D("1")},
+             "calmar": D("3"), "max_drawdown": D("-0.25"), "turnover": D("1")},
         ]
         assert rf.select_params(attempts) is None
 

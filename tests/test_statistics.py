@@ -143,15 +143,15 @@ class TestAcceptanceCriteria:
         assert st.c2_positive_oos_return_stressed(D("0.01")) is True
         assert st.c2_positive_oos_return_stressed(D("-0.001")) is False
 
-    def test_c3_aggregate_drawdown_at_or_below_5pct(self):
-        # drawdown stored as a non-positive fraction
-        assert st.c3_aggregate_drawdown_ok(D("-0.05")) is True   # exactly 5%
-        assert st.c3_aggregate_drawdown_ok(D("-0.04")) is True
-        assert st.c3_aggregate_drawdown_ok(D("-0.0501")) is False
+    def test_c3_aggregate_drawdown_at_or_below_cap(self):
+        # drawdown stored as a non-positive fraction; equity-appropriate 20% cap
+        assert st.c3_aggregate_drawdown_ok(D("-0.20")) is True    # exactly 20%
+        assert st.c3_aggregate_drawdown_ok(D("-0.07")) is True    # normal equity DD
+        assert st.c3_aggregate_drawdown_ok(D("-0.2001")) is False
 
-    def test_c4_holdout_drawdown_at_or_below_5pct(self):
-        assert st.c4_holdout_drawdown_ok(D("-0.05")) is True
-        assert st.c4_holdout_drawdown_ok(D("-0.06")) is False
+    def test_c4_holdout_drawdown_at_or_below_cap(self):
+        assert st.c4_holdout_drawdown_ok(D("-0.20")) is True
+        assert st.c4_holdout_drawdown_ok(D("-0.25")) is False
 
     def test_c5_positive_in_at_least_60pct_of_folds(self):
         assert st.c5_fold_win_rate_ok([D("1"), D("1"), D("-1"), D("1"), D("1")]) is True  # 4/5=80%

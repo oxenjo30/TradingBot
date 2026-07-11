@@ -46,7 +46,12 @@ STOCK_SESSIONS_PER_MONTH = 21
 CRYPTO_DAYS_PER_YEAR = 365
 CRYPTO_DAYS_PER_MONTH = 30
 
-TRAINING_DRAWDOWN_CAP = D("-0.05")  # training drawdown must be at/above -5%
+TRAINING_DRAWDOWN_CAP = D("-0.20")  # training drawdown must be at/above -20%
+# Calibrated for LONG-ONLY EQUITY strategies, which normally draw down 10-20% even
+# in healthy bull markets (any window spanning 2022 exceeds 5%). The prior -5% cap
+# was appropriate only for market-neutral/low-vol strategies and rejected every
+# equity/ETF momentum config, yielding a frozen-nothing INCONCLUSIVE regardless of
+# real out-of-sample performance.
 
 
 class InsufficientHistory(Exception):

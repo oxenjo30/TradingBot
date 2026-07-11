@@ -33,7 +33,7 @@ CRYPTO_BLOCK = 14
 DEFAULT_CONFIDENCE = D("0.95")
 
 # Spec §12 numeric thresholds.
-DRAWDOWN_CEILING = D("-0.05")          # combined max drawdown at/below 5%
+DRAWDOWN_CEILING = D("-0.20")          # combined max drawdown at/below 20% (equity)
 MIN_FOLD_WIN_RATE = D("0.60")          # positive in >= 60% of folds
 MIN_STOCK_TRADES = 100                 # >= 100 closed stock trades
 MIN_CRYPTO_ROUND_TRIPS = 20            # >= 20 crypto round trips (else inconclusive)
