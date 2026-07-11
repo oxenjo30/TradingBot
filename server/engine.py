@@ -6,7 +6,7 @@ from dataclasses import replace as _dc_replace
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 
-from . import ai_explainer, ai_tuner, alpaca_client, crypto, db, notifications, risk, sentiment, strategies
+from . import ai_explainer, ai_tuner, alpaca_client, crypto, db, execution_router, notifications, risk, sentiment, strategies
 from .broker_factory import get_account_client
 
 log = logging.getLogger("engine")
@@ -59,6 +59,22 @@ def _run_take_profit_pass(acct_client, acct_id: int, take_profit_pct: float,
         reason = f"take-profit: {plpc:.2f}% >= {take_profit_pct:.2f}%"
         log.info("take-profit triggered %s acct %d (%.2f%% gain)", symbol, acct_id, plpc)
         try:
+            # Route take-profit through the ledger (§19.7). This sells ONLY the
+            # ORIGINAL opening strategy's OWNED quantity, never the full broker
+            # position (§4.3), and clamps to the strategy's sellable lots.
+            route = execution_router.route_take_profit(
+                broker=acct_client, account_id=acct_id, position=p,
+                take_profit_pct=take_profit_pct,
+            )
+            if route is not None and not route["legacy_authoritative"]:
+                # Authoritative mode: ledger submitted the clamped exit; skip the
+                # legacy broker submit + legacy P&L (moves behind confirmed fills).
+                db.log_signal("take_profit", symbol, "sell", qty,
+                              f"{reason} (ledger)", None, "acknowledged", account_id=acct_id)
+                local_positions.pop(symbol, None)
+                continue
+
+            # Shadow mode (default): legacy path stays authoritative — unchanged.
             import uuid
             client_oid = f"tp-{uuid.uuid4().hex[:12]}"
             order = acct_client.submit_market_order(
@@ -353,6 +369,38 @@ def run_tick():
                 # ── submit ──────────────────────────────────────────────────
                 client_oid = f"{s['name']}-{uuid.uuid4().hex[:12]}"
                 try:
+                    # Route automated orders through the execution ledger (§19.7).
+                    # Owner is the strategy name. In authoritative mode the ledger
+                    # submits ONCE and lots/P&L move behind CONFIRMED fills; the
+                    # legacy direct submit + legacy record_open_trade /
+                    # close_trade_and_record_perf are skipped (§19.8). In shadow mode
+                    # (default) the legacy path stays authoritative and we ADDITIONALLY
+                    # record an observation intent — live behavior is unchanged.
+                    route = execution_router.route_order(
+                        broker=acct_client, account_id=acct_id, owner=s["name"],
+                        symbol=sig.symbol, side=sig.side,
+                        qty=(str(final_qty) if not sig.notional and final_qty is not None else None),
+                        notional=(str(sig.notional) if sig.notional else None),
+                        client_order_id=client_oid,
+                    )
+                    if not route["legacy_authoritative"]:
+                        # Authoritative: ledger submitted; acknowledgement is NOT a
+                        # fill, so do NOT mutate lots/P&L here.
+                        eo = db.get_execution_order(route["order_id"])
+                        display_qty = final_qty if not sig.notional else sig.notional
+                        db.log_signal(s["name"], sig.symbol, sig.side, display_qty,
+                                      f"{sig.reason} (ledger)", eo.get("broker_order_id"),
+                                      (eo.get("state") or "").lower(),
+                                      account_id=acct_id, sentiment_score=sent_score)
+                        _last_run["signals"].append({
+                            "strategy": s["name"], "symbol": sig.symbol, "side": sig.side,
+                            "qty": final_qty, "reason": sig.reason,
+                            "order_id": eo.get("broker_order_id"),
+                        })
+                        db.reset_consecutive_losses()
+                        continue
+
+                    # Shadow mode below: legacy submit remains authoritative.
                     order = acct_client.submit_market_order(
                         sig.symbol, sig.side,
                         qty=final_qty if not sig.notional else None,

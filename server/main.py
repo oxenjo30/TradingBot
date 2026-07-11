@@ -17,7 +17,7 @@ from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from . import ai_explainer, ai_tuner, alpaca_client, auth, backtest as bt_mod, crypto, db, engine, notifications, risk, scanner, sentiment, strategies, updater, version
+from . import ai_explainer, ai_tuner, alpaca_client, auth, backtest as bt_mod, crypto, db, engine, execution_router, notifications, risk, scanner, sentiment, strategies, updater, version
 from .config import STATIC_DIR, BASE_DIR
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
@@ -828,6 +828,29 @@ def submit_order(o: OrderIn, request: Request):
     try:
         client = _get_broker_client(o.account_id)
         sym = o.symbol.upper()
+        # Route every manual order through the execution ledger (§19.7). Owner is
+        # "manual". In shadow mode (default) this records an observation intent and
+        # the legacy submit stays authoritative; in authoritative mode the ledger
+        # submits and the legacy direct submit below is skipped (§19.8).
+        route = execution_router.route_order(
+            broker=client, account_id=o.account_id, owner="manual", symbol=sym,
+            side=o.side,
+            qty=str(o.qty) if o.qty is not None else None,
+            notional=str(o.notional) if o.notional is not None else None,
+            order_type="limit" if (o.limit_price and o.qty) else "market",
+        )
+        if not route["legacy_authoritative"]:
+            # Authoritative mode: the ledger already submitted once. Do NOT submit
+            # again and do NOT run legacy acknowledgement bookkeeping.
+            order = db.get_execution_order(route["order_id"])
+            result = {"id": order.get("broker_order_id"),
+                      "status": (order.get("state") or "").lower(), "symbol": sym,
+                      "side": o.side}
+            label = f"manual ${o.notional:.2f}" if o.notional else "manual order"
+            notifications.notify_trade("manual", sym, o.side, o.qty, o.notional, label, result["id"])
+            return result
+
+        # Shadow mode (default): legacy path stays authoritative — unchanged behavior.
         if o.limit_price and o.qty:
             result = client.submit_limit_order(sym, o.side, o.qty, o.limit_price)
             label = f"manual limit @${o.limit_price:.2f}"
@@ -875,25 +898,52 @@ def cancel_all(request: Request, account_id: int | None = None):
     return {"ok": True}
 
 @app.delete("/api/positions/{symbol}")
-def close_pos(symbol: str, request: Request, account_id: int | None = None):
+def close_pos(symbol: str, request: Request, account_id: int | None = None,
+              owner: str | None = None):
     _require_auth(request)
+    # A manual close must name the owner(s) it affects (§19.7): explicit user closes
+    # affect only the selected owners, never another strategy's inventory.
+    owners = execution_router.parse_owners(owner)
+    if not owners:
+        raise HTTPException(400, "owner selection required (e.g. ?owner=sma_cross)")
     try:
-        _get_broker_client(account_id).close_position(symbol)
-        db.log_audit("position", f"manually closed {symbol}", f"account_id={account_id}")
-        return {"ok": True}
+        client = _get_broker_client(account_id)
+        # Record owner-scoped exit intents through the ledger (§19.7). Each exit sells
+        # only that owner's OWNED quantity of the symbol.
+        results = execution_router.route_owner_close(
+            broker=client, account_id=account_id, owners=owners, symbol=symbol)
+        # In shadow mode the legacy broker close stays authoritative for the actual
+        # position teardown; in authoritative mode the ledger has already submitted.
+        if results and results[0]["legacy_authoritative"]:
+            client.close_position(symbol)
+        db.log_audit("position", f"manually closed {symbol}",
+                     f"account_id={account_id} owners={','.join(owners)}")
+        return {"ok": True, "owners": owners, "exits": len(results)}
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(400, str(e))
 
 @app.delete("/api/positions")
-def close_all(request: Request, account_id: int | None = None):
+def close_all(request: Request, account_id: int | None = None,
+              owner: str | None = None):
     _require_auth(request)
+    # Close-all affects only the selected owner(s) unless the authenticated request
+    # explicitly names multiple owners (comma-separated) (§19.7).
+    owners = execution_router.parse_owners(owner)
+    if not owners:
+        raise HTTPException(400, "owner selection required (e.g. ?owner=sma_cross or ?owner=a,b)")
     client = _get_broker_client(account_id)
-    if hasattr(client, "close_all_positions"):
+    results = execution_router.route_owner_close(
+        broker=client, account_id=account_id, owners=owners, symbol=None)
+    # Shadow mode: legacy broker close stays authoritative. Only tear down the broker
+    # positions when the ledger is in shadow (legacy authoritative).
+    legacy = (not results) or results[0]["legacy_authoritative"]
+    if legacy and hasattr(client, "close_all_positions"):
         client.close_all_positions()
-    db.log_audit("position", "manually closed ALL positions", f"account_id={account_id}")
-    return {"ok": True}
+    db.log_audit("position", "manually closed positions",
+                 f"account_id={account_id} owners={','.join(owners)}")
+    return {"ok": True, "owners": owners, "exits": len(results)}
 
 @app.get("/api/quote/{symbol}")
 def quote(symbol: str, request: Request, account_id: int | None = None):
@@ -1607,6 +1657,23 @@ def webhook_signal(body: WebhookSignal, request: Request):
         raise HTTPException(502, f"Broker error: {e}")
 
     try:
+        # Route through the ledger with owner "webhook" (§19.7). In shadow mode
+        # (default) this records an observation intent and the legacy submit below
+        # stays authoritative; in authoritative mode the ledger submits once.
+        broker_for_route = acct_client or alpaca_client
+        route = execution_router.route_order(
+            broker=broker_for_route, account_id=body.account_id, owner="webhook",
+            symbol=body.symbol, side=body.side,
+            qty=str(body.qty) if body.qty is not None else None,
+            notional=str(body.notional) if body.notional is not None else None,
+        )
+        if not route["legacy_authoritative"]:
+            order = db.get_execution_order(route["order_id"])
+            db.log_signal(body.strategy, body.symbol, body.side, body.qty or 0,
+                          "webhook signal executed (ledger)", blocked=False,
+                          account_id=body.account_id)
+            return {"status": "executed", "order_id": order.get("broker_order_id")}
+
         if acct_client:
             result = acct_client.submit_market_order(body.symbol, body.side,
                                                      qty=body.qty, notional=body.notional)
@@ -1616,6 +1683,8 @@ def webhook_signal(body: WebhookSignal, request: Request):
         db.log_signal(body.strategy, body.symbol, body.side, body.qty or 0,
                       "webhook signal executed", blocked=False, account_id=body.account_id)
         return {"status": "executed", "order_id": result.get("id")}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(502, f"Order submission failed: {e}")
 
