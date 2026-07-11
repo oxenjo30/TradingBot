@@ -121,3 +121,76 @@ class Fill:
     fee: str
     fee_currency: str
     filled_at: str
+
+
+# ── Normalized broker status vocabulary (§5, §19.3) ─────────────────────────────
+#
+# Every adapter maps its broker-specific status words to a canonical OrderState.
+# Acknowledgement words (accepted/pending/new/open/acknowledged/held) map to
+# ACKNOWLEDGED — they are NEVER treated as fills (plan anti-pattern, §4.1).
+
+_STATUS_MAP: dict[str, OrderState] = {
+    # acknowledgement / working — NOT a fill
+    "accepted":          OrderState.ACKNOWLEDGED,
+    "pending":           OrderState.ACKNOWLEDGED,
+    "pending_new":       OrderState.ACKNOWLEDGED,
+    "new":               OrderState.ACKNOWLEDGED,
+    "open":              OrderState.ACKNOWLEDGED,
+    "acknowledged":      OrderState.ACKNOWLEDGED,
+    "held":              OrderState.ACKNOWLEDGED,
+    "calculated":        OrderState.ACKNOWLEDGED,
+    "accepted_for_bidding": OrderState.ACKNOWLEDGED,
+    # submitting
+    "submitting":        OrderState.SUBMITTING,
+    # partial
+    "partially_filled":  OrderState.PARTIALLY_FILLED,
+    "partial":           OrderState.PARTIALLY_FILLED,
+    "partial_fill":      OrderState.PARTIALLY_FILLED,
+    # fully filled — the ONLY states that count as filled
+    "filled":            OrderState.FILLED,
+    "closed":            OrderState.FILLED,   # ccxt: a fully-worked order is "closed"
+    "done_for_day":      OrderState.FILLED,
+    # cancel in flight
+    "pending_cancel":    OrderState.CANCEL_PENDING,
+    "canceling":         OrderState.CANCEL_PENDING,
+    "cancel_pending":    OrderState.CANCEL_PENDING,
+    # terminal cancel / reject / expire
+    "canceled":          OrderState.CANCELED,
+    "cancelled":         OrderState.CANCELED,
+    "rejected":          OrderState.REJECTED,
+    "error":             OrderState.REJECTED,
+    "expired":           OrderState.EXPIRED,
+    "suspended":         OrderState.EXPIRED,
+}
+
+
+def normalize_state(broker_status: str | None,
+                    *, filled_qty: Decimal | None = None,
+                    requested_qty: Decimal | None = None) -> OrderState:
+    """Map a broker status word to a canonical OrderState.
+
+    `filled_qty`/`requested_qty` refine an ambiguous "closed"/"done" status: a ccxt
+    order that is "closed" with a partial fill and a canceled remainder is CANCELED
+    with fills preserved, not FILLED. Unknown vocabularies fail closed to UNKNOWN so
+    the caller freezes rather than guessing (§16, §19.3)."""
+    key = (broker_status or "").strip().lower()
+    state = _STATUS_MAP.get(key)
+    if state is None:
+        return OrderState.UNKNOWN
+    # A "closed"/"filled" word with a short fill is not a full fill (§19.3):
+    #   - some quantity filled then the remainder canceled → CANCELED (fills kept)
+    #   - nothing filled at all → REJECTED (no economic execution occurred)
+    if (state is OrderState.FILLED and filled_qty is not None
+            and requested_qty is not None and filled_qty < requested_qty):
+        return OrderState.CANCELED if filled_qty > 0 else OrderState.REJECTED
+    return state
+
+
+def synthetic_fill_id(account_id: int, broker_order_id: str,
+                      cumulative_filled_qty: str, snapshot_version: int) -> str:
+    """Deterministic stable id for a synthetic monotonic fill delta (§19.4).
+
+    Keyed by (account_id, broker_order_id, cumulative_filled_qty, snapshot_version)
+    so the SAME cumulative snapshot always produces the SAME id — making synthetic
+    fills idempotent through the ledger's fill-identity uniqueness."""
+    return f"syn:{account_id}:{broker_order_id}:{cumulative_filled_qty}:{snapshot_version}"

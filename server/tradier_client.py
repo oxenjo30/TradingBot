@@ -16,6 +16,14 @@ PAPER_BASE = "https://sandbox.tradier.com/v1"
 LIVE_BASE  = "https://api.tradier.com/v1"
 
 
+class SnapshotRegressionError(Exception):
+    """A cumulative-fill snapshot regressed vs a prior snapshot (spec §19.4).
+
+    Tradier exposes only the aggregate cumulative executed quantity + average fill
+    price per order, so synthetic monotonic deltas are used. A shrinking cumulative
+    executed quantity is impossible under monotonicity and must freeze the account."""
+
+
 class TradierAccountClient:
     """
     Per-account Tradier client.  Same public interface as alpaca_client.AccountClient:
@@ -25,12 +33,19 @@ class TradierAccountClient:
       submit_market_order()   -> dict
     """
 
-    def __init__(self, api_key: str, api_secret: str, paper: bool):
+    # Tradier supports authoritative lookup by broker order id, and by client id via
+    # the order `tag` (our sanitized client order id round-trips through the API).
+    supports_authoritative_lookup = True
+
+    def __init__(self, api_key: str, api_secret: str, paper: bool, account_id: int | None = None):
         # Tradier uses a Bearer token; api_key is the access token, api_secret unused
         self._token = api_key
         self._paper = paper
         self._base  = PAPER_BASE if paper else LIVE_BASE
         self._account_id: str | None = None  # fetched lazily
+        self._db_account_id = account_id     # internal DB account id (for synthetic keys)
+        # broker_order_id -> (cumulative_exec_qty_text, snapshot_version)
+        self._synthetic_cursor: dict[str, tuple[str, int]] = {}
 
     # ── internal helpers ───────────────────────────────────────────────────
 
@@ -341,3 +356,114 @@ class TradierAccountClient:
             "next_close": clock.get("next_close", ""),
             "timestamp":  clock.get("timestamp", ""),
         }
+
+    # ── Normalized acknowledgement + fill lookup (Task 3, §5, §19.3, §19.4) ──────
+
+    @staticmethod
+    def _dtext(v) -> str:
+        from decimal import Decimal
+        from .execution_models import decimal_text
+        return decimal_text(Decimal(str(v if v is not None else 0)))
+
+    def _normalize_order(self, o: dict) -> dict:
+        """Map a Tradier order dict to the normalized acknowledgement shape (§5)."""
+        from decimal import Decimal
+        from .execution_models import normalize_state
+        filled = Decimal(str(o.get("exec_quantity", 0) or 0))
+        requested = Decimal(str(o.get("quantity", 0) or 0)) if o.get("quantity") else None
+        state = normalize_state(o.get("status"), filled_qty=filled, requested_qty=requested)
+        avg = o.get("avg_fill_price")
+        return {
+            "broker_order_id": str(o.get("id", "")),
+            "client_order_id": o.get("tag", "") or "",
+            "symbol":          o.get("symbol", ""),
+            "side":            str(o.get("side", "")).lower(),
+            "requested_qty":   self._dtext(o.get("quantity")) if o.get("quantity") else None,
+            "filled_qty":      self._dtext(filled),
+            "avg_price":       self._dtext(avg) if avg else None,
+            "state":           state.value,
+            "raw_status":      str(o.get("status", "")).lower(),
+        }
+
+    def get_order(self, order_id: str, symbol: str | None = None) -> dict | None:
+        acct_id = self._account_id_str()
+        try:
+            data = self._get(f"/accounts/{acct_id}/orders/{order_id}")
+        except Exception:
+            return None
+        o = data.get("order")
+        if not o or o == "null":
+            return None
+        return self._normalize_order(o)
+
+    def get_order_by_client_id(self, client_id: str, symbol: str | None = None) -> dict | None:
+        """Recovery lookup by client order id (§19.3). Tradier has no query-by-tag
+        endpoint, so scan the account's orders for a matching (sanitized) tag.
+
+        Returns the single normalized match, or None. Raises if MORE than one order
+        carries the same tag — the caller must freeze on an ambiguous match."""
+        target = self._clean_tag(client_id)
+        acct_id = self._account_id_str()
+        data = self._get(f"/accounts/{acct_id}/orders")
+        raw = data.get("orders", {})
+        if not raw or raw == "null":
+            return None
+        orders = raw.get("order", [])
+        if isinstance(orders, dict):
+            orders = [orders]
+        matches = [o for o in orders if (o.get("tag") or "") == target]
+        if not matches:
+            return None
+        if len(matches) > 1:
+            raise MultipleTradierOrdersError(client_id)
+        return self._normalize_order(matches[0])
+
+    def get_order_fills(self, order_id: str, since=None, symbol: str | None = None) -> list:
+        """Synthetic monotonic fill deltas from the order's cumulative exec quantity
+        + average fill price (§19.4). Tradier has no per-execution trade feed, so a
+        regressing cumulative snapshot raises SnapshotRegressionError (freeze)."""
+        from decimal import Decimal
+        from .execution_models import Fill, synthetic_fill_id
+        norm = self.get_order(order_id, symbol=symbol)
+        if not norm:
+            return []
+        cumulative = Decimal(norm["filled_qty"])
+        if cumulative <= 0:
+            return []
+        avg = norm.get("avg_price")
+        if getattr(self, "_synthetic_cursor", None) is None:
+            self._synthetic_cursor = {}
+        prev_text, version = self._synthetic_cursor.get(order_id, ("0", 0))
+        prev = Decimal(prev_text)
+        if cumulative < prev:
+            raise SnapshotRegressionError(
+                f"order {order_id} cumulative executed regressed {prev_text} -> "
+                f"{norm['filled_qty']} (account {self._db_account_id})"
+            )
+        if cumulative == prev:
+            return []
+        delta = cumulative - prev
+        acct = self._db_account_id if self._db_account_id is not None else 0
+        cum_text = norm["filled_qty"]
+        new_version = version + 1
+        fill = Fill(
+            broker_fill_id=synthetic_fill_id(acct, order_id, cum_text, new_version),
+            broker_order_id=str(order_id),
+            qty=self._dtext(delta),
+            price=avg if avg else "0",
+            fee="0",
+            fee_currency="USD",
+            filled_at=_now_micro(),
+        )
+        self._synthetic_cursor[order_id] = (cum_text, new_version)
+        return [fill]
+
+
+class MultipleTradierOrdersError(Exception):
+    """A client id (order tag) maps to more than one Tradier order — ambiguous."""
+
+
+def _now_micro() -> str:
+    """UTC ISO-8601 with microseconds (fallback fill timestamp)."""
+    from datetime import datetime, timezone
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f") + "Z"

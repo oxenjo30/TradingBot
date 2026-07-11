@@ -50,3 +50,6 @@ server/static/mockup-*.html
 backfill_perf.py
 check_db.py
 fix_encoding.py
+
+# Subagent scratch pytest dirs (locked; harmless)
+.pytest-task*/

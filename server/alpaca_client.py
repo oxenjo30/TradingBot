@@ -14,6 +14,11 @@ from .config import ALPACA_API_KEY, ALPACA_API_SECRET, PAPER
 _bt = threading.local()
 
 
+def _now_micro() -> str:
+    """UTC ISO-8601 with microseconds (fallback fill timestamp)."""
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f") + "Z"
+
+
 def _db_alpaca_creds() -> tuple[str, str, bool]:
     """Return (api_key, api_secret, paper) from the first Alpaca DB account.
     Falls back to .env values if no DB account exists or decryption fails."""
@@ -314,16 +319,31 @@ def get_portfolio_history(period: str = "1M", timeframe: str = "1D") -> dict:
     return r.json()
 
 
+class SnapshotRegressionError(Exception):
+    """A cumulative-fill snapshot regressed vs a prior snapshot (spec §19.4).
+
+    Alpaca exposes only aggregate cumulative filled qty + avg price per order (no
+    per-execution trade feed in the base SDK), so synthetic monotonic deltas are
+    used. A cumulative filled qty that shrinks between polls is impossible under
+    monotonicity and must freeze the account rather than emit a negative delta."""
+
+
 class AccountClient:
     """Per-account Alpaca client with the same interface as the module-level functions.
     get_account_summary() returns identical 11-key dict so risk.check_all() works unchanged.
     get_positions() returns 3 fields only (symbol, qty, side) — sufficient for engine sizing.
     """
 
-    def __init__(self, api_key: str, api_secret: str, paper: bool):
+    # Alpaca supports authoritative lookup by broker order id AND client order id.
+    supports_authoritative_lookup = True
+
+    def __init__(self, api_key: str, api_secret: str, paper: bool, account_id: int | None = None):
         self._t = TradingClient(api_key, api_secret, paper=paper)
         self._d = StockHistoricalDataClient(api_key, api_secret)
         self._paper = paper
+        self._account_id = account_id
+        # broker_order_id -> (cumulative_filled_qty_text, snapshot_version)
+        self._synthetic_cursor: dict[str, tuple[str, int]] = {}
 
     def get_account_summary(self) -> dict:
         a = self._t.get_account()
@@ -444,3 +464,91 @@ class AccountClient:
 
     def close_all_positions(self):
         self._t.close_all_positions(cancel_orders=True)
+
+    # ── Normalized acknowledgement + fill lookup (Task 3, §5, §19.3, §19.4) ──────
+
+    @staticmethod
+    def _dtext(v) -> str:
+        from decimal import Decimal
+        from .execution_models import decimal_text
+        return decimal_text(Decimal(str(v if v is not None else 0)))
+
+    def _normalize_order(self, o) -> dict:
+        """Map an Alpaca order object to the normalized acknowledgement shape (§5)."""
+        from decimal import Decimal
+        from .execution_models import normalize_state
+        filled = Decimal(str(o.filled_qty or 0))
+        requested = Decimal(str(o.qty)) if o.qty else None
+        status = str(o.status).lower().replace("orderstatus.", "")
+        state = normalize_state(status, filled_qty=filled, requested_qty=requested)
+        avg = o.filled_avg_price
+        return {
+            "broker_order_id": str(o.id),
+            "client_order_id": o.client_order_id or "",
+            "symbol":          o.symbol,
+            "side":            str(o.side).lower().replace("orderside.", ""),
+            "requested_qty":   self._dtext(o.qty) if o.qty else None,
+            "filled_qty":      self._dtext(filled),
+            "avg_price":       self._dtext(avg) if avg else None,
+            "state":           state.value,
+            "raw_status":      status,
+        }
+
+    def get_order(self, order_id: str, symbol: str | None = None) -> dict | None:
+        try:
+            o = self._t.get_order_by_id(order_id)
+        except Exception:
+            return None
+        return self._normalize_order(o) if o else None
+
+    def get_order_by_client_id(self, client_id: str, symbol: str | None = None) -> dict | None:
+        """Authoritative recovery lookup by client order id (§19.3)."""
+        try:
+            o = self._t.get_order_by_client_id(client_id)
+        except Exception:
+            return None
+        return self._normalize_order(o) if o else None
+
+    def get_order_fills(self, order_id: str, since=None, symbol: str | None = None) -> list:
+        """Synthetic monotonic fill deltas from the order's cumulative filled qty
+        + avg price (§19.4). Alpaca's base SDK has no per-execution trade feed, so a
+        regressing cumulative snapshot raises SnapshotRegressionError (freeze)."""
+        from decimal import Decimal
+        from .execution_models import Fill, synthetic_fill_id
+        try:
+            o = self._t.get_order_by_id(order_id)
+        except Exception:
+            return []
+        if not o:
+            return []
+        cumulative = Decimal(str(o.filled_qty or 0))
+        if cumulative <= 0:
+            return []
+        avg = o.filled_avg_price
+        if getattr(self, "_synthetic_cursor", None) is None:
+            self._synthetic_cursor = {}
+        prev_text, version = self._synthetic_cursor.get(order_id, ("0", 0))
+        prev = Decimal(prev_text)
+        if cumulative < prev:
+            raise SnapshotRegressionError(
+                f"order {order_id} cumulative filled regressed {prev_text} -> "
+                f"{self._dtext(cumulative)} (account {self._account_id})"
+            )
+        if cumulative == prev:
+            return []
+        delta = cumulative - prev
+        acct = self._account_id if self._account_id is not None else 0
+        cum_text = self._dtext(cumulative)
+        new_version = version + 1
+        at = o.filled_at.isoformat() if getattr(o, "filled_at", None) else _now_micro()
+        fill = Fill(
+            broker_fill_id=synthetic_fill_id(acct, order_id, cum_text, new_version),
+            broker_order_id=str(order_id),
+            qty=self._dtext(delta),
+            price=self._dtext(avg) if avg else "0",
+            fee="0",
+            fee_currency="USD",
+            filled_at=at,
+        )
+        self._synthetic_cursor[order_id] = (cum_text, new_version)
+        return [fill]

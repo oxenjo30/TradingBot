@@ -328,3 +328,197 @@ class TestOrderManagement:
         client = self._make(mock_ex)
         result = client.cancel_order("999")
         assert result["status"] == "canceled"
+
+
+# ── Task 3: normalized acknowledgement + fill lookup (spec §5, §19.3, §19.4) ─────
+
+class TestNormalizedLookup:
+    """get_order / get_order_by_client_id normalize the ccxt status vocabulary
+    through OrderState, and expose it as authoritative lookup for recovery."""
+
+    def setup_method(self):
+        import importlib, server.binance_client as m
+        importlib.reload(m)
+        self.BinanceAccountClient = m.BinanceAccountClient
+
+    def _make(self, mock_ex):
+        mock_ex.load_markets.return_value = {}
+        with patch("ccxt.binance", return_value=mock_ex):
+            c = self.BinanceAccountClient.__new__(self.BinanceAccountClient)
+            c._paper = True
+            c._exchange = mock_ex
+            c._account_id = 7
+            return c
+
+    def test_capability_flag_supports_authoritative_lookup(self):
+        mock_ex = MagicMock()
+        client = self._make(mock_ex)
+        assert client.supports_authoritative_lookup is True
+
+    def test_get_order_normalizes_open_status(self):
+        from server.execution_models import OrderState
+        mock_ex = MagicMock()
+        mock_ex.fetch_order.return_value = {
+            "id": "111", "clientOrderId": "cid-1", "symbol": "BTC/USDT",
+            "side": "buy", "amount": 0.01, "filled": 0.0, "average": None,
+            "status": "open",
+        }
+        client = self._make(mock_ex)
+        o = client.get_order("111", symbol="BTC")
+        assert o["state"] == OrderState.ACKNOWLEDGED.value
+        assert o["broker_order_id"] == "111"
+        assert o["filled_qty"] == "0"
+
+    def test_get_order_normalizes_closed_as_filled(self):
+        from server.execution_models import OrderState
+        mock_ex = MagicMock()
+        mock_ex.fetch_order.return_value = {
+            "id": "111", "clientOrderId": "cid-1", "symbol": "BTC/USDT",
+            "side": "buy", "amount": 0.01, "filled": 0.01, "average": 60000.0,
+            "status": "closed",
+        }
+        client = self._make(mock_ex)
+        o = client.get_order("111", symbol="BTC")
+        assert o["state"] == OrderState.FILLED.value
+
+    def test_get_order_by_client_id_returns_single_match(self):
+        mock_ex = MagicMock()
+        mock_ex.fetch_order.return_value = {
+            "id": "111", "clientOrderId": "cid-x", "symbol": "BTC/USDT",
+            "side": "buy", "amount": 0.01, "filled": 0.01, "average": 60000.0,
+            "status": "closed",
+        }
+        client = self._make(mock_ex)
+        o = client.get_order_by_client_id("cid-x", symbol="BTC")
+        assert o is not None
+        assert o["client_order_id"] == "cid-x"
+        # ccxt binance supports fetch by clientOrderId param
+        _, kwargs = mock_ex.fetch_order.call_args
+        assert kwargs.get("params", {}).get("origClientOrderId") == "cid-x" or \
+               "cid-x" in str(mock_ex.fetch_order.call_args)
+
+    def test_get_order_by_client_id_none_when_missing(self):
+        import ccxt
+        mock_ex = MagicMock()
+        mock_ex.fetch_order.side_effect = ccxt.OrderNotFound("not found")
+        client = self._make(mock_ex)
+        assert client.get_order_by_client_id("nope", symbol="BTC") is None
+
+
+class TestFillLookupRealExecutions:
+    """When the exchange exposes per-execution trades with stable ids, use them
+    directly as authoritative fills."""
+
+    def setup_method(self):
+        import importlib, server.binance_client as m
+        importlib.reload(m)
+        self.BinanceAccountClient = m.BinanceAccountClient
+
+    def _make(self, mock_ex):
+        mock_ex.load_markets.return_value = {}
+        with patch("ccxt.binance", return_value=mock_ex):
+            c = self.BinanceAccountClient.__new__(self.BinanceAccountClient)
+            c._paper = True
+            c._exchange = mock_ex
+            c._account_id = 7
+            return c
+
+    def test_get_order_fills_from_real_trades(self):
+        mock_ex = MagicMock()
+        mock_ex.fetch_order.return_value = {
+            "id": "111", "symbol": "BTC/USDT", "clientOrderId": "c",
+            "filled": 0.02, "average": 60000.0, "status": "closed", "side": "buy",
+            "amount": 0.02,
+        }
+        mock_ex.fetch_order_trades.return_value = [
+            {"id": "t1", "order": "111", "amount": 0.01, "price": 60000.0,
+             "fee": {"cost": 0.5, "currency": "USDT"},
+             "timestamp": 1718722800000},
+            {"id": "t2", "order": "111", "amount": 0.01, "price": 60010.0,
+             "fee": {"cost": 0.5, "currency": "USDT"},
+             "timestamp": 1718722801000},
+        ]
+        client = self._make(mock_ex)
+        fills = client.get_order_fills("111", symbol="BTC")
+        assert len(fills) == 2
+        assert fills[0].broker_fill_id == "t1"
+        assert fills[0].qty == "0.01"
+        assert fills[0].fee == "0.5"
+        assert fills[0].fee_currency == "USDT"
+
+
+class TestSyntheticMonotonicFills:
+    """When only aggregate cumulative filled qty + avg price is available (no
+    per-execution trades), emit deterministic monotonic synthetic deltas keyed by
+    (account_id, broker_order_id, cumulative_filled_qty, snapshot_version). A
+    regressing/conflicting cumulative snapshot must FREEZE (§19.4)."""
+
+    def setup_method(self):
+        import importlib, server.binance_client as m
+        importlib.reload(m)
+        self.BinanceAccountClient = m.BinanceAccountClient
+
+    def _make(self, mock_ex):
+        mock_ex.load_markets.return_value = {}
+        with patch("ccxt.binance", return_value=mock_ex):
+            c = self.BinanceAccountClient.__new__(self.BinanceAccountClient)
+            c._paper = True
+            c._exchange = mock_ex
+            c._account_id = 7
+            return c
+
+    def _order(self, filled, avg, status="open"):
+        return {
+            "id": "111", "symbol": "BTC/USDT", "clientOrderId": "c",
+            "filled": filled, "average": avg, "status": status, "side": "buy",
+            "amount": 0.03, "lastTradeTimestamp": 1718722800000,
+        }
+
+    def test_first_snapshot_emits_one_delta(self):
+        mock_ex = MagicMock()
+        mock_ex.fetch_order.return_value = self._order(0.01, 60000.0)
+        mock_ex.fetch_order_trades.return_value = []   # no per-execution data
+        client = self._make(mock_ex)
+        fills = client.get_order_fills("111", symbol="BTC")
+        assert len(fills) == 1
+        assert fills[0].qty == "0.01"
+        # synthetic id is deterministic and keyed by cumulative qty + snapshot version
+        assert "111" in fills[0].broker_fill_id
+
+    def test_growing_snapshot_emits_only_new_delta(self):
+        mock_ex = MagicMock()
+        mock_ex.fetch_order_trades.return_value = []
+        client = self._make(mock_ex)
+
+        mock_ex.fetch_order.return_value = self._order(0.01, 60000.0)
+        first = client.get_order_fills("111", symbol="BTC")
+        assert len(first) == 1
+
+        # cumulative grows to 0.03 → only the 0.02 delta is new
+        mock_ex.fetch_order.return_value = self._order(0.03, 60005.0, status="closed")
+        second = client.get_order_fills("111", symbol="BTC")
+        assert len(second) == 1
+        assert second[0].qty == "0.02"
+
+    def test_duplicate_snapshot_is_idempotent(self):
+        mock_ex = MagicMock()
+        mock_ex.fetch_order_trades.return_value = []
+        mock_ex.fetch_order.return_value = self._order(0.01, 60000.0)
+        client = self._make(mock_ex)
+        first = client.get_order_fills("111", symbol="BTC")
+        second = client.get_order_fills("111", symbol="BTC")   # identical snapshot
+        assert len(first) == 1
+        assert second == []           # no new deltas from a repeated snapshot
+
+    def test_regressing_snapshot_freezes(self):
+        from server.binance_client import SnapshotRegressionError
+        mock_ex = MagicMock()
+        mock_ex.fetch_order_trades.return_value = []
+        client = self._make(mock_ex)
+        mock_ex.fetch_order.return_value = self._order(0.03, 60000.0)
+        client.get_order_fills("111", symbol="BTC")
+        # cumulative filled qty DROPS → regression → must raise (freeze upstream)
+        mock_ex.fetch_order.return_value = self._order(0.01, 60000.0)
+        with pytest.raises(SnapshotRegressionError):
+            client.get_order_fills("111", symbol="BTC")
+

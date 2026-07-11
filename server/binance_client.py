@@ -9,6 +9,16 @@ from typing import Literal
 import ccxt
 
 
+class SnapshotRegressionError(Exception):
+    """A cumulative-fill snapshot regressed or conflicted with a prior snapshot.
+
+    When a broker exposes only monotonic cumulative filled quantity + avg price
+    (no per-execution trades), a later snapshot whose cumulative filled qty is
+    SMALLER than a previously-observed one is impossible under monotonicity. That
+    means the ledger and the broker disagree, so the account must freeze rather
+    than emit a negative/guessed synthetic delta (spec §19.4)."""
+
+
 def _to_ccxt(symbol: str) -> str:
     """Normalise bare ticker or concatenated pair to ccxt slash format.
 
@@ -29,15 +39,30 @@ def _from_ccxt(ccxt_symbol: str) -> str:
     return ccxt_symbol.split("/")[0]
 
 
+def _now_micro() -> str:
+    """UTC ISO-8601 with microseconds (fallback fill timestamp)."""
+    from datetime import datetime, timezone
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f") + "Z"
+
+
 class BinanceAccountClient:
     """
     Per-account Binance client. Same public interface as alpaca_client.AccountClient
     and tradier_client.TradierAccountClient.
     """
 
+    # Binance/ccxt exposes authoritative lookup by broker order id AND client order
+    # id (origClientOrderId) plus per-execution trades — so automation is supported
+    # (spec §19.4). The execution service gates on this flag.
+    supports_authoritative_lookup = True
+
     def __init__(self, api_key: str, api_secret: str, paper: bool, account_id: int | None = None):
         self._paper = paper
         self._account_id = account_id
+        # Highest cumulative filled qty seen per broker order id, for deterministic
+        # synthetic monotonic fill deltas when per-execution trades are unavailable
+        # (spec §19.4). Maps broker_order_id -> (cumulative_qty_text, snapshot_version).
+        self._synthetic_cursor: dict[str, tuple[str, int]] = {}
         self._exchange = ccxt.binance({
             "apiKey":  api_key,
             "secret":  api_secret,
@@ -398,3 +423,141 @@ class BinanceAccountClient:
                 self.submit_market_order(symbol, "sell", qty=p["qty"])
                 return
         raise ValueError(f"No open position for {symbol}")
+
+    # ── Normalized acknowledgement + fill lookup (Task 3, §5, §19.3, §19.4) ──────
+
+    @staticmethod
+    def _dtext(v) -> str:
+        from .execution_models import decimal_text
+        from decimal import Decimal
+        # ccxt returns floats; route through Decimal(str(...)) to avoid float noise.
+        return decimal_text(Decimal(str(v if v is not None else 0)))
+
+    def _normalize_order(self, o: dict) -> dict:
+        """Map a ccxt order dict to the normalized acknowledgement shape (§5)."""
+        from decimal import Decimal
+        from .execution_models import normalize_state
+        filled = Decimal(str(o.get("filled") or 0))
+        requested = Decimal(str(o.get("amount") or 0)) if o.get("amount") is not None else None
+        state = normalize_state(o.get("status"), filled_qty=filled, requested_qty=requested)
+        avg = o.get("average")
+        return {
+            "broker_order_id": str(o.get("id", "")),
+            "client_order_id": o.get("clientOrderId", "") or "",
+            "symbol":          _from_ccxt(o.get("symbol", "")),
+            "side":            str(o.get("side", "")).lower(),
+            "requested_qty":   self._dtext(o.get("amount")) if o.get("amount") is not None else None,
+            "filled_qty":      self._dtext(filled),
+            "avg_price":       self._dtext(avg) if avg else None,
+            "state":           state.value,
+            "raw_status":      str(o.get("status", "")).lower(),
+        }
+
+    def get_order(self, order_id: str, symbol: str | None = None) -> dict | None:
+        """Authoritative lookup by broker order id (§5). Returns None if not found."""
+        self._ensure_markets()
+        ccxt_sym = _to_ccxt(symbol) if symbol else None
+        try:
+            o = self._exchange.fetch_order(order_id, ccxt_sym)
+        except ccxt.OrderNotFound:
+            return None
+        return self._normalize_order(o) if o else None
+
+    def get_order_by_client_id(self, client_id: str, symbol: str | None = None) -> dict | None:
+        """Authoritative recovery lookup by client order id (§19.3).
+
+        Binance supports fetch by origClientOrderId. Returns the single normalized
+        order, or None if the exchange has no such order."""
+        self._ensure_markets()
+        ccxt_sym = _to_ccxt(symbol) if symbol else None
+        try:
+            o = self._exchange.fetch_order(None, ccxt_sym,
+                                           params={"origClientOrderId": client_id})
+        except ccxt.OrderNotFound:
+            return None
+        except Exception:
+            return None
+        if not o:
+            return None
+        return self._normalize_order(o)
+
+    def get_order_fills(self, order_id: str, since=None, symbol: str | None = None) -> list:
+        """Return authoritative fills for an order (§5, §19.4).
+
+        Preferred source: per-execution trades (stable trade ids). If the exchange
+        has no per-execution trades but the order shows cumulative filled quantity,
+        emit deterministic MONOTONIC synthetic deltas keyed by
+        (account_id, broker_order_id, cumulative_filled_qty, snapshot_version). A
+        cumulative snapshot that REGRESSES raises SnapshotRegressionError (freeze)."""
+        from decimal import Decimal
+        from datetime import datetime, timezone
+        from .execution_models import Fill, synthetic_fill_id
+
+        self._ensure_markets()
+        ccxt_sym = _to_ccxt(symbol) if symbol else None
+
+        # 1) Try authoritative per-execution trades.
+        trades = []
+        try:
+            trades = self._exchange.fetch_order_trades(order_id, ccxt_sym,
+                                                       since=since, params={}) or []
+        except Exception:
+            trades = []
+        if trades:
+            out = []
+            for t in trades:
+                ts = t.get("timestamp")
+                at = (datetime.fromtimestamp(ts / 1000, tz=timezone.utc)
+                      .strftime("%Y-%m-%dT%H:%M:%S.%f") + "Z") if ts else _now_micro()
+                feeobj = t.get("fee") or {}
+                out.append(Fill(
+                    broker_fill_id=str(t.get("id", "")),
+                    broker_order_id=str(t.get("order", order_id) or order_id),
+                    qty=self._dtext(t.get("amount")),
+                    price=self._dtext(t.get("price")),
+                    fee=self._dtext(feeobj.get("cost", 0)),
+                    fee_currency=str(feeobj.get("currency") or "USDT"),
+                    filled_at=at,
+                ))
+            return out
+
+        # 2) Synthetic monotonic deltas from cumulative filled snapshot (§19.4).
+        try:
+            o = self._exchange.fetch_order(order_id, ccxt_sym)
+        except Exception:
+            return []
+        if not o:
+            return []
+        cumulative = Decimal(str(o.get("filled") or 0))
+        if cumulative <= 0:
+            return []
+        avg = o.get("average")
+        if getattr(self, "_synthetic_cursor", None) is None:
+            self._synthetic_cursor = {}
+        prev_text, version = self._synthetic_cursor.get(order_id, ("0", 0))
+        prev = Decimal(prev_text)
+        if cumulative < prev:
+            raise SnapshotRegressionError(
+                f"order {order_id} cumulative filled regressed {prev_text} -> "
+                f"{self._dtext(cumulative)} (account {self._account_id})"
+            )
+        if cumulative == prev:
+            return []                        # duplicate snapshot → idempotent no-op
+        delta = cumulative - prev
+        acct = self._account_id if self._account_id is not None else 0
+        cum_text = self._dtext(cumulative)
+        new_version = version + 1
+        ts = o.get("lastTradeTimestamp") or o.get("timestamp")
+        at = (datetime.fromtimestamp(ts / 1000, tz=timezone.utc)
+              .strftime("%Y-%m-%dT%H:%M:%S.%f") + "Z") if ts else _now_micro()
+        fill = Fill(
+            broker_fill_id=synthetic_fill_id(acct, order_id, cum_text, new_version),
+            broker_order_id=str(order_id),
+            qty=self._dtext(delta),
+            price=self._dtext(avg) if avg else "0",
+            fee="0",
+            fee_currency="USDT",
+            filled_at=at,
+        )
+        self._synthetic_cursor[order_id] = (cum_text, new_version)
+        return [fill]

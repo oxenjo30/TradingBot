@@ -279,6 +279,16 @@ CREATE TABLE IF NOT EXISTS portfolio_risk_state (
     value              TEXT NOT NULL,
     updated_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f000Z','now'))
 );
+
+-- Per-account fill-ingestion watermark + overlap cursor (spec §19.13). The poller
+-- refetches a 24h overlap on every cycle; the watermark is the latest ingested
+-- fill time so downtime beyond retention can be detected and frozen.
+CREATE TABLE IF NOT EXISTS fill_watermarks (
+    account_id         INTEGER PRIMARY KEY,
+    watermark          TEXT NOT NULL,          -- latest ingested fill time (UTC ISO-8601)
+    overlap_cursor     TEXT,                   -- start of the last overlap window
+    updated_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f000Z','now'))
+);
 """
 
 RISK_DEFAULTS = {
@@ -2187,6 +2197,75 @@ def insert_fill_and_apply_fifo(order_id: int, *, broker_fill_id: str, qty: str,
         raise
     finally:
         c.close()
+
+
+# ── Fill-ingestion watermark + overlap cursor (Task 3, §19.13) ──────────────────
+
+def get_fill_watermark(account_id: int) -> str | None:
+    """Latest ingested fill time for an account, or None if never polled."""
+    with get_conn() as c:
+        r = c.execute("SELECT watermark FROM fill_watermarks WHERE account_id=?",
+                      (account_id,)).fetchone()
+    return r["watermark"] if r else None
+
+
+def set_fill_watermark(account_id: int, watermark: str,
+                       overlap_cursor: str | None = None) -> None:
+    """Advance the account's fill-ingestion watermark. Monotonic: never moves
+    backward, so a late fill inside the overlap window cannot rewind the cursor."""
+    now = _utc_micro()
+    with get_conn() as c:
+        existing = c.execute("SELECT watermark FROM fill_watermarks WHERE account_id=?",
+                             (account_id,)).fetchone()
+        if existing is not None and existing["watermark"] >= watermark:
+            # Keep the higher watermark; still refresh the overlap cursor/timestamp.
+            c.execute(
+                "UPDATE fill_watermarks SET overlap_cursor=?, updated_at=? WHERE account_id=?",
+                (overlap_cursor, now, account_id))
+            return
+        c.execute(
+            "INSERT INTO fill_watermarks(account_id, watermark, overlap_cursor, updated_at) "
+            "VALUES(?,?,?,?) ON CONFLICT(account_id) DO UPDATE SET "
+            "watermark=excluded.watermark, overlap_cursor=excluded.overlap_cursor, "
+            "updated_at=excluded.updated_at",
+            (account_id, watermark, overlap_cursor, now))
+
+
+# ── Late fee adjustments (Task 3, §19.5 — fills are immutable; fees append) ──────
+
+def append_fee_adjustment(*, account_id: int, broker_fill_id: str, fee: str,
+                          fee_currency: str = "USD", reason: str | None = None) -> int:
+    """Append a fee correction to an existing fill (§19.5). Fills are immutable, so a
+    late fee is a NEW fee_adjustments row, never an overwrite of the original fee."""
+    from .execution_models import decimal_text
+    with get_conn() as c:
+        r = c.execute(
+            "SELECT id FROM execution_fills WHERE account_id=? AND broker_fill_id=?",
+            (account_id, broker_fill_id)).fetchone()
+        if r is None:
+            raise ValueError(f"no fill {broker_fill_id!r} on account {account_id}")
+        cur = c.execute(
+            "INSERT INTO fee_adjustments(execution_fill_id, fee, fee_currency, reason) "
+            "VALUES(?,?,?,?)",
+            (r["id"], decimal_text(fee), fee_currency, reason))
+        return cur.lastrowid
+
+
+def get_fill_total_fee(*, account_id: int, broker_fill_id: str):
+    """Total fee for a fill: original fill fee + all appended adjustments (Decimal)."""
+    from decimal import Decimal
+    with get_conn() as c:
+        r = c.execute(
+            "SELECT id, fee FROM execution_fills WHERE account_id=? AND broker_fill_id=?",
+            (account_id, broker_fill_id)).fetchone()
+        if r is None:
+            raise ValueError(f"no fill {broker_fill_id!r} on account {account_id}")
+        total = Decimal(r["fee"])
+        adj = c.execute("SELECT fee FROM fee_adjustments WHERE execution_fill_id=?",
+                        (r["id"],)).fetchall()
+    for a in adj:
+        total += Decimal(a["fee"])
+    return total
 
 
 # ── Strategy-owned lots, reservations, and entry prices (Task 2, §4.3, §19.5) ────
