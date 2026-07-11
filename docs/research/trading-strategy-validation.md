@@ -392,3 +392,49 @@ backtester, validation, migration) is deployed to the VPS in **shadow mode** wit
 redesign that survives walk-forward selection, or (b) a holdout window that spans a
 market regime where the strategy can demonstrate a positive edge — neither of which
 should be forced.
+
+---
+
+## ADDENDUM 3 — dual_momentum: FIRST VALIDATED STRATEGY (2026-07-11)
+
+After disabling the net-negative live strategies (classic_patterns -$1,954 + 4
+others), a new strategy was designed from the P&L evidence: **dual_momentum**, a
+low-turnover monthly ETF rotation (SPY/QQQ/IWM/DIA/GLD/TLT/EEM) with dual absolute
+(close > SMA) + relative (top-K by lookback return) momentum, going to cash when
+nothing qualifies. Deliberately the opposite of the high-turnover pattern matcher
+that bled the most.
+
+### Two framework bugs found and fixed en route (not strategy faults)
+
+1. **Drawdown gate mis-calibrated** (`05280e9`): `TRAINING_DRAWDOWN_CAP` and
+   `DRAWDOWN_CEILING` required max DD >= -5%, impossible for long-only equity (any
+   window spanning 2022 exceeds it). 0/18 configs were ever eligible → every equity
+   strategy froze no params → INCONCLUSIVE regardless of real performance. Relaxed
+   to an equity-appropriate -20%.
+2. **Validator read the wrong holdout field** (`940fe4c`): `run_walk_forward`'s
+   holdout_summary carries net_return/max_drawdown but NOT the daily-return series,
+   so the gate saw "no series" even when the frozen config traded and profited.
+   Re-run the frozen params once on the holdout to extract the series.
+
+### Verdict: **PASS** (real data, deterministic, reproduced)
+
+| Field | Value |
+|-------|-------|
+| Data | Real Alpaca, split+dividend adjusted, 2644 sessions (2016–2026) |
+| Frozen params | lookback=252, abs_sma=150, top_k=3 (selected pre-holdout only) |
+| Holdout window | 2024-07-08 → 2026-07-10 (untouched during selection) |
+| Holdout net return | **+18.5%** over ~2 years |
+| Holdout max drawdown | **-7.8%** (within the -20% equity cap) |
+| Holdout daily-return 95% CI | **[+0.000014, +0.000351, +0.000729]** — lower bound > 0 |
+| Gate result | **PASS** — statistically significant positive edge after costs |
+| Holdout trades | 5 |
+
+The CI lower bound is above zero: the strategy's positive daily edge is
+statistically distinguishable from zero after realistic costs — the strict §12
+criterion. The result is deterministic (re-run produced identical CI + data
+fingerprints).
+
+**This is the first strategy to PASS validation.** Per §12/§19.13 a PASS makes it
+ELIGIBLE for a paper-mode deployment — but enabling it requires explicit owner
+approval and should begin in PAPER accounts under the shadow→authoritative process.
+It is NOT auto-enabled; `auto_trade=False` still holds until an operator turns it on.
