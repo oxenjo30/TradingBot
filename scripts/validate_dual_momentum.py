@@ -231,16 +231,32 @@ def main(argv=None):
         extra = {"frozen_params": {k: str(v) for k, v in (wf.frozen_params or {}).items()},
                  "sessions": len(cal), "attempts": len(wf.attempts),
                  "fingerprints": fps}
-        holdout = wf.holdout or {}
-        dr = holdout.get("daily_returns") if isinstance(holdout, dict) else None
-        if dr:
-            lo, pt, hi = S.moving_block_bootstrap_ci(dr, S.STOCK_BLOCK, seed=7)
-            ci = (lo, pt, hi)
-            verdict = S.classify_ci(lo, hi).value.upper()
-            reason = f"holdout 95% CI = [{lo:.6f}, {pt:.6f}, {hi:.6f}]"
+        # run_walk_forward's holdout_summary carries only net_return/max_drawdown —
+        # NOT the daily-return series. To score the §12 gate we must RE-RUN the
+        # frozen params on the holdout window (exactly once) and extract the series
+        # ourselves (mirrors run_strategy_research.py). This is not a second peek:
+        # the freeze already selected params without touching the holdout.
+        if wf.frozen_params is not None:
+            plan = R.build_folds(cal, geo)
+            h = bt(params=wf.frozen_params, window=plan.holdout,
+                   from_cash=True, role="holdout")
+            dr = h["daily_returns"]
+            extra["holdout_net_return"] = str(h["net_return"])
+            extra["holdout_trades"] = len(h["trades"])
+            if dr:
+                lo, pt, hi = S.moving_block_bootstrap_ci(dr, S.STOCK_BLOCK, seed=7)
+                ci = (lo, pt, hi)
+                # Drawdown criterion still applies: a PASS also needs holdout DD
+                # within the equity-appropriate ceiling (§12.4).
+                dd_ok = S.c4_holdout_drawdown_ok(h["max_drawdown"])
+                base_verdict = S.classify_ci(lo, hi).value.upper()
+                verdict = base_verdict if (base_verdict != "PASS" or dd_ok) else "INCONCLUSIVE"
+                reason = (f"holdout 95% CI = [{lo:.6f}, {pt:.6f}, {hi:.6f}]; "
+                          f"holdout DD={h['max_drawdown']} ({'ok' if dd_ok else 'exceeds cap'})")
+            else:
+                reason = "frozen params took no holdout trades (no return series)"
         else:
-            reason = ("no holdout series (walk-forward froze no params or the "
-                      "frozen params took no holdout trades)")
+            reason = "walk-forward selection froze no params (no config was eligible)"
     except R.InsufficientHistory as exc:
         reason = f"insufficient history: {exc}"
     except Exception as exc:  # noqa: BLE001
