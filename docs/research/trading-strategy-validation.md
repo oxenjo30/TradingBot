@@ -298,3 +298,57 @@ test-first; the rest is cited evidence.
 
 **Net:** one Important issue (credential-adjacent redaction) found and fixed
 test-first; all other lenses passed with cited evidence.
+
+---
+
+## ADDENDUM — Real-data run on the VPS (2026-07-11)
+
+The initial Task 11 run fell back to synthetic fixtures on the local machine
+(no decryptable broker credentials). This addendum records the **real-data**
+run executed on the production VPS, which has working broker credentials and
+`DB_SECRET_KEY`. Three fixes were required to reach real data, each committed:
+
+1. **Split/dividend adjustment** (`6b8183f`) — `get_recent_bars` now supports
+   `adjustment` (default `raw`, live path unchanged); the research provider pulls
+   `adjustment='all'`. Verified: AAPL's 2020-08-31 4:1 split is continuous
+   (124.81 → 129.04 → 134.18), not a fabricated ~73% gap. `_detect_split_gap`
+   re-forces INCONCLUSIVE if any uncorrected split-sized gap remains.
+2. **`init_crypto()` in the runner** (`0ce7b51`) — the standalone script never
+   initialised Fernet, so every `crypto.decrypt()` failed and both sleeves fell
+   back to synthetic even with valid credentials.
+3. **History window + graceful shortfall** (`586c228`) — the fetch window clipped
+   ~5 months of the daily history Alpaca actually holds; widened to capture the
+   full series (2644 stock sessions, 2016-01-04 → 2026-07-10). `run_sleeve` now
+   catches `InsufficientHistory` and reports that sleeve INCONCLUSIVE instead of
+   aborting the whole run.
+
+### Real-data verdicts
+
+| Sleeve | Data | Sessions | Verdict | Reason |
+|--------|------|----------|---------|--------|
+| Stock  | REAL (Alpaca, split+div adjusted) | 2644 (2016–2026), 4 folds | **INCONCLUSIVE** | Walk-forward selection (§19.10) froze NO parameter set across all 4 folds → no holdout series. |
+| Crypto | REAL (Binance) | 1000 (~2.75y) | **INCONCLUSIVE** | Binance client caps at 1000 daily bars; the 6y walk-forward needs ≥ 2190. Needs history pagination. |
+
+### What the stock result means (the honest answer)
+
+- The strategy **does trade and can be profitable** in isolation: the most
+  permissive grid point (breakout=126) took 179 pre-holdout trades for **+31.9%**
+  net and 22 holdout trades.
+- BUT the **walk-forward's own out-of-sample selection rule rejected every
+  parameter set** — none cleared the Calmar/drawdown/turnover selection thresholds
+  on the training folds — so `frozen_params = None` and there is no scored holdout.
+- Even a what-if evaluation of breakout=126 on the holdout gives a 95% daily-return
+  CI of **[-0.000057, +0.000206]** → spans zero → **INCONCLUSIVE** by the §12 gate.
+  The edge is not statistically distinguishable from zero after costs.
+
+**Conclusion:** on real, split-adjusted, 10-year data, the §7 liquid-stock trend
+strategy is **NOT validated** — it is INCONCLUSIVE, not a proven winner. Per
+§12/§19.13 it **remains disabled**. This is consistent with the live observation
+that the stock engine rarely trades. No strategy is enabled by this run.
+
+### Remaining work for a scored crypto verdict
+
+`binance_client.get_recent_bars` passes `limit=days` to a single `fetch_ohlcv`
+call, which Binance caps at 1000. A real 6-year crypto walk-forward requires
+paginating with the `since` parameter across multiple calls. Until then the
+crypto sleeve is INCONCLUSIVE on data-coverage grounds, not on merit.
